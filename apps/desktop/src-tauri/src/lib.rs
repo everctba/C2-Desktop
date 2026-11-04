@@ -106,6 +106,7 @@ async fn workspace_reindex(
             limit,
             only_path: None,
             dry_run: false,
+            ..IndexOptions::default()
         };
         let report =
             indexer::run(&workspace, &config, &client, &options, |_| {}).map_err(|err| err.to_string())?;

@@ -220,6 +220,7 @@ name = "c2-core"
 version = "0.1.0"
 dependencies = [
  "ignore",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
