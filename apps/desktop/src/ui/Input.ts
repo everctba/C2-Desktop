@@ -6,6 +6,8 @@ export interface InputProps {
   label?: string;
   size?: "sm" | "md";
   mono?: boolean;
+  readOnly?: boolean;
+  hint?: string;
   onInput?: (value: string) => void;
   onEnter?: (value: string) => void;
 }
@@ -28,6 +30,10 @@ export function Input(props: InputProps = {}): { root: HTMLElement; input: HTMLI
   input.placeholder = props.placeholder ?? "";
   if (props.value) input.value = props.value;
   if (props.mono) input.style.fontFamily = "var(--font-mono)";
+  if (props.readOnly) {
+    input.readOnly = true;
+    input.style.opacity = "0.75";
+  }
 
   if (props.onInput) {
     input.addEventListener("input", () => props.onInput?.(input.value));
@@ -39,5 +45,14 @@ export function Input(props: InputProps = {}): { root: HTMLElement; input: HTMLI
   }
 
   root.appendChild(input);
+
+  if (props.hint) {
+    const hint = document.createElement("span");
+    hint.className = styles.label;
+    hint.style.textTransform = "none";
+    hint.style.letterSpacing = "0";
+    hint.textContent = props.hint;
+    root.appendChild(hint);
+  }
   return { root, input };
 }

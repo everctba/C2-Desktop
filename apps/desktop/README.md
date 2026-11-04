@@ -69,6 +69,20 @@ apps/desktop/
     └── tauri.conf.json
 ```
 
+## Configurações
+
+A rota **Config** (engrenagem no rail) edita o `.c2/config.json` do projeto:
+
+- **Workspace**: extensões indexadas, diretórios excluídos, tamanho máximo por
+  arquivo e por execução, links por arquivo, `.gitignore`, política de segredos
+  (`skip`/`mask`).
+- **Runtime**: caminho do `.gguf` (com seletor), host/porta, contexto, camadas na
+  GPU, threads, temperatura, `max_tokens`, timeout, tentativas, raciocínio,
+  fallback LM Studio, polling e arquivos por ciclo do engine.
+
+Cada campo alterado é gravado pela mesma API do Core (`config set`), com
+validação; o rodapé mostra quantos campos foram salvos e o runtime só usa
+contexto/camadas novos no próximo carregamento do modelo.
 ## Selecionar modelo (`.gguf`)
 
 Na tela **Projetos**, o card *Modelo* tem o botão **Selecionar .gguf…**:

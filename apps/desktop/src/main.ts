@@ -11,6 +11,7 @@ import { Input } from "./ui/Input";
 import { loadingBar, memoryBar } from "./ui/MemoryBar";
 import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
+import { renderSettings } from "./views/Settings";
 import type { View } from "./views/view";
 
 const app = document.getElementById("app")!;
@@ -392,6 +393,18 @@ function render(): void {
           onPlay: () => void toggleEngine(),
           onStop: () => void toggleEngine(),
           onReindex: (full: boolean) => void runReindex(full),
+        });
+        break;
+      case "settings":
+        view = await renderSettings({
+          root: state.root,
+          status: state.status,
+          onSaved: () =>
+            void (async () => {
+              await loadStatus();
+              render();
+            })(),
+          onPickProject: () => void pickProject(),
         });
         break;
       case "search":
