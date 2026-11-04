@@ -94,3 +94,32 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+## Código: contexto antes de leitura (C2)
+
+Este projeto é indexado pelo **C2**: cada arquivo tem um `<arquivo>.c2.json` ao
+lado com `what`, `why`, `goal`, `summary`, `responsibility` e `links[]`.
+
+Antes de ler código: `c2 status` → `c2 grep "<tarefa>" --limit 5` → ler o
+`.c2.json` do candidato → `c2 related <arquivo>` → `c2 read <arquivo> --lines A:B`.
+Metadado é hipótese; código é evidência; divergência pede `c2 reindex`.
+
+Protocolo completo: [docs/agent-protocol.md](docs/agent-protocol.md) ·
+Versão curta para colar em regras de agente: [docs/agent-snippet.md](docs/agent-snippet.md).
+
+## Build & Test
+
+```bash
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+```
+
+## Architecture Overview
+
+Um núcleo, múltiplas interfaces: `c2-core` (biblioteca Rust, sem UI) + `c2-cli`
+(binário `c2`) + desktop Tauri + servidor MCP, todos consumindo a mesma API do
+Core. Metadados em `<arquivo>.c2.json` ao lado do código, índice incremental por
+SHA-256, inferência local via `llama-server` supervisionado. Sem banco de dados,
+sem embeddings no MVP. Decisões em `bd show c2-dec1..c2-dec6`; backlog em `bd ready`.
