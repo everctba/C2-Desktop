@@ -1,0 +1,56 @@
+/* Tree row — 28px, indentação 14px por nível (§8.8) */
+.row {
+  display: flex;
+  align-items: center;
+  height: var(--tree-row-h, 28px);
+  padding-left: var(--space-m);
+  padding-right: var(--space-l);
+  gap: var(--space-2xs);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  border-radius: 8px;
+  transition:
+    background 80ms ease,
+    color 80ms ease,
+    opacity 80ms ease;
+  min-width: 0;
+}
+
+.row:hover {
+  background: var(--overlay-10);
+  color: var(--text);
+}
+
+.selected {
+  background: var(--overlay-10);
+  color: var(--text);
+}
+
+.row:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.primary {
+  color: var(--text);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.secondary {
+  color: var(--text-subtle);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.badge {
+  flex-shrink: 0;
+}

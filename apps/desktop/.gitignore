@@ -1,0 +1,7 @@
+# frontend
+node_modules/
+dist/
+
+# tauri
+src-tauri/target/
+src-tauri/gen/

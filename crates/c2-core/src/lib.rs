@@ -16,6 +16,7 @@ pub mod schema;
 pub mod search;
 pub mod security;
 pub mod state;
+pub mod status;
 pub mod workspace;
 
 pub use config::Config;

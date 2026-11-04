@@ -1,0 +1,50 @@
+/* Input — o único componente que usa borda (§8.2) */
+.input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--overlay-20);
+  border-radius: var(--input-radius);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.input::placeholder {
+  color: var(--text-disabled);
+}
+
+.input:hover {
+  border-color: var(--overlay-30);
+}
+
+.input:focus {
+  border-color: var(--overlay-50);
+  box-shadow: var(--shadow-input-focus);
+}
+
+.sm {
+  min-height: 28px;
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text-xs);
+}
+
+.md {
+  min-height: 32px;
+  padding: var(--space-xs) var(--space-m);
+  font-size: var(--text-s);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2xs);
+  width: 100%;
+}
+
+.label {
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}

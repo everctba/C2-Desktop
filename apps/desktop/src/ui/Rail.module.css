@@ -1,0 +1,82 @@
+/* Rail de 48px — navegação primária (§9) */
+.rail {
+  width: 48px;
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-m) 0;
+  gap: var(--space-2xs);
+  z-index: 55;
+}
+
+.item {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  border-radius: var(--radius);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.item:hover {
+  background: var(--overlay-10);
+  color: var(--text);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.active {
+  background: var(--overlay-10);
+  color: var(--text);
+}
+
+/* barra de seleção no accent do workspace */
+.active::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  inset-block: 9px;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-1);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.label {
+  position: absolute;
+  left: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-body);
+  color: var(--text-bright);
+  border: 1px solid var(--overlay-5);
+  border-radius: var(--tooltip-radius);
+  padding: var(--space-2xs) var(--space-s);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease;
+  z-index: var(--tooltip-z-index);
+}
+
+.item:hover .label,
+.item:focus-visible .label {
+  opacity: 1;
+}

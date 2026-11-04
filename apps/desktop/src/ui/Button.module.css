@@ -1,0 +1,120 @@
+/* Button — 4 variantes × 5 tamanhos (§8.1) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3xs);
+  border: 0;
+  border-radius: var(--input-radius);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}
+
+.primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+}
+.primary:hover {
+  background: var(--btn-primary-bg-hover);
+}
+.primary:active {
+  background: var(--btn-primary-bg-active);
+}
+
+.secondary {
+  background: var(--overlay-10);
+  color: var(--text-muted);
+}
+.secondary:hover {
+  background: var(--overlay-20);
+  color: var(--text);
+}
+.secondary:active {
+  background: var(--overlay-30);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+.ghost:hover {
+  background: var(--overlay-10);
+  color: var(--text);
+}
+.ghost:active {
+  background: var(--overlay-20);
+}
+
+.destructive {
+  background: var(--danger-10);
+  color: var(--danger);
+}
+.destructive:hover {
+  opacity: 0.9;
+}
+
+.micro {
+  height: 18px;
+  padding: 0 var(--space-3xs);
+  font-size: var(--text-2xs);
+}
+.xs {
+  height: 22px;
+  padding: 0 var(--space-xs);
+  font-size: var(--text-2xs);
+}
+.sm {
+  height: 26px;
+  padding: 0 var(--space-s);
+  font-size: var(--text-xs);
+}
+.md {
+  height: 32px;
+  padding: var(--space-xs) var(--space-xl);
+  font-size: var(--text-s);
+}
+.lg {
+  height: 44px;
+  padding: 0 var(--space-2xl);
+  font-size: var(--text-m);
+}
+
+.iconOnly.sm {
+  width: 28px;
+  padding: 0;
+}
+.iconOnly.md {
+  width: 34px;
+  padding: 0;
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

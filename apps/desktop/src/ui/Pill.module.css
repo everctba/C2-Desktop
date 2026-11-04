@@ -1,0 +1,53 @@
+/* TagPill (§8.7) — fundo 10% do accent, texto na cor cheia */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  border-radius: var(--radius);
+  background: linear-gradient(0deg, var(--pill-bg), transparent);
+  color: var(--pill-color);
+  font-weight: 620;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.xs {
+  min-height: 18px;
+  padding: var(--space-px) var(--space-xs);
+  font-size: var(--text-2xs);
+}
+
+.sm {
+  min-height: 20px;
+  padding: 0 var(--space-s);
+  font-size: var(--text-xs);
+}
+
+.neutral {
+  background: var(--overlay-10);
+  color: var(--text-muted);
+}
+
+.success {
+  background: var(--success-10);
+  color: var(--success);
+}
+
+.warning {
+  background: var(--warning-10);
+  color: var(--warning);
+}
+
+.danger {
+  background: var(--danger-10);
+  color: var(--danger);
+}
+
+:global(.dot) {
+  flex-shrink: 0;
+}

@@ -1,0 +1,41 @@
+/* Card — sem borda, raio 16, separado por gap (§8.3) */
+.card {
+  background: var(--bg-surface-2);
+  border: 0;
+  border-radius: var(--card-radius);
+  padding: var(--space-3xl) var(--space-3xl) var(--space-2xl);
+  display: grid;
+  gap: var(--space-xs);
+  transition: background 150ms ease;
+  min-width: 0;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:hover {
+  background: var(--bg-surface-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s);
+  min-width: 0;
+}
+
+.body {
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  color: var(--text-subtle);
+  font-size: var(--text-2xs);
+}
