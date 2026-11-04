@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/c2-core", "crates/c2-cli"]
-exclude = ["apps/desktop/src-tauri"]
+exclude = ["apps/desktop/src-tauri", "examples/bench-ab/loja"]
 
 [workspace.package]
 version = "0.1.0"
