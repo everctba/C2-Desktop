@@ -12,9 +12,11 @@ Toda a lógica vem de `c2-core` — aqui não há regra de indexação duplicada
 | Rust com **MSVC** | instalar Visual Studio Build Tools (bead `c2-e14.1`) e rodar `rustup default stable-x86_64-pc-windows-msvc` |
 | WebView2 | já vem no Windows 10/11 |
 
-> No Windows sem MSVC, o desktop **não compila** (Tauri depende do `link.exe`).
-> O frontend, porém, roda no navegador com dados falsos (`pnpm dev`), o que
-> permite validar o design antes de instalar o Build Tools.
+> Nesta máquina o MSVC já está instalado (VS 2019 Build Tools em
+> `E:\VSBuildTools2019` + Windows SDK 10.0.19041 em `E:\Windows Kits\10`,
+> com `rustup default stable-x86_64-pc-windows-msvc`). Numa máquina nova,
+> instale o Build Tools antes — o frontend, porém, roda no navegador com dados
+> falsos (`pnpm dev`) mesmo sem ele.
 
 ## Desenvolvimento
 

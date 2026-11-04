@@ -118,21 +118,35 @@ cargo fmt --all -- --check
 
 ## Toolchain no Windows
 
-Esta máquina **não tem MSVC** (Visual Studio Build Tools). O build usa o
-toolchain GNU com o `rust-lld` e as libs self-contained que já vêm com o Rust —
-ver [.cargo/config.toml](.cargo/config.toml). Não precisa instalar nada além de
-ter `dlltool` de 64 bits no PATH (w64devkit).
+Esta máquina **tem MSVC** (instalado em 2026-11-04):
+
+| Item | Caminho |
+|---|---|
+| MSVC 14.29 (VS 2019 Build Tools 16.11) | `E:\VSBuildTools2019` |
+| Windows SDK 10.0.19041 | `E:\Windows Kits\10` |
+| Toolchain Rust padrão | `stable-x86_64-pc-windows-msvc` |
 
 ```bash
-rustup default stable-x86_64-pc-windows-gnu
-rustup component add clippy rustfmt --toolchain stable-x86_64-pc-windows-gnu
+rustup default stable-x86_64-pc-windows-msvc
+cargo build --workspace                                  # host MSVC (padrão)
+cargo build --workspace --target x86_64-pc-windows-gnu   # alternativa GNU
 ```
 
-Atenção: `D:\MinGW\bin` (MinGW.org 6.3, 32-bit) *não* serve — precisa vir depois
-de `I:\P\Vim\w64devkit\bin` no PATH, senão o `dlltool` errado quebra o link.
+O alvo GNU continua configurado em [.cargo/config.toml](.cargo/config.toml)
+(rust-lld + libs self-contained) e exige `dlltool` de 64 bits no PATH
+(w64devkit). `D:\MinGW\bin` (MinGW.org 6.3, 32-bit) quebra o link GNU —
+mantenha `I:\P\Vim\w64devkit\bin` antes no PATH.
 
-O desktop Tauri (`c2-e14`) exige MSVC: instale o Visual Studio Build Tools e
-rode `rustup default stable-x86_64-pc-windows-msvc`.
+Histórico da instalação: o VS 2022 foi recusado (Windows 10 build 19041 não é
+mais suportado pelo instalador 17.14); usamos o VS 2019 16.11. O instalador
+falhava com `Error 1327 Invalid Drive: J:` porque `KitsRoot10` apontava para um
+drive inexistente — corrigido por `scripts/fix-sdk-kits2.ps1`.
+
+O desktop (`apps/desktop`) compila e roda com esse toolchain:
+
+```bash
+cd apps/desktop && pnpm install && pnpm tauri dev
+```
 
 ## Architecture Overview
 
