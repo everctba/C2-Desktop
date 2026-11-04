@@ -1,0 +1,88 @@
+/* Barra de memoria do modal de carga (estilo LM Studio, tokens do DS). */
+.bar {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-4);
+  overflow: hidden;
+}
+
+.segment {
+  height: 100%;
+  transition: width 150ms ease;
+}
+
+.model {
+  background: var(--accent-3);
+}
+
+.kv {
+  background: var(--accent-8);
+}
+
+.overhead {
+  background: var(--bg-surface-5);
+}
+
+.overflow {
+  background: var(--danger);
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-s);
+  flex-wrap: wrap;
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.totals {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-s);
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+}
+
+.warning {
+  color: var(--warning);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.ok {
+  color: var(--success);
+}
+
+.indeterminate {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--overlay-10) 0%, var(--overlay-40) 50%, var(--overlay-10) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

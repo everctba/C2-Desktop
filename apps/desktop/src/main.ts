@@ -5,7 +5,11 @@ import { Toolbar } from "./ui/Toolbar";
 import type { StatusReport } from "./types";
 import { renderEngine } from "./views/Engine";
 import { modelInstructions, renderProjects } from "./views/Projects";
-import { dialogField, openDialog } from "./ui/Dialog";
+import { createDialog, dialogField, openDialog } from "./ui/Dialog";
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
+import { loadingBar, memoryBar } from "./ui/MemoryBar";
+import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
 import type { View } from "./views/view";
 
@@ -144,6 +148,170 @@ async function ensureModel(): Promise<boolean> {
   }
 }
 
+/**
+ * Antes de iniciar o engine: se o runtime não estiver no ar, abre o modal de
+ * carga na GPU (contexto, camadas e barra de VRAM) — estilo LM Studio.
+ */
+async function ensureModelLoaded(): Promise<boolean> {
+  if (!state.root) return false;
+  await loadStatus();
+  if (state.status?.runtime.healthy) return true;
+
+  let plano: Awaited<ReturnType<typeof api.runtimePlan>>;
+  try {
+    plano = await api.runtimePlan(state.root);
+  } catch (error) {
+    await openDialog({
+      title: "Não foi possível planejar a carga",
+      body: dialogField("Erro", String(error), true),
+      confirmLabel: "Entendi",
+      cancelLabel: "",
+    });
+    return false;
+  }
+
+  return await new Promise<boolean>((resolve) => {
+    let settled = false;
+    const handle = createDialog({
+      title: "Carregar modelo na GPU",
+      onClose: () => {
+        if (!settled) {
+          settled = true;
+          resolve(false);
+        }
+      },
+    });
+    const concluir = (valor: boolean) => {
+      if (settled) return;
+      settled = true;
+      handle.close();
+      resolve(valor);
+    };
+
+    handle.body.appendChild(
+      dialogField(
+        `${plano.gguf.name ?? "modelo"} · ${plano.gguf.quantization}`,
+        plano.gguf.path,
+        true,
+      ),
+    );
+
+    const gpuRow = document.createElement("div");
+    gpuRow.style.display = "flex";
+    gpuRow.style.gap = "var(--space-2xs)";
+    gpuRow.style.flexWrap = "wrap";
+    gpuRow.appendChild(
+      Pill(
+        plano.gpu
+          ? `${plano.gpu.name} · ${(plano.gpu.total_mb / 1024).toFixed(1)} GB (${(plano.gpu.free_mb / 1024).toFixed(1)} livres)`
+          : "GPU não detectada — o modelo vai para a CPU",
+        plano.gpu ? "neutral" : "warning",
+        "xs",
+      ),
+    );
+    handle.body.appendChild(gpuRow);
+
+    const campos = document.createElement("div");
+    campos.style.display = "grid";
+    campos.style.gridTemplateColumns = "1fr 1fr";
+    campos.style.gap = "var(--space-s)";
+
+    const ctxField = Input({
+      label: "contexto (tokens)",
+      value: String(plano.ctx_size),
+      size: "sm",
+      mono: true,
+    });
+    const layersField = Input({
+      label: "camadas na GPU (0 = CPU)",
+      value: String(plano.gpu_layers),
+      size: "sm",
+      mono: true,
+    });
+    campos.append(ctxField.root, layersField.root);
+    handle.body.appendChild(campos);
+
+    const barra = document.createElement("div");
+    barra.appendChild(memoryBar(plano.estimate));
+    handle.body.appendChild(barra);
+
+    const erro = document.createElement("div");
+    erro.style.color = "var(--danger)";
+    erro.style.fontSize = "var(--text-2xs)";
+    erro.style.display = "none";
+    handle.body.appendChild(erro);
+
+    let recalculo: number | undefined;
+    const recalcular = () => {
+      window.clearTimeout(recalculo);
+      recalculo = window.setTimeout(async () => {
+        const ctx = Number.parseInt(ctxField.input.value, 10);
+        const camadas = Number.parseInt(layersField.input.value, 10);
+        if (!Number.isFinite(ctx) || ctx < 512) return;
+        if (!Number.isFinite(camadas) || camadas < 0) return;
+        try {
+          const novo = await api.runtimePlan(state.root, ctx, camadas);
+          barra.replaceChildren(memoryBar(novo.estimate));
+        } catch {
+          /* mantém a barra anterior */
+        }
+      }, 250);
+    };
+    ctxField.input.addEventListener("input", recalcular);
+    layersField.input.addEventListener("input", recalcular);
+
+    let btnCancelar: HTMLButtonElement;
+    let btnCarregar: HTMLButtonElement;
+
+    const carregar = async () => {
+      const ctx = Number.parseInt(ctxField.input.value, 10);
+      const camadas = Number.parseInt(layersField.input.value, 10);
+      if (!Number.isFinite(ctx) || ctx < 512) {
+        erro.textContent = "Contexto inválido (mínimo 512 tokens).";
+        erro.style.display = "block";
+        return;
+      }
+      if (!Number.isFinite(camadas) || camadas < 0) {
+        erro.textContent = "Camadas na GPU inválidas.";
+        erro.style.display = "block";
+        return;
+      }
+
+      btnCancelar.disabled = true;
+      btnCarregar.disabled = true;
+      btnCarregar.textContent = "Carregando…";
+      erro.style.display = "none";
+      barra.replaceChildren(loadingBar());
+
+      try {
+        await api.modelLoad(state.root, ctx, camadas);
+        await loadStatus();
+        log(`modelo carregado na GPU (ctx ${ctx}, ${camadas} camadas)`);
+        concluir(true);
+      } catch (error) {
+        erro.textContent = String(error);
+        erro.style.display = "block";
+        btnCancelar.disabled = false;
+        btnCarregar.disabled = false;
+        btnCarregar.textContent = "Carregar na GPU";
+        barra.replaceChildren(memoryBar(plano.estimate));
+      }
+    };
+
+    btnCancelar = Button({
+      label: "Cancelar",
+      variant: "ghost",
+      onClick: () => concluir(false),
+    });
+    btnCarregar = Button({
+      label: "Carregar na GPU",
+      variant: "primary",
+      onClick: () => void carregar(),
+    });
+    handle.footer.append(btnCancelar, btnCarregar);
+  });
+}
+
 async function toggleEngine(): Promise<void> {
   if (!state.root) return;
   state.busy = true;
@@ -155,6 +323,7 @@ async function toggleEngine(): Promise<void> {
       log("engine parado");
     } else {
       if (!(await ensureModel())) return;
+      if (!(await ensureModelLoaded())) return;
       await api.engineStart(state.root);
       state.running = true;
       log("engine iniciado");

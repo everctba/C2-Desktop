@@ -9,6 +9,7 @@ import type {
   FileEntry,
   Hit,
   ModelInspection,
+  RuntimePlan,
   IndexReport,
   InitResult,
   MetaFile,
@@ -47,6 +48,10 @@ export function onEngineEvent(
 
 export const api = {
   initialRoot: () => invoke<string | null>("initial_root"),
+  runtimePlan: (root: string, ctxSize?: number, gpuLayers?: number) =>
+    invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
+  modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
+    invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),
@@ -215,6 +220,34 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
     case "initial_root":
+      return null as T;
+    case "runtime_plan":
+      return {
+        gguf: {
+          path: String(args?.root ?? "") + "/modelo.gguf",
+          size_bytes: 3412060300,
+          version: 3,
+          tensor_count: 601,
+          architecture: "gemma4",
+          name: "Gemma 4 E2B",
+          quantization: "Q4_K_M",
+          file_type: null,
+        },
+        gpu: { name: "NVIDIA GeForce RTX 4060 Ti", total_mb: 8188, used_mb: 320, free_mb: 7868 },
+        ctx_size: Number(args?.ctxSize ?? 8192),
+        gpu_layers: Number(args?.gpuLayers ?? 99),
+        estimate: {
+          model_mb: 3256,
+          kv_mb: Number(args?.ctxSize ?? 8192) / 8192 * 716,
+          overhead_mb: 162,
+          total_mb: 3256 + 162 + 256 + (Number(args?.ctxSize ?? 8192) / 8192) * 716,
+          available_mb: 7868,
+          fit: "fits",
+        },
+        loaded: false,
+      } as T;
+    case "model_load":
+      await delay(1500);
       return null as T;
     case "model_inspect":
     case "model_set":

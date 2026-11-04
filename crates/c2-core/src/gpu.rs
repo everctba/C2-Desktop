@@ -45,6 +45,52 @@ pub fn detect() -> Option<GpuInfo> {
     })
 }
 
+/// Estimativa de memoria para carregar o modelo com um contexto.
+#[derive(Debug, Clone, Serialize)]
+pub struct UsageEstimate {
+    /// Peso do arquivo do modelo.
+    pub model_mb: u64,
+    /// KV cache estimado para o contexto pedido.
+    pub kv_mb: u64,
+    /// Overhead de runtime/contexto CUDA/Vulkan.
+    pub overhead_mb: u64,
+    /// Total estimado.
+    pub total_mb: u64,
+    /// VRAM livre no momento (0 quando nao ha GPU detectada).
+    pub available_mb: u64,
+    pub fit: VramFit,
+}
+
+/// Estima o uso de VRAM: pesos + overhead (5%) + KV cache + 256 MiB fixos.
+///
+/// O KV cache e aproximado por proporcao: um modelo de 3,2 GB com 8k de
+/// contexto consome ~0,7 GB, ou seja `ctx/8192 * model_mb * 0,22`. E uma
+/// heuristica de triagem para a barra da UI, nao uma medida do llama.cpp.
+pub fn estimate_usage(size_bytes: u64, ctx_size: u32, gpu: Option<&GpuInfo>) -> UsageEstimate {
+    let model_mb = size_bytes / (1024 * 1024);
+    let overhead_mb = (model_mb / 20).max(64);
+    let kv_mb = ((ctx_size as f64 / 8192.0) * (model_mb as f64 * 0.22)).round() as u64;
+    let total_mb = model_mb + overhead_mb + kv_mb + 256;
+    let available_mb = gpu.map(|gpu| gpu.free_mb).unwrap_or(0);
+
+    let free_com_folga = available_mb.saturating_sub(available_mb / 10);
+    let fit = match gpu {
+        None => VramFit::Unknown,
+        Some(_) if total_mb <= free_com_folga => VramFit::Fits,
+        Some(_) if total_mb <= available_mb => VramFit::Tight,
+        Some(_) => VramFit::TooBig,
+    };
+
+    UsageEstimate {
+        model_mb,
+        kv_mb,
+        overhead_mb,
+        total_mb,
+        available_mb,
+        fit,
+    }
+}
+
 /// Veredito de encaixe do modelo na VRAM livre.
 ///
 /// Estimativa: tamanho do arquivo + 10% de overhead + 512 MiB para o KV cache
@@ -85,6 +131,25 @@ mod tests {
             used_mb: 0,
             free_mb,
         }
+    }
+
+    #[test]
+    fn estimativa_cresce_com_contexto() {
+        let tamanho = 3_200 * 1024 * 1024;
+        let gpu_ = gpu(8000);
+        let curto = estimate_usage(tamanho, 4096, Some(&gpu_));
+        let longo = estimate_usage(tamanho, 16384, Some(&gpu_));
+        assert!(longo.kv_mb > curto.kv_mb);
+        assert!(longo.total_mb > curto.total_mb);
+        assert!(curto.total_mb > curto.model_mb);
+        assert_eq!(curto.available_mb, 8000);
+    }
+
+    #[test]
+    fn estimativa_sem_gpu_e_unknown() {
+        let estimativa = estimate_usage(1024 * 1024 * 1024, 8192, None);
+        assert_eq!(estimativa.fit, VramFit::Unknown);
+        assert_eq!(estimativa.available_mb, 0);
     }
 
     #[test]

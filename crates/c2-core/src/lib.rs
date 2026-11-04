@@ -24,7 +24,7 @@ pub mod workspace;
 pub use config::Config;
 pub use error::{C2Error, Result};
 pub use gguf::GgufInfo;
-pub use gpu::{GpuInfo, VramFit};
+pub use gpu::{GpuInfo, UsageEstimate, VramFit};
 pub use indexer::{IndexOptions, IndexReport};
 pub use llm::{Generated, LlmClient, SemanticProvider};
 pub use schema::{Link, MetaFile, Semantic};

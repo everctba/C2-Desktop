@@ -72,6 +72,24 @@ export interface ModelInspection {
   fit: VramFit;
 }
 
+export interface UsageEstimate {
+  model_mb: number;
+  kv_mb: number;
+  overhead_mb: number;
+  total_mb: number;
+  available_mb: number;
+  fit: VramFit;
+}
+
+export interface RuntimePlan {
+  gguf: GgufInfo;
+  gpu: GpuInfo | null;
+  ctx_size: number;
+  gpu_layers: number;
+  estimate: UsageEstimate;
+  loaded: boolean;
+}
+
 export interface StatusReport {
   root: string;
   initialized: boolean;

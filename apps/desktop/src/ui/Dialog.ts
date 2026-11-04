@@ -9,72 +9,114 @@ export interface DialogOptions {
   destructive?: boolean;
 }
 
+export interface DialogHandle {
+  element: HTMLElement;
+  body: HTMLElement;
+  footer: HTMLElement;
+  /** Fecha o dialog (dispara `onClose`). */
+  close: () => void;
+}
+
+interface CreateOptions {
+  title: string;
+  onClose?: () => void;
+}
+
 /**
- * Dialog modal (§8.5). Resolve `true` no confirmar e `false` no cancelar
- * (botão, Escape ou clique no backdrop).
+ * Cria um dialog modal (§8.5) sem botões prontos — o chamador monta o rodapé.
+ * Escape e clique no backdrop fecham.
  */
+export function createDialog(options: CreateOptions): DialogHandle {
+  const backdrop = document.createElement("div");
+  backdrop.className = styles.backdrop;
+  backdrop.setAttribute("role", "presentation");
+
+  const dialog = document.createElement("div");
+  dialog.className = styles.dialog;
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-label", options.title);
+
+  const header = document.createElement("div");
+  header.className = styles.header;
+  const title = document.createElement("span");
+  title.className = styles.title;
+  title.textContent = options.title;
+  header.appendChild(title);
+  dialog.appendChild(header);
+
+  const body = document.createElement("div");
+  body.className = styles.body;
+  dialog.appendChild(body);
+
+  const footer = document.createElement("div");
+  footer.className = styles.footer;
+  dialog.appendChild(footer);
+
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === "Escape") close();
+  };
+
+  const close = () => {
+    document.removeEventListener("keydown", onKey);
+    backdrop.remove();
+    options.onClose?.();
+  };
+
+  document.addEventListener("keydown", onKey);
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+
+  return { element: dialog, body, footer, close };
+}
+
+/** Dialog de confirmação: resolve `true` no confirmar e `false` ao cancelar. */
 export function openDialog(options: DialogOptions): Promise<boolean> {
   return new Promise((resolve) => {
-    const backdrop = document.createElement("div");
-    backdrop.className = styles.backdrop;
-    backdrop.setAttribute("role", "presentation");
+    let settled = false;
+    const handle = createDialog({
+      title: options.title,
+      onClose: () => {
+        if (!settled) {
+          settled = true;
+          resolve(false);
+        }
+      },
+    });
 
-    const dialog = document.createElement("div");
-    dialog.className = styles.dialog;
-    dialog.setAttribute("role", "dialog");
-    dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-label", options.title);
+    handle.body.appendChild(options.body);
 
-    const header = document.createElement("div");
-    header.className = styles.header;
-    const title = document.createElement("span");
-    title.className = styles.title;
-    title.textContent = options.title;
-    header.appendChild(title);
-    dialog.appendChild(header);
-
-    const body = document.createElement("div");
-    body.className = styles.body;
-    body.appendChild(options.body);
-    dialog.appendChild(body);
-
-    const footer = document.createElement("div");
-    footer.className = styles.footer;
-
-    const close = (value: boolean) => {
-      document.removeEventListener("keydown", onKey);
-      backdrop.remove();
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      handle.close();
       resolve(value);
     };
 
-    const cancel = Button({
-      label: options.cancelLabel ?? "Cancelar",
-      variant: "ghost",
-      onClick: () => close(false),
-    });
+    if (options.cancelLabel !== "") {
+      handle.footer.appendChild(
+        Button({
+          label: options.cancelLabel ?? "Cancelar",
+          variant: "ghost",
+          onClick: () => finish(false),
+        }),
+      );
+    }
     const confirm = Button({
       label: options.confirmLabel ?? "Confirmar",
       variant: options.destructive ? "destructive" : "primary",
-      onClick: () => close(true),
+      onClick: () => finish(true),
     });
-    footer.append(cancel, confirm);
-    dialog.appendChild(footer);
-
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close(false);
-    };
-    document.addEventListener("keydown", onKey);
-    backdrop.addEventListener("click", (event) => {
-      if (event.target === backdrop) close(false);
-    });
-
-    backdrop.appendChild(dialog);
-    document.body.appendChild(backdrop);
+    handle.footer.appendChild(confirm);
     confirm.focus();
   });
 }
 
-/** Linha label/valor usada nos dialogs (design system: label 10px uppercase). */
+/** Linha label/valor usada nos dialogs (label 10px uppercase). */
 export function dialogField(label: string, value: string, mono = false): HTMLElement {
   const field = document.createElement("div");
   field.className = styles.field;

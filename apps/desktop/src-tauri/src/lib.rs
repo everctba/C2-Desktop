@@ -418,6 +418,68 @@ fn model_set(root: String, path: String) -> Result<ModelInspection, String> {
     Ok(inspection)
 }
 
+#[derive(Serialize)]
+struct RuntimePlan {
+    gguf: c2_core::gguf::GgufInfo,
+    gpu: Option<c2_core::gpu::GpuInfo>,
+    ctx_size: u32,
+    gpu_layers: u32,
+    estimate: c2_core::gpu::UsageEstimate,
+    /// Runtime ja esta no ar (modelo carregado).
+    loaded: bool,
+}
+
+/// Plano de memoria para carregar o modelo na GPU (barra do modal).
+#[tauri::command]
+fn runtime_plan(
+    root: String,
+    ctx_size: Option<u32>,
+    gpu_layers: Option<u32>,
+) -> Result<RuntimePlan, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|err| err.to_string())?;
+    let path = config
+        .model
+        .path
+        .as_deref()
+        .ok_or_else(|| "nenhum modelo .gguf selecionado".to_string())?;
+    let gguf = c2_core::gguf::read_info(Path::new(path)).map_err(|err| err.to_string())?;
+
+    let ctx = ctx_size.unwrap_or(config.model.ctx_size);
+    let layers = gpu_layers.unwrap_or(config.model.gpu_layers);
+    let gpu = c2_core::gpu::detect();
+    let estimate = c2_core::gpu::estimate_usage(gguf.size_bytes, ctx, gpu.as_ref());
+
+    Ok(RuntimePlan {
+        gguf,
+        gpu,
+        ctx_size: ctx,
+        gpu_layers: layers,
+        estimate,
+        loaded: runtime::health(&config),
+    })
+}
+
+/// Grava contexto/camadas e sobe o llama-server (carrega o modelo na GPU).
+#[tauri::command]
+async fn model_load(root: String, ctx_size: u32, gpu_layers: u32) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = open_workspace(&root)?;
+        let mut config = workspace.load_config().map_err(|err| err.to_string())?;
+        require_model(&config)?;
+        config.model.ctx_size = ctx_size;
+        config.model.gpu_layers = gpu_layers;
+        workspace
+            .save_config(&config)
+            .map_err(|err| err.to_string())?;
+        runtime::ensure(&workspace, &config)
+            .map(|_| ())
+            .map_err(|err| err.to_string())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
 #[tauri::command]
 fn pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
@@ -460,7 +522,9 @@ pub fn run() {
             pick_folder,
             pick_model,
             model_inspect,
-            model_set
+            model_set,
+            runtime_plan,
+            model_load
         ])
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o C2 Desktop");
