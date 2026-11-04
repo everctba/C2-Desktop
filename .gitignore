@@ -26,12 +26,12 @@ Thumbs.db
 *.c2.json
 
 # configuracao do workspace C2 (especifica da maquina; c2 init regenera)
-/.c2/config.json
-/.c2/runtime.pid
-/.c2/engine.lock
 
 # cache do runtime baixado por scripts/fetch-runtime.ps1
 /build/
 
 # scripts temporarios de patch
 scripts/pf_*.py
+
+# estado local do C2 (config, logs, cache, pid) - por maquina
+/.c2/
