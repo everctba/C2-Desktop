@@ -36,6 +36,10 @@ pub struct EngineState {
     pub relinked: u64,
     /// Arquivos renomeados que reaproveitaram o metadado existente.
     pub renamed: u64,
+    /// Tamanho da fila no ultimo ciclo (c2-e5t3).
+    pub queue_total: usize,
+    /// Primeiras posicoes da fila do ultimo ciclo.
+    pub queue: Vec<crate::indexer::QueueEntry>,
     /// Bytes de conteudo enviados ao modelo.
     pub bytes_sent: u64,
     pub llm_calls: u64,
@@ -95,6 +99,8 @@ impl EngineState {
         if let Some(err) = report.last_error.clone() {
             self.last_error = Some(err);
         }
+        self.queue_total = report.queue_total;
+        self.queue = report.queue.clone();
         self.push_history(
             "index",
             format!(
@@ -155,6 +161,23 @@ mod tests {
         state.save(&path).unwrap();
         assert_eq!(EngineState::load(&path).unwrap(), state);
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn merge_guarda_fila_e_tamanho() {
+        let mut state = EngineState::default();
+        let report = crate::indexer::IndexReport {
+            queue_total: 7,
+            queue: vec![crate::indexer::QueueEntry {
+                rel: "src/a.rs".to_string(),
+                priority: 0,
+            }],
+            ..crate::indexer::IndexReport::default()
+        };
+        state.merge_report(&report);
+        assert_eq!(state.queue_total, 7);
+        assert_eq!(state.queue.len(), 1);
+        assert_eq!(state.queue[0].rel, "src/a.rs");
     }
 
     #[test]

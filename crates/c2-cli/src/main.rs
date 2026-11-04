@@ -5,6 +5,8 @@
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
@@ -419,6 +421,14 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0) / 1024,
         config.log.level
     );
+    if state.queue_total > 0 {
+        let novos = state.queue.iter().filter(|item| item.priority == 0).count();
+        let alterados = state.queue.iter().filter(|item| item.priority == 1).count();
+        println!(
+            "Fila:        {} item(ns) — topo: {} novos, {} alterados",
+            state.queue_total, novos, alterados
+        );
+    }
     if !state.history.is_empty() {
         println!("Operacoes:");
         for operacao in state.history.iter().take(3) {
@@ -597,6 +607,7 @@ fn cmd_reindex(
             .as_ref()
             .map(|p| p.to_string_lossy().replace('\\', "/")),
         dry_run,
+        stop: None,
     };
 
     // Completar links de metadados existentes nao chama o modelo: so exigimos
@@ -657,7 +668,20 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
     let config = workspace.load_config()?;
     let client = LlmClient::from_config(&config);
 
-    let options = IndexOptions::default();
+    // Ctrl+C pede parada; o ciclo atual termina no proximo arquivo (c2-e5t6).
+    let parar = Arc::new(AtomicBool::new(false));
+    {
+        let parar = Arc::clone(&parar);
+        if let Err(err) = ctrlc::set_handler(move || {
+            parar.store(true, Ordering::SeqCst);
+        }) {
+            eprintln!("aviso: nao foi possivel instalar handler de Ctrl+C: {err}");
+        }
+    }
+    let options = IndexOptions {
+        stop: Some(Arc::clone(&parar)),
+        ..IndexOptions::default()
+    };
     let precisa_modelo = indexer::plan(&workspace, &config, false, None)?
         .iter()
         .any(|item| {
@@ -671,9 +695,17 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
     }
 
     acquire_lock(&workspace)?;
+    // Em qualquer saida (Ctrl+C, erro, once) o runtime e o lock sao liberados.
+    let _guarda = EngineGuard {
+        workspace: &workspace,
+    };
     let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
 
     loop {
+        if parar.load(Ordering::SeqCst) {
+            println!("parada solicitada: encerrando o ciclo atual e liberando o runtime");
+            break;
+        }
         let report = indexer::run(&workspace, &config, &client, &options, |progress| {
             if !json_output {
                 println!(
@@ -1152,4 +1184,71 @@ fn cmd_migrate(root: Option<&Path>, apply: bool, json_output: bool) -> Result<()
         eprintln!("  falhou: {falha}");
     }
     Ok(())
+}
+
+/// Encerra o runtime e libera o lock ao sair, inclusive em erro ou Ctrl+C.
+struct EngineGuard<'a> {
+    workspace: &'a Workspace,
+}
+
+impl Drop for EngineGuard<'_> {
+    fn drop(&mut self) {
+        let _ = runtime::stop(self.workspace);
+        release_lock(self.workspace);
+    }
+}
+
+#[cfg(all(test, windows))]
+mod guard_tests {
+    use super::*;
+
+    #[test]
+    fn guarda_encerra_runtime_e_libera_lock() {
+        let base = std::env::temp_dir().join(format!(
+            "c2-guard-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(base.join(".c2")).unwrap();
+        let workspace = Workspace::at(&base);
+
+        // processo filho que faria o papel do llama-server
+        let mut filho = std::process::Command::new("cmd")
+            .args(["/c", "ping", "-n", "30", "127.0.0.1"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("spawn ping");
+        std::fs::write(
+            workspace.c2_dir().join("runtime.pid"),
+            filho.id().to_string(),
+        )
+        .unwrap();
+        std::fs::write(lock_path(&workspace), std::process::id().to_string()).unwrap();
+
+        {
+            let _guarda = EngineGuard {
+                workspace: &workspace,
+            };
+        }
+
+        assert!(!lock_path(&workspace).exists(), "lock deve ser removido");
+        let mut saiu = false;
+        for _ in 0..20 {
+            if filho.try_wait().unwrap().is_some() {
+                saiu = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        if !saiu {
+            let _ = filho.kill();
+        }
+        assert!(saiu, "runtime filho nao foi encerrado pela guarda");
+        let _ = std::fs::remove_file(workspace.c2_dir().join("runtime.pid"));
+        std::fs::remove_dir_all(&base).ok();
+    }
 }

@@ -254,61 +254,18 @@ fn strip_code_fences(raw: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{Read, Write};
-    use std::net::TcpListener;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    /// Servidor HTTP falso: responde `responses` em sequencia e conta chamadas.
+    /// Servidor HTTP falso: responde os payloads em sequencia e conta chamadas.
     fn fake_server(responses: Vec<Value>) -> (String, Arc<AtomicUsize>) {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let calls = Arc::new(AtomicUsize::new(0));
-        let calls_ref = Arc::clone(&calls);
-        std::thread::spawn(move || {
-            for response in responses {
-                let Ok((mut stream, _)) = listener.accept() else {
-                    return;
-                };
-                let mut buffer = [0u8; 65536];
-                let read = stream.read(&mut buffer).unwrap_or(0);
-                let request = String::from_utf8_lossy(&buffer[..read]).to_string();
-                let _ = calls_ref.fetch_add(1, Ordering::SeqCst);
-
-                // Consome o corpo restante, se o cabecalho indicar tamanho maior.
-                let mut body = request
-                    .split_once("\r\n\r\n")
-                    .map(|(_, b)| b.len())
-                    .unwrap_or(0);
-                let content_length = request
-                    .lines()
-                    .find(|l| l.to_ascii_lowercase().starts_with("content-length:"))
-                    .and_then(|l| l.split(':').nth(1))
-                    .and_then(|v| v.trim().parse::<usize>().ok())
-                    .unwrap_or(0);
-                while body < content_length {
-                    let mut extra = vec![0u8; 8192];
-                    let n = stream.read(&mut extra).unwrap_or(0);
-                    if n == 0 {
-                        break;
-                    }
-                    body += n;
-                }
-
-                let payload = response.to_string();
-                let reply = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    payload.len(),
-                    payload
-                );
-                let _ = stream.write_all(reply.as_bytes());
-                let _ = stream.flush();
-            }
-        });
-        (
-            format!("http://127.0.0.1:{}/v1/chat/completions", addr.port()),
-            calls,
-        )
+        let servidor = crate::llm_fake::start(
+            responses
+                .into_iter()
+                .map(crate::llm_fake::Reply::Ok)
+                .collect(),
+        );
+        (servidor.chat_url(), servidor.calls)
     }
 
     fn client(url: &str) -> LlmClient {
@@ -385,6 +342,64 @@ mod tests {
         )]);
         let generated = client(&url).semantic_for("a.rs", "x").unwrap();
         assert_eq!(generated.semantic.summary, "s");
+    }
+
+    #[test]
+    fn resposta_lenta_estoura_o_timeout() {
+        let servidor = crate::llm_fake::start(vec![
+            crate::llm_fake::Reply::Slow(
+                std::time::Duration::from_millis(1500),
+                crate::llm_fake::completion(crate::llm_fake::semantic_json(), "stop"),
+            ),
+            crate::llm_fake::Reply::Slow(
+                std::time::Duration::from_millis(1500),
+                crate::llm_fake::completion(crate::llm_fake::semantic_json(), "stop"),
+            ),
+        ]);
+        let mut llm = client(&servidor.chat_url());
+        llm.timeout = std::time::Duration::from_millis(300);
+        llm.max_retries = 1;
+
+        let inicio = std::time::Instant::now();
+        let erro = llm.semantic_for("src/a.rs", "x").unwrap_err();
+        assert!(matches!(erro, C2Error::Llm(_)), "esperava erro de LLM: {erro}");
+        assert!(
+            inicio.elapsed() < std::time::Duration::from_millis(2500),
+            "timeout deve cortar antes da resposta lenta"
+        );
+    }
+
+    #[test]
+    fn queda_no_meio_da_conexao_retenta_e_falha() {
+        let servidor = crate::llm_fake::start(vec![
+            crate::llm_fake::Reply::Drop,
+            crate::llm_fake::Reply::Drop,
+        ]);
+        let mut llm = client(&servidor.chat_url());
+        llm.max_retries = 1;
+
+        let erro = llm.semantic_for("src/a.rs", "x").unwrap_err();
+        assert!(matches!(erro, C2Error::Llm(_)), "esperava erro de LLM: {erro}");
+        assert!(
+            servidor.calls.load(Ordering::SeqCst) >= 1,
+            "ao menos uma tentativa deve ter sido feita"
+        );
+    }
+
+    #[test]
+    fn erro_http_vira_erro_de_llm_com_status() {
+        let servidor = crate::llm_fake::start(vec![
+            crate::llm_fake::Reply::Status(500, "boom".to_string()),
+            crate::llm_fake::Reply::Status(500, "boom".to_string()),
+        ]);
+        let erro = client(&servidor.chat_url())
+            .semantic_for("src/a.rs", "x")
+            .unwrap_err();
+        let texto = erro.to_string();
+        assert!(
+            matches!(erro, C2Error::Llm(_)) && texto.contains("500"),
+            "erro deveria citar o status: {texto}"
+        );
     }
 
     #[test]

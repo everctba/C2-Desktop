@@ -14,6 +14,8 @@ pub mod indexer;
 pub mod links;
 pub mod llm;
 pub mod log;
+#[cfg(test)]
+pub mod llm_fake;
 pub mod migrate;
 pub mod runtime;
 pub mod schema;

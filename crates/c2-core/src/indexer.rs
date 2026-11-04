@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::discover;
@@ -35,6 +35,17 @@ pub enum Decision {
 }
 
 impl Decision {
+    /// Ordem da fila: novos antes de alterados (c2-e5t3).
+    pub fn priority(self) -> u8 {
+        match self {
+            Decision::New => 0,
+            Decision::Changed => 1,
+            Decision::Renamed => 2,
+            Decision::Unchanged => 3,
+            Decision::Removed => 4,
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Decision::New => "novo",
@@ -71,6 +82,14 @@ pub struct RenamedFrom {
     pub old_rel: String,
 }
 
+/// Entrada da fila de trabalho visivel em `state.json` (c2-e5t3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QueueEntry {
+    pub rel: String,
+    /// 0 = novo, 1 = alterado, 2 = renomeado, 3 = inalterado, 4 = removido.
+    pub priority: u8,
+}
+
 /// Opcoes de um ciclo.
 #[derive(Debug, Clone, Default)]
 pub struct IndexOptions {
@@ -78,6 +97,8 @@ pub struct IndexOptions {
     pub limit: Option<usize>,
     pub only_path: Option<String>,
     pub dry_run: bool,
+    /// Sinaliza parada entre um arquivo e outro (Ctrl+C) — c2-e5t6.
+    pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 /// Progresso emitido por arquivo.
@@ -104,6 +125,10 @@ pub struct IndexReport {
     pub renamed: usize,
     /// Hashes reaproveitados do cache (tamanho+mtime iguais).
     pub hash_cache_hits: usize,
+    /// Teto de itens da fila do ciclo (as primeiras posicoes).
+    pub queue: Vec<QueueEntry>,
+    /// Tamanho total da fila do ciclo.
+    pub queue_total: usize,
     /// Arquivos pulados por conter segredo (politica `skip`).
     pub blocked: usize,
     /// Arquivos indexados com conteudo mascarado (politica `mask`).
@@ -242,7 +267,13 @@ pub fn plan(
     }
 
     items.extend(orfaos);
-    items.sort_by(|a, b| a.rel.cmp(&b.rel));
+    // Novos primeiro, depois alterados, renomeados, inalterados e removidos.
+    items.sort_by(|a, b| {
+        a.decision
+            .priority()
+            .cmp(&b.decision.priority())
+            .then_with(|| a.rel.cmp(&b.rel))
+    });
     Ok(items)
 }
 
@@ -279,11 +310,27 @@ pub fn run<P: SemanticProvider>(
     let hits_de_cache = items.iter().filter(|item| item.hash_from_cache).count();
     let mut report = IndexReport {
         hash_cache_hits: hits_de_cache,
+        queue: items
+            .iter()
+            .take(20)
+            .map(|item| QueueEntry {
+                rel: item.rel.clone(),
+                priority: item.decision.priority(),
+            })
+            .collect(),
+        queue_total: total,
         ..IndexReport::default()
     };
     let mut processed = 0usize;
 
     for (position, item) in items.iter().enumerate() {
+        if let Some(flag) = &options.stop {
+            if flag.load(std::sync::atomic::Ordering::SeqCst) {
+                report.deferred += total.saturating_sub(position);
+                report.last_error = Some("ciclo interrompido por sinal de parada".to_string());
+                break;
+            }
+        }
         if let Some(limit) = options.limit {
             if processed >= limit {
                 break;
@@ -699,6 +746,105 @@ mod tests {
             4,
             "full reindexa os 2 de novo (2 antes + 2 agora)"
         );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn plano_prioriza_novos_antes_de_alterados() {
+        let (base, workspace) = setup("prioridade");
+        let config = workspace.load_config().unwrap();
+
+        // a.rs ganha metadado com hash velho -> alterado; b.rs fica sem metadado -> novo
+        let meta = crate::schema::MetaFile::new(
+            "src/a.rs".to_string(),
+            "sha256:velho".to_string(),
+            9,
+            1,
+            crate::schema::Semantic {
+                what: "w".into(),
+                why: "y".into(),
+                goal: "g".into(),
+                summary: "s".into(),
+                responsibility: "r".into(),
+            },
+            Vec::new(),
+        );
+        meta.write_atomic(&base.join("src/a.rs.c2.json")).unwrap();
+
+        let plano = plan(&workspace, &config, false, None).unwrap();
+        let posicao_novo = plano
+            .iter()
+            .position(|item| item.decision == Decision::New)
+            .expect("b.rs deveria ser novo");
+        let posicao_alterado = plano
+            .iter()
+            .position(|item| item.decision == Decision::Changed)
+            .expect("a.rs deveria ser alterado");
+        assert!(
+            posicao_novo < posicao_alterado,
+            "novos devem vir antes de alterados"
+        );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn parada_solicitada_interrompe_o_ciclo_entre_arquivos() {
+        let (base, workspace) = setup("stop");
+        let config = workspace.load_config().unwrap();
+
+        let parar = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let gatilho = std::sync::Arc::clone(&parar);
+        let provider = MockProvider {
+            calls: AtomicUsize::new(0),
+            fail: false,
+            on_call: Some(Box::new(move || {
+                gatilho.store(true, std::sync::atomic::Ordering::SeqCst);
+            })),
+        };
+        let options = IndexOptions {
+            stop: Some(std::sync::Arc::clone(&parar)),
+            ..IndexOptions::default()
+        };
+
+        let report = run(&workspace, &config, &provider, &options, |_| {}).unwrap();
+        assert_eq!(report.indexed, 1, "para depois do arquivo em andamento");
+        assert!(report.deferred >= 1, "o resto fica para o proximo ciclo");
+        assert!(report
+            .last_error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("parada"));
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn indexa_de_ponta_a_ponta_com_servidor_llm_falso() {
+        let (base, workspace) = setup("http-llm");
+        let mut config = workspace.load_config().unwrap();
+        let servidor = crate::llm_fake::start(vec![
+            crate::llm_fake::Reply::Ok(crate::llm_fake::completion(
+                crate::llm_fake::semantic_json(),
+                "stop",
+            )),
+            crate::llm_fake::Reply::Ok(crate::llm_fake::completion(
+                crate::llm_fake::semantic_json(),
+                "stop",
+            )),
+        ]);
+        config.model.host = "127.0.0.1".to_string();
+        config.model.port = servidor.port;
+        config.model.timeout_secs = 5;
+        config.model.max_retries = 0;
+
+        let client = crate::llm::LlmClient::from_config(&config);
+        let report = run(&workspace, &config, &client, &options(), |_| {}).unwrap();
+
+        assert_eq!(report.indexed, 2);
+        assert_eq!(report.calls, 2);
+        assert_eq!(servidor.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+        let meta = MetaFile::read(&base.join("src/a.rs.c2.json")).unwrap();
+        assert_eq!(meta.semantic.what, "w");
+        assert_eq!(meta.schema_version, 1);
         fs::remove_dir_all(&base).ok();
     }
 
