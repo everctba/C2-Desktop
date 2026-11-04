@@ -106,6 +106,8 @@ pub struct IndexConfig {
     pub secret_allow: Vec<String>,
     /// Teto de bytes de conteudo enviados ao modelo por ciclo (0 = ilimitado).
     pub max_total_bytes_per_run: u64,
+    /// Regras de import por regex para linguagens sem extrator nativo.
+    pub link_fallback: Vec<FallbackRule>,
 }
 
 impl Default for IndexConfig {
@@ -119,6 +121,7 @@ impl Default for IndexConfig {
             secret_policy: SecretPolicy::Skip,
             secret_allow: Vec::new(),
             max_total_bytes_per_run: 64 * 1024 * 1024,
+            link_fallback: Vec::new(),
         }
     }
 }
@@ -225,6 +228,17 @@ impl Default for LogConfig {
             keep: 5,
         }
     }
+}
+
+/// Regra de fallback para import de linguagem nao suportada (c2-e6t5).
+///
+/// `regex` precisa ter um grupo de captura 1 com o alvo (arquivo/modulo).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FallbackRule {
+    /// Extensao do arquivo de origem, sem ponto (ex.: "lua").
+    pub extension: String,
+    /// Regex com grupo 1 = caminho do alvo.
+    pub regex: String,
 }
 
 /// Configuracao completa do workspace.

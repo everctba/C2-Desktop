@@ -349,12 +349,15 @@ mod tests {
         write(&base.join(".gitignore"), b"ignorado/\n*.log\n");
         write(&base.join("src").join("ok.rs"), b"fn ok() {}");
         write(&base.join("src").join("com espaco.rs"), b"fn espaco() {}");
-        write(&base.join("src").join("acentuação").join("ã.rs"), b"fn acento() {}");
+        write(
+            &base.join("src").join("acentuação").join("ã.rs"),
+            b"fn acento() {}",
+        );
         write(&base.join("ignorado").join("x.rs"), b"fn ignorado() {}");
         write(&base.join("debug.log"), b"linha de log");
         write(&base.join("binario.txt"), &[b'a', 0u8, b'b']);
         write(&base.join(".env"), b"SECRET=abc");
-        write(&base.join("grande.rs"), &vec![b'x'; 64]);
+        write(&base.join("grande.rs"), &[b'x'; 64]);
 
         let mut config = Config::default();
         config.index.max_file_bytes = 32;
@@ -363,7 +366,10 @@ mod tests {
         let rels: Vec<&str> = found.files.iter().map(|f| f.rel.as_str()).collect();
 
         assert!(rels.contains(&"src/ok.rs"), "{rels:?}");
-        assert!(rels.contains(&"src/com espaco.rs"), "nome com espaco: {rels:?}");
+        assert!(
+            rels.contains(&"src/com espaco.rs"),
+            "nome com espaco: {rels:?}"
+        );
         assert!(
             rels.contains(&"src/acentuação/ã.rs"),
             "nome com acento: {rels:?}"
@@ -372,7 +378,10 @@ mod tests {
         assert!(!rels.contains(&"debug.log"), "gitignore glob: {rels:?}");
         assert!(!rels.contains(&".env"), "nome sensivel deve ser pulado");
         assert!(!rels.contains(&"binario.txt"), "binario deve ser pulado");
-        assert!(!rels.contains(&"grande.rs"), "arquivo grande deve ser pulado");
+        assert!(
+            !rels.contains(&"grande.rs"),
+            "arquivo grande deve ser pulado"
+        );
 
         assert!(found.skipped.sensitive >= 1);
         assert!(found.skipped.binary >= 1);
@@ -386,5 +395,4 @@ mod tests {
 
         fs::remove_dir_all(&base).ok();
     }
-
 }

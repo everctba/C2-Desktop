@@ -6,6 +6,9 @@
 
 use std::path::Path;
 
+use regex::Regex;
+
+use crate::config::FallbackRule;
 use crate::schema::Link;
 
 /// Teto de arestas por arquivo (o mesmo de `index.max_links_per_file`).
@@ -13,6 +16,17 @@ pub const DEFAULT_MAX_LINKS: usize = 64;
 
 /// Extrai as arestas de `content`, resolvendo alvos a partir da raiz do workspace.
 pub fn extract(root: &Path, rel: &str, content: &str, max_links: usize) -> Vec<Link> {
+    extract_with_rules(root, rel, content, max_links, &[])
+}
+
+/// Como [`extract`], mas aplica as regras de `link_fallback` da configuracao.
+pub fn extract_with_rules(
+    root: &Path,
+    rel: &str,
+    content: &str,
+    max_links: usize,
+    rules: &[FallbackRule],
+) -> Vec<Link> {
     let extension = extension_of(rel);
     let mut raw: Vec<(String, &'static str)> = Vec::new();
 
@@ -24,6 +38,7 @@ pub fn extract(root: &Path, rel: &str, content: &str, max_links: usize) -> Vec<L
         "py" => extract_python(rel, content, &mut raw),
         _ => {}
     }
+    extract_fallback(rel, content, rules, &mut raw);
 
     let mut links: Vec<Link> = Vec::new();
     for (target, kind) in raw {
@@ -43,6 +58,47 @@ pub fn extract(root: &Path, rel: &str, content: &str, max_links: usize) -> Vec<L
     }
     links.sort_by(|a, b| (a.to.as_str(), a.kind.as_str()).cmp(&(b.to.as_str(), b.kind.as_str())));
     links
+}
+
+/// Aplica as regras de `link_fallback`: regex configuravel por extensao.
+///
+/// Regra invalida e ignorada com aviso (nao derruba a indexacao).
+fn extract_fallback(
+    rel: &str,
+    content: &str,
+    rules: &[FallbackRule],
+    raw: &mut Vec<(String, &'static str)>,
+) {
+    if rules.is_empty() {
+        return;
+    }
+    let extensao = extension_of(rel);
+    let dir = dir_of(rel);
+
+    for regra in rules {
+        if regra.extension.trim_start_matches('.').to_ascii_lowercase() != extensao {
+            continue;
+        }
+        let Ok(regex) = Regex::new(&regra.regex) else {
+            eprintln!(
+                "aviso: link_fallback de '{}' ignorado (regex invalida: {})",
+                regra.extension, regra.regex
+            );
+            continue;
+        };
+        for captura in regex.captures_iter(content) {
+            let Some(alvo) = captura.get(1) else {
+                continue;
+            };
+            let alvo = alvo.as_str().trim();
+            if alvo.is_empty() {
+                continue;
+            }
+            raw.push((join(&dir, alvo), "fallback"));
+            raw.push((join(&dir, &format!("{alvo}.{extensao}")), "fallback"));
+            raw.push((alvo.to_string(), "fallback"));
+        }
+    }
 }
 
 fn extension_of(rel: &str) -> String {
@@ -421,5 +477,62 @@ mod tests {
         assert_eq!(join("src/auth", "../util.rs"), "src/util.rs");
         assert_eq!(join("", "a/b.rs"), "a/b.rs");
         assert_eq!(join("src", "./x.rs"), "src/x.rs");
+    }
+
+    #[test]
+    fn regra_de_fallback_cria_aresta() {
+        let base = workspace("fallback");
+        touch(&base, "scripts/a.lua");
+        touch(&base, "scripts/b.lua");
+
+        let regras = [FallbackRule {
+            extension: "lua".to_string(),
+            regex: r#"require\("([^"]+)"\)"#.to_string(),
+        }];
+        let links = extract_with_rules(
+            &base,
+            "scripts/a.lua",
+            "local b = require(\"b\")\n",
+            DEFAULT_MAX_LINKS,
+            &regras,
+        );
+        let alvos: Vec<&str> = links.iter().map(|link| link.to.as_str()).collect();
+        assert!(alvos.contains(&"scripts/b.lua"), "{alvos:?}");
+        assert_eq!(links[0].kind, "fallback");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn regra_invalida_e_ignorada_sem_derrubar() {
+        let base = workspace("fallback-invalida");
+        touch(&base, "a.lua");
+        let regras = [FallbackRule {
+            extension: "lua".to_string(),
+            regex: "(".to_string(),
+        }];
+        let links = extract_with_rules(&base, "a.lua", "x", DEFAULT_MAX_LINKS, &regras);
+        assert!(links.is_empty());
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn regra_de_outra_extensao_nao_afeta() {
+        let base = workspace("fallback-outra");
+        touch(&base, "src/lib.rs");
+        touch(&base, "src/a.rs");
+        touch(&base, "src/b.rs");
+        let regras = [FallbackRule {
+            extension: "lua".to_string(),
+            regex: r#"require\("([^"]+)"\)"#.to_string(),
+        }];
+        let links = extract_with_rules(
+            &base,
+            "src/a.rs",
+            "use crate::b;\n",
+            DEFAULT_MAX_LINKS,
+            &regras,
+        );
+        assert!(links.iter().any(|link| link.to == "src/b.rs"));
+        fs::remove_dir_all(&base).ok();
     }
 }

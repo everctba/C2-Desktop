@@ -524,11 +524,12 @@ fn index_one<P: SemanticProvider>(
     let metadata = fs::metadata(&item.path).at(&item.path)?;
 
     // Arestas estaticas: custo zero de inferencia (bead c2-e6).
-    let extracted = links::extract(
+    let extracted = links::extract_with_rules(
         workspace.root(),
         &item.rel,
         &content,
         config.index.max_links_per_file,
+        &config.index.link_fallback,
     );
 
     let meta = MetaFile::new(
@@ -550,11 +551,12 @@ fn extract_links(
     item: &PlanItem,
 ) -> Result<Vec<crate::schema::Link>> {
     let content = fs::read_to_string(&item.path).at(&item.path)?;
-    Ok(links::extract(
+    Ok(links::extract_with_rules(
         workspace.root(),
         &item.rel,
         &content,
         config.index.max_links_per_file,
+        &config.index.link_fallback,
     ))
 }
 

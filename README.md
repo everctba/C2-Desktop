@@ -128,6 +128,22 @@ c2 config set index.secret_policy mask
 c2 config set engine.poll_interval_secs 5
 ```
 
+### Links de linguagens sem suporte nativo
+
+Para linguagens fora do extrator (Rust, JS/TS, Python), dá para declarar uma
+regex de import em `index.link_fallback`:
+
+```json
+"index": {
+  "link_fallback": [
+    { "extension": "lua", "regex": "require\\(`"([^`"]+)`"\\)" }
+  ]
+}
+```
+
+O grupo 1 é o alvo; o C2 tenta `<dir do arquivo>/<alvo>`, `<alvo>.<ext>` e
+`<alvo>` na raiz. Regex inválida é ignorada com aviso (não derruba a indexação).
+
 ## Comandos
 
 | Comando | Função |

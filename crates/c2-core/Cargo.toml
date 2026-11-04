@@ -8,6 +8,7 @@ description = "Nucleo do C2: descoberta, hash e metadados semanticos de projetos
 
 [dependencies]
 ignore.workspace = true
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
