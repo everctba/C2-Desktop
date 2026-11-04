@@ -17,9 +17,9 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 |---|---|---|---|---|
 | 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: `pwsh -File instalar.ps1 -Dest <pasta>` instala app + CLI + runtime (116 MB) com escolha de pasta, atalho e desinstalador | Linux não validado (`c2-e12.2`) |
 | 2 | Executar `c2 init` dentro de um projeto | ✅ | cria `.c2/config.json`, detecta linguagens, idempotente (teste de integração) | — |
-| 3 | O desktop reconhecer o workspace | ❌ | desktop Tauri não existe | `c2-e14`, bloqueado por MSVC (`c2-e14.1`) |
+| 3 | O desktop reconhecer o workspace | ✅ | `C2.exe` abre com projeto (`c2 open --root <dir>` via `initial_root`, ou escolha de pasta) | — |
 | 4 | Configurar um modelo local | ✅ | `c2 config set model.path|binary|port` + validação por `--version` | — |
-| 5 | Pressionar PLAY | ⚠️ | equivalente CLI: `c2 start` sobe runtime, indexa e supervisiona; janela não existe | `c2-e14` |
+| 5 | Pressionar PLAY | ✅ | botão **Iniciar** na janela sobe engine (thread + eventos) e runtime; **Parar** encerra os dois; **Reindexar** faz passada única | — |
 | 6 | Runtime iniciar e indexar os arquivos | ✅ | `c2 reindex` em projeto real: 37/37 arquivos, 0 erros | — |
 | 7 | Alterações atualizarem os metadados | ✅ | hash diferente → reindexa só o arquivo mudado (teste + execução real) | — |
 | 8 | Arquivos inalterados não chamarem o LLM | ✅ | 2ª passada: 0 chamadas (teste de integração e execução real) | — |
@@ -40,7 +40,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 | Semantic Grep | ✅ | busca híbrida com evidência e trecho |
 | `read` e `related` | ✅ | faixa de linhas; usa/usado por |
 | Segurança de segredos | ✅ | `.env`/chaves pulados; conteúdo bloqueado ou mascarado |
-| Desktop mínimo | ❌ | `c2-e14`, bloqueado por MSVC |
+| Desktop mínimo | ✅ | janela Tauri com Projetos/Engine/Busca, seletor de `.gguf` com validação, PLAY/STOP/REINDEX e `c2 open` |
 | Migração do protótipo bash | ⚠️ | leitura tolerante pronta; `c2 migrate` não existe (`c2-e11`) |
 
 ## 3. Benchmark de indexação e busca (500 arquivos)
@@ -77,13 +77,14 @@ Duas ressalvas registradas:
 
 ## 4. Veredito
 
-**NO-GO para "MVP fechado"** — restam dois critérios:
+**GO para "alpha Windows"** · **NO-GO para "MVP fechado"** — restam dois itens:
 
 1. Linux sem validação (`c2-e12.2`).
 2. MCP fora do escopo por decisão (`c2-dec2` / `c2-e13`).
 
-O desktop mínimo agora existe e roda (pacote portátil com instalador), e o
-runtime do llama.cpp vai embarcado — não depende mais do LM Studio (`c2-e12.1`).
+O desktop mínimo existe e roda (pacote portátil com instalador), o runtime do
+llama.cpp vai embarcado (sem LM Studio) e os critérios 3 e 5 do PRD são
+atendidos pela janela.
 
 **GO para "alpha usável Core + CLI"**: init, indexação incremental, grafo,
 busca, leitura e segurança funcionam de ponta a ponta, com testes e evidência.
