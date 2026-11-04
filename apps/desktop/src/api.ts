@@ -8,6 +8,7 @@
 import type {
   FileEntry,
   Hit,
+  McpStatus,
   ModelInspection,
   RuntimePlan,
   IndexReport,
@@ -52,6 +53,7 @@ export const api = {
     invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
+  mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),
@@ -219,6 +221,20 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return MOCK_ROOT as T;
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
+    case "mcp_smoke":
+      return {
+        available: true,
+        binary: "C:/C2/cli/c2.exe",
+        protocol_version: "2024-11-05",
+        server_name: "c2",
+        tools: [
+          { name: "c2_grep", description: "Busca semantica nos metadados do projeto." },
+          { name: "c2_read", description: "Le um arquivo com numero de linha." },
+          { name: "c2_related", description: "Dependencias pelo grafo estatico." },
+          { name: "c2_map", description: "Arvore plana do projeto." },
+        ],
+        error: null,
+      } as T;
     case "initial_root":
       return null as T;
     case "runtime_plan":

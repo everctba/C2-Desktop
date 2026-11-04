@@ -3,6 +3,7 @@
 //! Superficie do MVP (`c2-e7`): inicializar, indexar, inspecionar, configurar e
 //! limpar. Busca e leitura (`c2 grep/read/related`) chegam nas fases seguintes.
 
+use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -62,6 +63,9 @@ enum Command {
         #[arg(long)]
         yes: bool,
     },
+
+    /// Servidor MCP por STDIO (JSON-RPC): expoe o Core para agentes
+    Mcp,
 
     /// Mostra as ultimas linhas do log do workspace
     Logs {
@@ -175,6 +179,7 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Open => cmd_open(cli.root.as_deref()),
         Command::Logs { lines } => cmd_logs(cli.root.as_deref(), lines, cli.json),
+        Command::Mcp => cmd_mcp(cli.root.as_deref()),
         Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
         Command::Config { action } => match action {
@@ -1255,4 +1260,28 @@ mod guard_tests {
         let _ = std::fs::remove_file(workspace.c2_dir().join("runtime.pid"));
         std::fs::remove_dir_all(&base).ok();
     }
+}
+
+fn cmd_mcp(root: Option<&Path>) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    eprintln!(
+        "c2-mcp: pronto (workspace {}, protocolo {}, ferramentas: {})",
+        workspace.root().display(),
+        c2_core::mcp::PROTOCOL_VERSION,
+        c2_core::mcp::tool_names().join(", ")
+    );
+
+    let entrada = std::io::stdin();
+    for linha in entrada.lock().lines() {
+        let linha = linha?;
+        if linha.trim().is_empty() {
+            continue;
+        }
+        if let Some(resposta) = c2_core::mcp::handle(&workspace, &config, &linha) {
+            println!("{resposta}");
+            std::io::stdout().flush()?;
+        }
+    }
+    Ok(())
 }

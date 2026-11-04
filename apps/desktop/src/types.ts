@@ -90,6 +90,20 @@ export interface RuntimePlan {
   loaded: boolean;
 }
 
+export interface McpToolInfo {
+  name: string;
+  description: string;
+}
+
+export interface McpStatus {
+  available: boolean;
+  binary: string | null;
+  protocol_version: string | null;
+  server_name: string | null;
+  tools: McpToolInfo[];
+  error: string | null;
+}
+
 export interface RecentProject {
   path: string;
   opened_at: number;

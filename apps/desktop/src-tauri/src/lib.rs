@@ -509,6 +509,146 @@ async fn model_load(root: String, ctx_size: u32, gpu_layers: u32) -> Result<(), 
     .map_err(|err| err.to_string())?
 }
 
+#[derive(serde::Serialize)]
+struct McpToolInfo {
+    name: String,
+    description: String,
+}
+
+#[derive(serde::Serialize)]
+struct McpStatus {
+    available: bool,
+    binary: Option<String>,
+    protocol_version: Option<String>,
+    server_name: Option<String>,
+    tools: Vec<McpToolInfo>,
+    error: Option<String>,
+}
+
+/// Localiza a CLI `c2` ao lado do app (pacote: <dest>/cli/c2.exe).
+fn find_cli() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let nome = if cfg!(windows) { "c2.exe" } else { "c2" };
+    let candidatos = [
+        dir.join("cli").join(nome),
+        dir.join("..").join("cli").join(nome),
+        dir.join(nome),
+    ];
+    candidatos.into_iter().find(|caminho| caminho.is_file())
+}
+
+/// Sobe `c2 mcp`, faz o handshake e devolve o estado real do servidor.
+#[tauri::command]
+async fn mcp_smoke(root: String) -> McpStatus {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(cli) = find_cli() else {
+            return McpStatus {
+                available: false,
+                binary: None,
+                protocol_version: None,
+                server_name: None,
+                tools: Vec::new(),
+                error: Some(
+                    "CLI c2 nao encontrada ao lado do app (pacote: <dest>/cli/c2.exe)".to_string(),
+                ),
+            };
+        };
+
+        use std::io::{BufRead, BufReader, Write};
+        let mut filho = match std::process::Command::new(&cli)
+            .arg("--root")
+            .arg(&root)
+            .arg("mcp")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(filho) => filho,
+            Err(erro) => {
+                return McpStatus {
+                    available: false,
+                    binary: Some(cli.display().to_string()),
+                    protocol_version: None,
+                    server_name: None,
+                    tools: Vec::new(),
+                    error: Some(format!("falha ao executar {}: {erro}", cli.display())),
+                }
+            }
+        };
+
+        let mut stdin = filho.stdin.take().expect("stdin do mcp");
+        let stdout = filho.stdout.take().expect("stdout do mcp");
+        let mut leitor = BufReader::new(stdout);
+
+        let mut enviar = |linha: String| {
+            let _ = writeln!(stdin, "{linha}");
+            let _ = stdin.flush();
+        };
+        enviar(r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"c2-desktop","version":"0.1.0"}}}"#.to_string());
+        enviar(r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#.to_string());
+
+        let mut protocolo: Option<String> = None;
+        let mut servidor: Option<String> = None;
+        let mut ferramentas: Vec<McpToolInfo> = Vec::new();
+        let mut erro: Option<String> = None;
+        let mut lidas = 0;
+        let mut linha = String::new();
+        while lidas < 2 {
+            linha.clear();
+            match leitor.read_line(&mut linha) {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(_) => break,
+            }
+            let Ok(valor) = serde_json::from_str::<serde_json::Value>(&linha) else {
+                continue;
+            };
+            if valor.get("error").is_some() {
+                erro = valor["error"]["message"].as_str().map(str::to_string);
+            }
+            if let Some(protocolo_valor) = valor.pointer("/result/protocolVersion").and_then(|v| v.as_str()) {
+                protocolo = Some(protocolo_valor.to_string());
+            }
+            if let Some(nome) = valor.pointer("/result/serverInfo/name").and_then(|v| v.as_str()) {
+                servidor = Some(nome.to_string());
+            }
+            if let Some(lista) = valor.pointer("/result/tools").and_then(|v| v.as_array()) {
+                ferramentas = lista
+                    .iter()
+                    .map(|tool| McpToolInfo {
+                        name: tool["name"].as_str().unwrap_or_default().to_string(),
+                        description: tool["description"].as_str().unwrap_or_default().to_string(),
+                    })
+                    .collect();
+            }
+            lidas += 1;
+        }
+
+        let _ = filho.kill();
+        let _ = filho.wait();
+
+        McpStatus {
+            available: protocolo.is_some() && !ferramentas.is_empty(),
+            binary: Some(cli.display().to_string()),
+            protocol_version: protocolo,
+            server_name: servidor,
+            tools: ferramentas,
+            error: erro,
+        }
+    })
+    .await
+    .unwrap_or_else(|erro| McpStatus {
+        available: false,
+        binary: None,
+        protocol_version: None,
+        server_name: None,
+        tools: Vec::new(),
+        error: Some(format!("falha interna ao testar o MCP: {erro}")),
+    })
+}
+
 #[tauri::command]
 fn pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
@@ -552,6 +692,7 @@ pub fn run() {
             pick_model,
             model_inspect,
             model_set,
+            mcp_smoke,
             runtime_plan,
             model_load
         ])

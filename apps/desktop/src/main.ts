@@ -11,6 +11,7 @@ import { Input } from "./ui/Input";
 import { loadingBar, memoryBar } from "./ui/MemoryBar";
 import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
+import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
@@ -492,6 +493,9 @@ function render(): void {
             })(),
           onPickProject: () => void pickProject(),
         });
+        break;
+      case "mcp":
+        view = await renderMcp({ root: state.root });
         break;
       case "search":
         view = await renderSearch({ root: state.root });

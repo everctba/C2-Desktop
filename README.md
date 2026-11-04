@@ -80,6 +80,33 @@ c2 reindex --full            # ignora o hash e reindexa tudo
 c2 reindex --dry-run         # mostra o plano sem chamar o modelo
 ```
 
+## MCP (agentes de IA)
+
+O C2 expõe o Core por **MCP** sobre STDIO, somente leitura:
+
+```powershell
+c2 --root . mcp          # JSON-RPC: initialize, tools/list, tools/call
+```
+
+Ferramentas: `c2_grep`, `c2_read`, `c2_related`, `c2_map`. Elas reutilizam a
+mesma lógica do CLI (sem duplicar regra) e limitam a resposta.
+
+Configure no seu cliente MCP (Claude Desktop, Cursor, …):
+
+```json
+{
+  "mcpServers": {
+    "c2": {
+      "command": "<pasta instalada>\cli\c2.exe",
+      "args": ["--root", "<pasta do projeto>", "mcp"]
+    }
+  }
+}
+```
+
+A janela tem a aba **MCP** com o estado real do servidor (handshake ao entrar),
+a lista de ferramentas e essa configuração pronta para copiar.
+
 ## Consultar
 
 ```bash

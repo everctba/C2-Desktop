@@ -16,6 +16,7 @@ pub mod llm;
 #[cfg(test)]
 pub mod llm_fake;
 pub mod log;
+pub mod mcp;
 pub mod migrate;
 pub mod runtime;
 pub mod schema;

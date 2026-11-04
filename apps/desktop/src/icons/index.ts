@@ -8,7 +8,8 @@ export type IconName =
   | "stop"
   | "refresh"
   | "settings"
-  | "close";
+  | "close"
+  | "mcp";
 
 const PATHS: Record<IconName, string> = {
   // pasta
@@ -21,6 +22,9 @@ const PATHS: Record<IconName, string> = {
   stop: "M3 3h9v9H3z",
   refresh: "M8 2a6 6 0 1 1-5.7 4.1l1.6.6A4.3 4.3 0 1 0 8 3.7V6L4.5 3 8 0z",
   // engrenagem
+  // plugue (MCP)
+  mcp:
+    "M5 2h2v3H5zM9 2h2v3H9zM4 5h8v2a4 4 0 0 1-8 0zM7 11h2v3H7z",
   // X de remover
   close:
     "M4.7 3.3 3.3 4.7 6.6 8l-3.3 3.3 1.4 1.4L8 9.4l3.3 3.3 1.4-1.4L9.4 8l3.3-3.3-1.4-1.4L8 6.6z",

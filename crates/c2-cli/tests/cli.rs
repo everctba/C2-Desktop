@@ -1,8 +1,9 @@
 //! Testes de integracao da CLI: exercitam o binario `c2` de verdade.
 
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn tmp(tag: &str) -> PathBuf {
@@ -272,5 +273,53 @@ fn grep_encontra_pelo_metadado() {
     assert_eq!(hits[0]["file"], "auth/session.rs");
     assert!(hits[0]["score"].as_f64().unwrap() > 0.0);
 
+    fs::remove_dir_all(&base).ok();
+}
+
+#[test]
+fn mcp_responde_handshake_e_tools_list() {
+    use std::io::BufRead;
+
+    let base = tmp("mcp");
+    fs::write(base.join("a.rs"), "fn main() {}").unwrap();
+    let init = c2().arg("--root").arg(&base).arg("init").output().unwrap();
+    assert!(init.status.success());
+
+    let mut filho = c2()
+        .arg("--root")
+        .arg(&base)
+        .arg("mcp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    {
+        let mut stdin = filho.stdin.take().unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2024-11-05"}}}}"#
+        )
+        .unwrap();
+        writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list"}}"#).unwrap();
+    }
+
+    let mut linhas = Vec::new();
+    {
+        let stdout = filho.stdout.take().unwrap();
+        let leitor = std::io::BufReader::new(stdout);
+        for linha in leitor.lines().take(2) {
+            linhas.push(linha.unwrap());
+        }
+    }
+    let _ = filho.kill();
+    let _ = filho.wait();
+
+    let tudo = linhas.join("\n");
+    assert!(tudo.contains("\"protocolVersion\""), "{tudo}");
+    assert!(tudo.contains("2024-11-05"), "{tudo}");
+    assert!(tudo.contains("c2_grep"), "{tudo}");
+    assert!(tudo.contains("c2_map"), "{tudo}");
     fs::remove_dir_all(&base).ok();
 }

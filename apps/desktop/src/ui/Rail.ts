@@ -1,7 +1,7 @@
 import { icon, type IconName } from "../icons/index";
 import styles from "./Rail.module.css";
 
-export type Route = "projects" | "engine" | "search" | "settings";
+export type Route = "projects" | "engine" | "search" | "mcp" | "settings";
 
 export interface RailProps {
   active: Route;
@@ -12,6 +12,7 @@ const ITEMS: Array<{ route: Route; icon: IconName; label: string }> = [
   { route: "projects", icon: "projects", label: "Projetos" },
   { route: "engine", icon: "engine", label: "Engine" },
   { route: "search", icon: "search", label: "Busca" },
+  { route: "mcp", icon: "mcp", label: "MCP" },
   { route: "settings", icon: "settings", label: "Config" },
 ];
 

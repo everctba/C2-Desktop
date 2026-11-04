@@ -69,6 +69,13 @@ apps/desktop/
     └── tauri.conf.json
 ```
 
+## MCP
+
+A aba **MCP** faz o handshake real com `c2 mcp` (`initialize` + `tools/list`)
+ao abrir, mostra protocolo, servidor, lista de ferramentas e a configuração
+para colar em um cliente MCP. Se a CLI não estiver ao lado do app, o painel
+mostra "indisponível" com o motivo.
+
 ## Instalar em outra pasta
 
 O instalador abre o **seletor gráfico de pasta** do Windows (padrão
