@@ -101,6 +101,27 @@ impl Hit {
 }
 
 /// Executa a busca sobre os metadados do workspace.
+/// Teto de arquivos lidos na fase 2 (símbolos/trecho). O metadado já filtrou
+/// os candidatos; não faz sentido voltar a ler o projeto inteiro (c2-e8.1).
+fn max_content_reads(limit: usize) -> usize {
+    limit.saturating_mul(4).clamp(40, 400)
+}
+
+/// Candidato da fase 1: caminho + metadados, sem I/O de conteúdo.
+struct Candidate {
+    file: String,
+    summary: String,
+    path_score: f32,
+    semantic_score: f32,
+    evidence: Vec<Evidence>,
+}
+
+/// Busca em duas fases:
+/// 1. caminho + metadados (barato, sem abrir arquivos) → candidatos;
+/// 2. conteúdo apenas dos melhores candidatos, para símbolos e trecho.
+///
+/// Compromisso: arquivo que só casaria por símbolo e cujo metadado não menciona
+/// o termo não vira candidato. Em troca, deixa de ler o projeto inteiro.
 pub fn search(
     workspace: &Workspace,
     config: &Config,
@@ -113,79 +134,100 @@ pub fn search(
         return Ok(Vec::new());
     }
 
-    let mut hits = Vec::new();
-    let mut symbol_cache: HashMap<String, Vec<String>> = HashMap::new();
-
+    /* ---------- fase 1: metadados ---------- */
+    let mut candidatos: Vec<Candidate> = Vec::new();
     for meta_path in crate::cleaner::metadata_files(workspace.root())? {
         let Ok(meta) = MetaFile::read(&meta_path) else {
             continue;
         };
-        let rel = meta.file.clone();
-        if rel.is_empty() {
+        if meta.file.is_empty() {
             continue;
         }
 
-        let path_tokens = tokenize(&rel);
+        let path_tokens = tokenize(&meta.file);
         let semantic_fields = semantic_tokens(&meta);
-        let symbols = symbols_for(workspace, &rel, &mut symbol_cache);
-
         let mut path_score = 0.0;
-        let mut symbol_score = 0.0;
         let mut semantic_score = 0.0;
         let mut evidence: Vec<Evidence> = Vec::new();
 
         for term in &query_terms {
-            let mut term_hit = false;
-
             if let Some(matched) = match_terms(term, &path_tokens) {
                 path_score += W_PATH * matched;
-                term_hit = true;
                 push_evidence(&mut evidence, "path", term);
-            }
-            if let Some(matched) = match_terms(term, &symbols) {
-                symbol_score += W_SYMBOL * matched;
-                term_hit = true;
-                push_evidence(&mut evidence, "symbol", term);
             }
             for (field, tokens) in &semantic_fields {
                 if let Some(matched) = match_terms(term, tokens) {
                     semantic_score += W_SEMANTIC * matched;
-                    term_hit = true;
                     push_evidence(&mut evidence, &format!("semantic.{field}"), term);
                 }
             }
+            if semantic_fields
+                .values()
+                .any(|tokens| tokens.iter().any(|token| token.contains(term.as_str())))
+            {
+                semantic_score += W_SEMANTIC * PARTIAL;
+                push_evidence(&mut evidence, "semantic.summary", term);
+            }
+        }
 
-            if !term_hit {
-                // Ultimo recurso: substring no resumo, para consulta com radical.
-                if semantic_fields
-                    .values()
-                    .any(|tokens| tokens.iter().any(|t| t.contains(term.as_str())))
-                {
-                    semantic_score += W_SEMANTIC * PARTIAL;
-                    push_evidence(&mut evidence, "semantic.summary", term);
+        if path_score + semantic_score <= 0.0 {
+            continue;
+        }
+        candidatos.push(Candidate {
+            file: meta.file,
+            summary: meta.semantic.summary,
+            path_score,
+            semantic_score,
+            evidence,
+        });
+    }
+
+    candidatos.sort_by(|a, b| {
+        let score_a = a.path_score + a.semantic_score;
+        let score_b = b.path_score + b.semantic_score;
+        score_b
+            .partial_cmp(&score_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.file.cmp(&b.file))
+    });
+    candidatos.truncate(max_content_reads(options.limit));
+
+    /* ---------- fase 2: conteúdo só dos candidatos ---------- */
+    let mut hits: Vec<Hit> = Vec::with_capacity(candidatos.len());
+    for candidato in candidatos {
+        let caminho = workspace
+            .root()
+            .join(candidato.file.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let conteudo = fs::read_to_string(caminho).ok();
+
+        let mut symbol_score = 0.0;
+        let mut evidence = candidato.evidence;
+        if let Some(conteudo) = &conteudo {
+            let simbolos = extract_symbols(conteudo);
+            for term in &query_terms {
+                if let Some(matched) = match_terms(term, &simbolos) {
+                    symbol_score += W_SYMBOL * matched;
+                    push_evidence(&mut evidence, "symbol", term);
                 }
             }
         }
 
-        let score = path_score + symbol_score + semantic_score;
-        if score <= 0.0 {
-            continue;
-        }
-
         let snippet = if options.include_snippets {
-            find_snippet(workspace, &rel, &query_terms)
+            conteudo
+                .as_deref()
+                .and_then(|texto| snippet_from_content(texto, &query_terms))
         } else {
             None
         };
 
         hits.push(Hit {
-            file: rel,
-            score,
-            path_score,
+            file: candidato.file,
+            score: candidato.path_score + symbol_score + candidato.semantic_score,
+            path_score: candidato.path_score,
             symbol_score,
-            semantic_score,
+            semantic_score: candidato.semantic_score,
             evidence,
-            summary: meta.semantic.summary.clone(),
+            summary: candidato.summary,
             snippet,
         });
     }
@@ -238,48 +280,10 @@ fn semantic_tokens(meta: &MetaFile) -> BTreeMap<&'static str, Vec<String>> {
 }
 
 /// Simbolos do arquivo, extraidos por heuristica de linha (sem parser).
-fn symbols_for(
-    workspace: &Workspace,
-    rel: &str,
-    cache: &mut HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    if let Some(cached) = cache.get(rel) {
-        return cached.clone();
-    }
-    let path = workspace
-        .root()
-        .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
-    let symbols = fs::read_to_string(&path)
-        .map(|content| extract_symbols(&content))
-        .unwrap_or_default();
-    cache.insert(rel.to_string(), symbols.clone());
-    symbols
-}
-
 const SYMBOL_KEYWORDS: &[&str] = &[
-    "fn",
-    "def",
-    "function",
-    "class",
-    "struct",
-    "enum",
-    "trait",
-    "impl",
-    "interface",
-    "type",
-    "const",
-    "static",
-    "pub",
-    "async",
-    "let",
-    "var",
-    "module",
-    "defmodule",
-    "func",
-    "sub",
+    "fn", "def", "function", "class", "struct", "enum", "trait", "impl", "interface", "type",
+    "const", "static", "pub", "async", "let", "var", "module", "defmodule", "func", "sub",
 ];
-
-/// Extrai identificadores declarados (heuristica por palavra-chave).
 pub fn extract_symbols(content: &str) -> Vec<String> {
     let mut symbols = Vec::new();
     for line in content.lines() {
@@ -302,13 +306,9 @@ pub fn extract_symbols(content: &str) -> Vec<String> {
 }
 
 /// Primeiro trecho do arquivo onde algum termo da consulta aparece.
-fn find_snippet(workspace: &Workspace, rel: &str, terms: &[String]) -> Option<Snippet> {
-    let path = workspace
-        .root()
-        .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
-    let content = fs::read_to_string(path).ok()?;
+/// Trecho (linha do primeiro termo com contexto de 1 linha antes/2 depois).
+fn snippet_from_content(content: &str, terms: &[String]) -> Option<Snippet> {
     let lines: Vec<&str> = content.lines().collect();
-
     for (index, line) in lines.iter().enumerate() {
         let normalized = normalize(line);
         if terms.iter().any(|term| normalized.contains(term.as_str())) {
@@ -325,7 +325,6 @@ fn find_snippet(workspace: &Workspace, rel: &str, terms: &[String]) -> Option<Sn
     None
 }
 
-/// Minusculas e sem acentos.
 pub fn normalize(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
