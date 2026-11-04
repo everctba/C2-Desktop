@@ -17,6 +17,9 @@ use serde::Serialize;
 use tauri::{Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
+/// Projeto passado por `c2 open --root <dir>`.
+struct InitialRoot(Option<String>);
+
 /// Estado do laco de indexacao controlado pela janela.
 #[derive(Default)]
 struct Engine {
@@ -32,6 +35,12 @@ fn open_workspace(root: &str) -> Result<Workspace, String> {
         return Ok(found);
     }
     Ok(workspace)
+}
+
+/// Projeto com que a janela foi aberta (se veio de `c2 open`).
+#[tauri::command]
+fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
+    initial.0.clone()
 }
 
 #[tauri::command]
@@ -405,10 +414,20 @@ fn pick_model(app: tauri::AppHandle) -> Option<String> {
 /// Ponto de entrada chamado por `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `c2 open --root <dir>` passa o projeto para a janela.
+    let args: Vec<String> = std::env::args().collect();
+    let root = args
+        .iter()
+        .position(|arg| arg == "--root")
+        .and_then(|index| args.get(index + 1))
+        .cloned();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Engine::default())
+        .manage(InitialRoot(root))
         .invoke_handler(tauri::generate_handler![
+            initial_root,
             workspace_status,
             workspace_init,
             workspace_reindex,

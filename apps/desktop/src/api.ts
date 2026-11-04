@@ -46,6 +46,7 @@ export function onEngineEvent(
 }
 
 export const api = {
+  initialRoot: () => invoke<string | null>("initial_root"),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),
@@ -213,6 +214,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return MOCK_ROOT as T;
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
+    case "initial_root":
+      return null as T;
     case "model_inspect":
     case "model_set":
       return {

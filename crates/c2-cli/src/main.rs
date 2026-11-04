@@ -45,7 +45,13 @@ enum Command {
         /// Sobrescreve a configuracao existente
         #[arg(long)]
         force: bool,
+        /// Abre a janela do C2 neste projeto ao terminar
+        #[arg(long)]
+        open: bool,
     },
+
+    /// Abre a janela do C2 Desktop neste projeto
+    Open,
 
     /// Mostra o estado do workspace
     Status,
@@ -143,7 +149,14 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init { force } => cmd_init(cli.root.as_deref(), force, cli.json),
+        Command::Init { force, open } => {
+            cmd_init(cli.root.as_deref(), force, cli.json)?;
+            if open {
+                cmd_open(cli.root.as_deref())?;
+            }
+            Ok(())
+        }
+        Command::Open => cmd_open(cli.root.as_deref()),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
@@ -245,6 +258,54 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
     }
     println!();
     println!("Proximo passo: `c2 start` para indexar.");
+    Ok(())
+}
+
+/// Localiza o executavel do C2 Desktop ao lado da CLI, no PATH ou na
+/// instalacao padrao (%LOCALAPPDATA%\C2).
+fn find_desktop_app() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let atual = std::fs::canonicalize(&exe).unwrap_or_else(|_| exe.clone());
+    let dir = exe.parent()?;
+
+    let mut candidatos = vec![dir.join("..").join("C2.exe"), dir.join("C2.exe")];
+    if let Some(found) = runtime::which("C2") {
+        candidatos.push(found);
+    }
+    if let Some(base) = std::env::var_os("LOCALAPPDATA") {
+        candidatos.push(PathBuf::from(base).join("C2").join("C2.exe"));
+    }
+
+    // No Windows `c2.exe` e `C2.exe` sao o mesmo arquivo: nunca "abrir" a
+    // propria CLI por engano (o app tem outro binario).
+    candidatos.into_iter().find(|candidato| {
+        if !candidato.is_file() {
+            return false;
+        }
+        match std::fs::canonicalize(candidato) {
+            Ok(canonico) => canonico != atual,
+            Err(_) => false,
+        }
+    })
+}
+/// Abre a janela do C2 no workspace atual (ou na pasta informada).
+fn cmd_open(root: Option<&Path>) -> Result<()> {
+    let workspace = resolve_workspace(root)?;
+    let app = find_desktop_app().ok_or_else(|| {
+        anyhow::anyhow!(
+            "C2 Desktop nao encontrado. Instale o pacote (instalar.ps1) ou abra a \
+             janela manualmente em {}",
+            workspace.root().display()
+        )
+    })?;
+
+    std::process::Command::new(&app)
+        .arg("--root")
+        .arg(workspace.root())
+        .spawn()
+        .with_context(|| format!("falha ao abrir {}", app.display()))?;
+
+    println!("C2 Desktop aberto em {}", workspace.root().display());
     Ok(())
 }
 

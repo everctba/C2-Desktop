@@ -197,6 +197,13 @@ function subscribeEvents(): void {
 }
 
 async function boot(): Promise<void> {
+  if (!state.root) {
+    const fromArgs = await api.initialRoot();
+    if (fromArgs) {
+      state.root = fromArgs.replace(/\\/g, "/");
+      localStorage.setItem("c2.root", state.root);
+    }
+  }
   await loadStatus();
   if (!state.status && state.root) state.route = "projects";
   if (state.status) log("workspace carregado");
