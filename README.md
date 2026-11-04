@@ -15,8 +15,9 @@ tokens e errando menos.
 ## Plataformas
 
 - **Windows 10/11 (x64)** — suportado e validado nesta fase.
-- **Linux** — planejado para uma fase seguinte; o Core já compila para
-  `x86_64-unknown-linux-gnu` (decisão `c2-uf5`).
+- **Linux** — planejado para uma fase seguinte (decisão `c2-uf5`); o Core já
+  compila para `x86_64-unknown-linux-gnu` e o build está pronto:
+  `bash scripts/build-linux.sh` (roteiro em `docs/linux-validation.md`).
 - **macOS** — fora do escopo.
 
 ## Requisitos

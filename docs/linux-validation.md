@@ -20,6 +20,89 @@ encerramento de processo (`kill`).
 
 ---
 
+## Linux Mint (dual boot) — caminho pronto
+
+O projeto já tem script de build e download de runtime para Linux. No Mint:
+
+**1. Copie o repositório para o home** (NTFS é lento e não guarda permissões/symlinks):
+
+```bash
+DISCO="/media/$USER/$(ls /media/$USER | head -1)"
+rsync -a --exclude target --exclude node_modules --exclude dist --exclude build \
+    "$DISCO/TUDO/Codigo/Codigo/C2 Desktop/" ~/c2/
+cd ~/c2
+```
+
+**2. Instale dependências e compile** (uma vez; pede sudo):
+
+```bash
+bash scripts/build-linux.sh --install-deps
+```
+
+Isso instala `build-essential`, `libssl-dev`, `pkg-config`, `curl`, `unzip` e — se
+for compilar o desktop — `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`,
+`libayatana-appindicator3-dev`, `librsvg2-dev`, `patchelf`.
+
+> **Mint 21 (base Ubuntu 22.04)** pode não ter `libwebkit2gtk-4.1-dev` (Tauri v2
+> exige 4.1). Sem problema: rode `bash scripts/build-linux.sh --no-desktop` para
+> gerar o pacote de **CLI + runtime**, que é o caminho do gate; o desktop pede
+> Mint 22 (base Ubuntu 24.04). O script avisa quando isso acontece.
+
+Requisitos de Node (só para o desktop): Node 20+ e pnpm
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo corepack enable && corepack prepare pnpm@10 --activate
+```
+
+**3. Build:**
+
+```bash
+bash scripts/build-linux.sh                  # CLI + desktop + runtime (Vulkan)
+bash scripts/build-linux.sh --no-desktop     # só CLI + runtime
+FLAVOR=cpu bash scripts/build-linux.sh       # runtime apenas CPU
+```
+
+Saída em `dist/linux/`:
+
+```text
+dist/linux/
+├── C2                app desktop (se compilado)
+├── cli/c2            CLI do Core
+├── runtime/          llama-server oficial (Vulkan + CPU)
+├── LEIA-ME.txt
+└── CHECKSUMS.txt
+```
+
+O script termina com smoke test (`--version`, `init`, `status`, `reindex --dry-run`,
+`cleaner`) e o runtime já é encontrado pela CLI (`cli/../runtime`).
+
+**4. Testar o fluxo completo** (modelo pode ficar no NTFS):
+
+```bash
+GGUF="/media/$USER/<disco>/ChatRTX/LocalAI/models/lmstudio-community/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q4_K_M.gguf"
+
+./dist/linux/cli/c2 --root /tmp/proj init
+./dist/linux/cli/c2 --root /tmp/proj config set model.path "$GGUF"
+./dist/linux/cli/c2 --root /tmp/proj config set model.port 8099
+./dist/linux/cli/c2 --root /tmp/proj status
+./dist/linux/cli/c2 --root /tmp/proj reindex --limit 1
+./dist/linux/cli/c2 --root /tmp/proj status    # metadata = 1
+./dist/linux/cli/c2 --root /tmp/proj reindex   # 2ª passada: 0 chamadas
+./dist/linux/cli/c2 --root /tmp/proj grep "valida limite"
+./dist/linux/cli/c2 --root /tmp/proj related main.rs --json
+./dist/linux/cli/c2 --root /tmp/proj cleaner
+pgrep -af llama-server || echo "nenhum runtime orfao"
+```
+
+Desktop (precisa de sessão gráfica): `./dist/linux/C2 --root /tmp/proj`.
+
+**5. Runtime sob demanda:** `bash scripts/fetch-runtime.sh` baixa de novo o
+runtime (Vulkan por padrão; `FLAVOR=cpu` para CPU) sem recompilar o resto.
+
+---
+
 ## Roteiro A — WSL2 (recomendado)
 
 Requer **PowerShell como Administrador** e, normalmente, **um reboot**.
