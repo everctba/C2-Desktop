@@ -42,6 +42,8 @@ pub struct RuntimeSummary {
     pub source: Option<String>,
     pub version: Option<String>,
     pub url: String,
+    /// Ultima mensagem de erro do llama-server, quando houver.
+    pub last_error: Option<String>,
 }
 
 /// Parametros do laco.
@@ -102,6 +104,7 @@ pub fn build(workspace: &Workspace) -> Result<StatusReport> {
             source: runtime_status.source,
             version: runtime_status.version,
             url: config.model.health_url(),
+            last_error: crate::runtime::last_error(workspace),
         },
         files: discovery.files.len(),
         metadata: metadata.len(),

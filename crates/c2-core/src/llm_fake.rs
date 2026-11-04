@@ -61,7 +61,10 @@ pub fn start(replies: Vec<Reply>) -> FakeServer {
 
             // Consome o corpo restante (Content-Length) para o cliente nao travar.
             let cabecalho = String::from_utf8_lossy(&buffer[..lidos]).to_string();
-            let mut corpo = cabecalho.split_once("\r\n\r\n").map(|(_, b)| b.len()).unwrap_or(0);
+            let mut corpo = cabecalho
+                .split_once("\r\n\r\n")
+                .map(|(_, b)| b.len())
+                .unwrap_or(0);
             let esperado = cabecalho
                 .lines()
                 .find(|linha| linha.to_ascii_lowercase().starts_with("content-length:"))

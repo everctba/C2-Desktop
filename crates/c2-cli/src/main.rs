@@ -361,6 +361,7 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                     "pid": engine_pid,
                 },
                 "runtime": runtime_json(&workspace, &config),
+                "runtime_error": runtime::last_error(&workspace),
                 "initialized": true,
                 "pending": discovery.files.len().saturating_sub(metadata.len()),
                 "log": {
@@ -1116,6 +1117,9 @@ fn print_runtime_status(workspace: &Workspace, config: &c2_core::Config) {
     }
     if let Some(version) = &status.version {
         println!("Versao:      {version}");
+    }
+    if let Some(erro) = &status.last_error {
+        println!("Erro:        {erro}");
     }
 }
 

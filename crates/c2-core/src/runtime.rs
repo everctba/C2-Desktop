@@ -38,6 +38,8 @@ pub struct RuntimeStatus {
     pub binary: Option<PathBuf>,
     pub source: Option<String>,
     pub version: Option<String>,
+    /// Ultima linha de erro do log do llama-server.
+    pub last_error: Option<String>,
 }
 
 /// Resultado de `ensure`.
@@ -311,14 +313,81 @@ pub fn validate_binary(resolved: &Resolved) -> Result<String> {
         })
 }
 
+/// Valida o arquivo antes de gastar tempo subindo o servidor (c2-e4t6).
+fn validar_modelo(model: &str) -> Result<()> {
+    if !Path::new(model).is_file() {
+        return Err(C2Error::InvalidConfig(format!(
+            "modelo GGUF nao encontrado: {model}\n  dica: c2 config set model.path \"<caminho do .gguf>\""
+        )));
+    }
+    crate::gguf::read_info(Path::new(model)).map_err(|err| {
+        C2Error::InvalidConfig(format!(
+            "o arquivo nao parece um GGUF valido ({model}): {err}\n  dica: baixe de novo o .gguf (o download pode ter sido interrompido)"
+        ))
+    })?;
+    Ok(())
+}
+
+/// Alguem ja escuta nesta porta? (evita subir e falhar em silencio)
+fn porta_em_uso(host: &str, port: u16) -> bool {
+    std::net::TcpStream::connect((host, port)).is_ok()
+}
+
+/// Traduz o log do llama-server em uma mensagem acionavel.
+fn explicar_falha(err_path: &Path, tail: &str) -> String {
+    let minusculo = tail.to_ascii_lowercase();
+    let falta_memoria = [
+        "out of memory",
+        "failed to allocate",
+        "cuda error",
+        "vulkan error",
+        "ggml_backend_vk",
+        "ggml_backend_cuda",
+        "oom",
+    ]
+    .iter()
+    .any(|marcador| minusculo.contains(marcador));
+
+    if falta_memoria {
+        return format!(
+            "falta de memoria ao carregar o modelo: reduza model.ctx_size e model.gpu_layers, \
+             ou feche outros programas que usam a GPU/RAM\n  log: {}\n{tail}",
+            err_path.display()
+        );
+    }
+    format!(
+        "llama-server nao respondeu: o processo pode ter morrido ao carregar. \
+         Verifique o log \n  log: {}\n{tail}",
+        err_path.display()
+    )
+}
+
+/// Ultimo erro registrado pelo runtime (para `c2 status`).
+pub fn last_error(workspace: &Workspace) -> Option<String> {
+    let path = workspace.logs_dir().join("llama.err.log");
+    let texto = fs::read_to_string(path).ok()?;
+    let linha = texto
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|linha| !linha.is_empty() && !linha.starts_with("llama-server: server"))?;
+    Some(linha.chars().take(200).collect())
+}
+
 /// Sobe o servidor, espera o health check e devolve o PID.
 pub fn start(workspace: &Workspace, config: &Config, resolved: &Resolved) -> Result<u32> {
     let model = config.model.path.as_deref().ok_or_else(|| {
-        C2Error::InvalidConfig("model.path nao configurado (caminho do .gguf)".to_string())
+        C2Error::InvalidConfig(
+            "nenhum modelo configurado (model.path vazio)\n  dica: c2 config set model.path \"<caminho do .gguf>\" ou use a tela Modelo".to_string(),
+        )
     })?;
-    if !Path::new(model).is_file() {
+    validar_modelo(model)?;
+    if porta_em_uso(&config.model.host, config.model.port) {
         return Err(C2Error::InvalidConfig(format!(
-            "modelo GGUF nao encontrado: {model}"
+            "porta {} ja esta em uso em {}\n  dica: feche o processo que ocupa a porta ou rode: c2 config set model.port {}",
+            config.model.port,
+            config.model.host,
+            config.model.port.saturating_add(1)
         )));
     }
 
@@ -369,15 +438,16 @@ pub fn start(workspace: &Workspace, config: &Config, resolved: &Resolved) -> Res
         if health(config) {
             return Ok(pid);
         }
+        if !pid_alive(pid) {
+            break;
+        }
         std::thread::sleep(Duration::from_millis(500));
     }
 
     let _ = stop(workspace);
     let tail = fs::read_to_string(&err_path).unwrap_or_default();
     let tail: String = tail.lines().rev().take(8).collect::<Vec<_>>().join("\n");
-    Err(C2Error::Llm(format!(
-        "llama-server nao respondeu em 180s. Log ({err_path:?}):\n{tail}"
-    )))
+    Err(C2Error::Llm(explicar_falha(&err_path, &tail)))
 }
 
 /// Garante o servidor no ar, reiniciando com backoff ate `model.max_retries`.
@@ -467,6 +537,7 @@ pub fn status(workspace: &Workspace, config: &Config) -> RuntimeStatus {
         binary: resolved.as_ref().map(|res| res.binary.clone()),
         source: resolved.map(|res| res.source),
         version,
+        last_error: last_error(workspace),
     }
 }
 
@@ -600,5 +671,93 @@ mod tests {
             err.to_string().contains("nao foi possivel executar"),
             "{err}"
         );
+    }
+}
+
+#[cfg(test)]
+mod erro_tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    fn tmp(tag: &str) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("c2-err-{tag}-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn falta_de_memoria_tem_mensagem_propria() {
+        let mensagem = explicar_falha(
+            Path::new(".c2/logs/llama.err.log"),
+            "ggml_backend_cuda: failed to allocate 4.00 MiB",
+        );
+        assert!(mensagem.contains("falta de memoria"), "{mensagem}");
+        assert!(mensagem.contains("ctx_size"), "{mensagem}");
+    }
+
+    #[test]
+    fn modelo_ausente_cita_como_configurar() {
+        let base = tmp("sem-modelo");
+        let workspace = Workspace::at(&base);
+        workspace.init(false).unwrap();
+        let config = workspace.load_config().unwrap();
+        let resolvido = Resolved {
+            binary: base.join("llama-server-inexistente"),
+            dll_dirs: Vec::new(),
+            source: "teste".to_string(),
+        };
+
+        let erro = start(&workspace, &config, &resolvido)
+            .unwrap_err()
+            .to_string();
+        assert!(erro.contains("c2 config set model.path"), "{erro}");
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn modelo_corrompido_e_recusado_com_dica() {
+        let base = tmp("corrompido");
+        let modelo = base.join("modelo.gguf");
+        std::fs::write(&modelo, b"nao sou gguf").unwrap();
+
+        let erro = validar_modelo(&modelo.display().to_string())
+            .unwrap_err()
+            .to_string();
+        assert!(erro.contains("GGUF"), "{erro}");
+        assert!(erro.contains("baixe de novo"), "{erro}");
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn porta_ocupada_e_detectada() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let porta = listener.local_addr().unwrap().port();
+        assert!(porta_em_uso("127.0.0.1", porta));
+        drop(listener);
+
+        // porta sem listener nao acusa uso
+        let livre = TcpListener::bind("127.0.0.1:0").unwrap();
+        let livre_porta = livre.local_addr().unwrap().port();
+        drop(livre);
+        assert!(!porta_em_uso("127.0.0.1", livre_porta));
+    }
+
+    #[test]
+    fn status_reflete_ultimo_erro_do_runtime() {
+        let base = tmp("status");
+        let workspace = Workspace::at(&base);
+        workspace.init(false).unwrap();
+        let logs = workspace.logs_dir();
+        std::fs::create_dir_all(&logs).unwrap();
+        std::fs::write(logs.join("llama.err.log"), "load_tensors: out of memory\n").unwrap();
+
+        let erro = last_error(&workspace).unwrap();
+        assert!(erro.contains("out of memory"), "{erro}");
+        std::fs::remove_dir_all(&base).ok();
     }
 }

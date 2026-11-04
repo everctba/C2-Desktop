@@ -362,7 +362,10 @@ mod tests {
 
         let inicio = std::time::Instant::now();
         let erro = llm.semantic_for("src/a.rs", "x").unwrap_err();
-        assert!(matches!(erro, C2Error::Llm(_)), "esperava erro de LLM: {erro}");
+        assert!(
+            matches!(erro, C2Error::Llm(_)),
+            "esperava erro de LLM: {erro}"
+        );
         assert!(
             inicio.elapsed() < std::time::Duration::from_millis(2500),
             "timeout deve cortar antes da resposta lenta"
@@ -379,7 +382,10 @@ mod tests {
         llm.max_retries = 1;
 
         let erro = llm.semantic_for("src/a.rs", "x").unwrap_err();
-        assert!(matches!(erro, C2Error::Llm(_)), "esperava erro de LLM: {erro}");
+        assert!(
+            matches!(erro, C2Error::Llm(_)),
+            "esperava erro de LLM: {erro}"
+        );
         assert!(
             servidor.calls.load(Ordering::SeqCst) >= 1,
             "ao menos uma tentativa deve ter sido feita"
