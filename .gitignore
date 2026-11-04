@@ -24,3 +24,8 @@ Thumbs.db
 
 # metadados gerados pelo C2 (regeneraveis com c2 start)
 *.c2.json
+
+# configuracao do workspace C2 (especifica da maquina; c2 init regenera)
+/.c2/config.json
+/.c2/runtime.pid
+/.c2/engine.lock

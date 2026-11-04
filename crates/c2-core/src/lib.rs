@@ -11,6 +11,7 @@ pub mod hash;
 pub mod indexer;
 pub mod links;
 pub mod llm;
+pub mod runtime;
 pub mod schema;
 pub mod search;
 pub mod security;

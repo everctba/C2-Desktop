@@ -1,6 +1,7 @@
 # Sobe o llama-server para desenvolvimento.
 #
-# Enquanto o C2 nao empacota o proprio runtime (c2-e4t3), usa o llama.cpp que
+# Fallback manual: o C2 ja sobe e supervisiona o runtime sozinho (c2-e4t2/e4t3).
+# Use este script para depurar o servidor isoladamente. Ele usa o llama.cpp que
 # ja vem com o LM Studio e o modelo apontado em .c2/config.json (model.path).
 # O modelo NAO e copiado: e lido no caminho configurado.
 #

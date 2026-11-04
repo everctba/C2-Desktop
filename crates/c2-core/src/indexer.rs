@@ -312,7 +312,14 @@ fn index_one<P: SemanticProvider>(
 
     // Segredos nunca vao ao modelo (c2-e9t2). O hash continua sendo do conteudo
     // original: mascarar nao muda a identidade do arquivo.
+    let allowlisted = config
+        .index
+        .secret_allow
+        .iter()
+        .any(|pattern| item.rel == *pattern || item.rel.starts_with(pattern.as_str()));
+
     let prompt_content = match config.index.secret_policy {
+        _ if allowlisted => content.clone(),
         SecretPolicy::Skip => {
             if let Some(kind) = security::detect(&content) {
                 report.blocked += 1;
@@ -687,7 +694,7 @@ mod tests {
         let config = workspace.load_config().unwrap();
         fs::write(
             base.join("src/a.rs"),
-            "-----BEGIN RSA PRIVATE KEY-----\nabc\n",
+            "-----BEGIN RSA PRIVATE KEY-----\nabc\n", // c2:allow-secret
         )
         .unwrap();
         let provider = MockProvider::ok();
@@ -707,7 +714,7 @@ mod tests {
         config.index.secret_policy = crate::security::SecretPolicy::Mask;
         fs::write(
             base.join("src/a.rs"),
-            "password = \"super-secreta-123\"\nfn a() {}\n",
+            "password = \"super-secreta-123\"\nfn a() {}\n", // c2:allow-secret
         )
         .unwrap();
         let provider = CapturingProvider::default();
@@ -719,6 +726,25 @@ mod tests {
         let all: String = seen.join("\n");
         assert!(all.contains("[REDACTED]"), "conteudo enviado: {all}");
         assert!(!all.contains("super-secreta-123"));
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn allowlist_libera_arquivo_com_fixture_de_segredo() {
+        let (base, workspace) = setup("allow");
+        let mut config = workspace.load_config().unwrap();
+        config.index.secret_allow = vec!["src/a.rs".to_string()];
+        fs::write(
+            base.join("src/a.rs"),
+            "password = \"fixture-de-teste-123\"\n",
+        )
+        .unwrap();
+        let provider = MockProvider::ok();
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.blocked, 0);
+        assert!(base.join("src/a.rs.c2.json").exists());
 
         fs::remove_dir_all(&base).ok();
     }

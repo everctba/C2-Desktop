@@ -20,6 +20,13 @@ pub struct ModelConfig {
     pub name: String,
     /// Caminho do GGUF; `None` usa o que o servidor ja estiver servindo.
     pub path: Option<String>,
+    /// Caminho do binario do llama-server; `None` busca automaticamente.
+    pub binary: Option<String>,
+    /// Diretorios extras com DLLs do runtime (ex.: vendor CUDA).
+    pub dll_dirs: Vec<String>,
+    /// Permite usar os backends do LM Studio como fallback de desenvolvimento.
+    /// O produto final embarca o runtime proprio (c2-e12.1).
+    pub allow_lmstudio: bool,
     /// Host do llama-server.
     pub host: String,
     /// Porta HTTP local do llama-server.
@@ -59,11 +66,14 @@ impl Default for ModelConfig {
         Self {
             name: "local-model".to_string(),
             path: None,
+            binary: None,
+            dll_dirs: Vec::new(),
+            allow_lmstudio: true,
             host: "127.0.0.1".to_string(),
             port: 8080,
             ctx_size: 8192,
             threads: 0,
-            gpu_layers: 0,
+            gpu_layers: 99,
             temperature: 0.3,
             timeout_secs: 120,
             max_retries: 2,
@@ -91,6 +101,9 @@ pub struct IndexConfig {
     pub max_links_per_file: usize,
     /// O que fazer com arquivo que contem segredo.
     pub secret_policy: SecretPolicy,
+    /// Caminhos (prefixo relativo) liberados da checagem de segredo, para
+    /// arquivos com fixtures de teste. Use com cuidado.
+    pub secret_allow: Vec<String>,
     /// Teto de bytes de conteudo enviados ao modelo por ciclo (0 = ilimitado).
     pub max_total_bytes_per_run: u64,
 }
@@ -104,6 +117,7 @@ impl Default for IndexConfig {
             respect_gitignore: true,
             max_links_per_file: 64,
             secret_policy: SecretPolicy::Skip,
+            secret_allow: Vec::new(),
             max_total_bytes_per_run: 64 * 1024 * 1024,
         }
     }

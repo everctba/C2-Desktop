@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use c2_core::indexer::{self, IndexOptions, IndexReport};
+use c2_core::runtime;
 use c2_core::schema::MetaFile;
 use c2_core::search::{self, SearchOptions};
 use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
@@ -279,6 +280,7 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                     "running": engine_pid.is_some(),
                     "pid": engine_pid,
                 },
+                "runtime": runtime_json(&workspace, &config),
                 "files": discovery.files.len(),
                 "metadata": metadata.len(),
                 "skipped": discovery.skipped,
@@ -320,6 +322,7 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         Some(pid) => println!("Engine:      rodando (pid {pid})"),
         None => println!("Engine:      parado"),
     }
+    print_runtime_status(&workspace, &config);
     println!(
         "Historico:   {} indexados, {} chamadas, {} tokens, {} erros (ultima varredura: {})",
         state.indexed,
@@ -388,6 +391,9 @@ fn cmd_config_list(root: Option<&Path>, json_output: bool) -> Result<()> {
                 config.get("model.disable_thinking"),
             ),
             ("model.max_tokens", config.get("model.max_tokens")),
+            ("model.binary", config.get("model.binary")),
+            ("model.allow_lmstudio", config.get("model.allow_lmstudio")),
+            ("model.gpu_layers", config.get("model.gpu_layers")),
             ("index.max_file_bytes", config.get("index.max_file_bytes")),
             ("index.secret_policy", config.get("index.secret_policy")),
             (
@@ -477,12 +483,10 @@ fn cmd_reindex(
                 indexer::Decision::New | indexer::Decision::Changed
             )
         });
-    if !dry_run && precisa_modelo && !client.health() {
-        bail!(
-            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1` \
-             ou ajuste model.host/model.port.",
-            config.model.health_url()
-        );
+    let mut runtime_started = false;
+    if !dry_run && precisa_modelo {
+        runtime_started = !runtime::health(&config);
+        runtime::ensure(&workspace, &config)?;
     }
 
     let report = indexer::run(&workspace, &config, &client, &options, |progress| {
@@ -503,6 +507,11 @@ fn cmd_reindex(
         state.save(&workspace.state_path())?;
     }
 
+    // Comando de uma vez: se o runtime foi subido aqui, nao deixa VRAM ocupada.
+    if runtime_started {
+        let _ = runtime::stop(&workspace);
+    }
+
     print_report(&report, dry_run, json_output)
 }
 
@@ -520,11 +529,8 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
                 indexer::Decision::New | indexer::Decision::Changed
             )
         });
-    if precisa_modelo && !client.health() {
-        bail!(
-            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1`.",
-            config.model.health_url()
-        );
+    if precisa_modelo {
+        runtime::ensure(&workspace, &config)?;
     }
 
     acquire_lock(&workspace)?;
@@ -551,6 +557,13 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
 
         if once {
             break;
+        }
+        if !runtime::health(&config) {
+            if let Ok(outcome) = runtime::ensure(&workspace, &config) {
+                if !json_output {
+                    println!("runtime reiniciado ({outcome:?})");
+                }
+            }
         }
         if !json_output {
             println!("aguardando {interval:?} (Ctrl+C para parar)...\n");
@@ -848,9 +861,17 @@ fn release_lock(workspace: &Workspace) {
 
 fn cmd_stop(root: Option<&Path>) -> Result<()> {
     let workspace = require_workspace(root)?;
+
+    let runtime_stopped = runtime::stop(&workspace)?;
+    if runtime_stopped {
+        println!("runtime (llama-server) encerrado");
+    }
+
     let Some(pid) = read_lock(&workspace) else {
         let _ = std::fs::remove_file(lock_path(&workspace));
-        println!("nenhum engine rodando neste workspace");
+        if !runtime_stopped {
+            println!("nenhum engine rodando neste workspace");
+        }
         return Ok(());
     };
 
@@ -875,22 +896,35 @@ fn cmd_stop(root: Option<&Path>) -> Result<()> {
 }
 
 fn pid_alive(pid: u32) -> bool {
-    #[cfg(windows)]
-    {
-        let output = std::process::Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
-            .output();
-        match output {
-            Ok(out) => String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()),
-            Err(_) => false,
+    runtime::pid_alive(pid)
+}
+
+fn runtime_json(workspace: &Workspace, config: &c2_core::Config) -> serde_json::Value {
+    let status = runtime::status(workspace, config);
+    json!({
+        "healthy": status.healthy,
+        "pid": status.pid,
+        "binary": status.binary,
+        "source": status.source,
+        "version": status.version,
+        "url": config.model.health_url(),
+    })
+}
+
+fn print_runtime_status(workspace: &Workspace, config: &c2_core::Config) {
+    let status = runtime::status(workspace, config);
+    let state = if status.healthy { "saudavel" } else { "parado" };
+    match (&status.binary, &status.pid) {
+        (Some(binary), Some(pid)) => {
+            println!("Runtime:     {state} (pid {pid}) {}", binary.display())
         }
+        (Some(binary), None) => println!("Runtime:     {state} ({})", binary.display()),
+        (None, _) => println!("Runtime:     nao localizado"),
     }
-    #[cfg(not(windows))]
-    {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
+    if let Some(source) = &status.source {
+        println!("Origem:      {source}");
+    }
+    if let Some(version) = &status.version {
+        println!("Versao:      {version}");
     }
 }

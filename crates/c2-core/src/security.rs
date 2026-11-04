@@ -105,6 +105,10 @@ pub fn detect(content: &str) -> Option<SecretKind> {
 }
 
 fn detect_line(line: &str) -> Option<SecretKind> {
+    // Excecao explicita para fixtures de teste: `// c2:allow-secret`.
+    if line.contains("c2:allow-secret") {
+        return None;
+    }
     let trimmed = line.trim();
 
     for marker in [
@@ -157,22 +161,7 @@ fn detect_line(line: &str) -> Option<SecretKind> {
         }
     }
 
-    const KEY_WORDS: &[&str] = &[
-        "password",
-        "passwd",
-        "senha",
-        "secret",
-        "api_key",
-        "apikey",
-        "access_key",
-        "private_key",
-        "client_secret",
-        "auth_token",
-    ];
-    if KEY_WORDS
-        .iter()
-        .any(|word| lower.contains(word) && literal_after_key(trimmed).is_some())
-    {
+    if password_assignment(trimmed) {
         return Some(SecretKind::PasswordLiteral);
     }
 
@@ -191,19 +180,91 @@ fn has_token(line: &str, prefix: &str, min_rest: usize) -> bool {
     rest.len() >= min_rest
 }
 
-/// Literal entre aspas com tamanho de segredo na mesma linha.
-fn literal_after_key(line: &str) -> Option<&str> {
-    for quote in ['"', '\''] {
-        let mut parts = line.split(quote);
-        let _ = parts.next();
-        while let Some(candidate) = parts.next() {
-            let trimmed = candidate.trim();
-            if trimmed.len() >= 8 && parts.next().is_some() {
-                return Some(trimmed);
+/// Palavras que, quando usadas como chave, indicam valor sensivel.
+fn is_secret_key(word: &str) -> bool {
+    matches!(
+        word,
+        "password"
+            | "passwd"
+            | "senha"
+            | "secret"
+            | "token"
+            | "api_key"
+            | "apikey"
+            | "access_key"
+            | "private_key"
+            | "client_secret"
+            | "auth_token"
+            | "credential"
+            | "credentials"
+    )
+}
+
+/// `chave = "valor"` ou `chave: "valor"`, exigindo valor com cara de segredo.
+fn password_assignment(line: &str) -> bool {
+    let chars: Vec<char> = line.chars().collect();
+    let mut index = 0usize;
+
+    while index < chars.len() {
+        if !chars[index].is_alphabetic() {
+            index += 1;
+            continue;
+        }
+        let start = index;
+        while index < chars.len() && (chars[index].is_alphanumeric() || chars[index] == '_') {
+            index += 1;
+        }
+        let word: String = chars[start..index]
+            .iter()
+            .collect::<String>()
+            .to_ascii_lowercase();
+        if !is_secret_key(&word) {
+            continue;
+        }
+
+        let rest: String = chars[index..].iter().collect();
+        let value = rest
+            .split_once('=')
+            .map(|(_, value)| value)
+            .or_else(|| rest.split_once(':').map(|(_, value)| value));
+        let Some(value) = value else { continue };
+
+        if let Some(literal) = quoted_value(value) {
+            if looks_like_secret(&literal) {
+                return true;
             }
         }
     }
-    None
+
+    false
+}
+
+/// Valor entre aspas logo apos o separador.
+fn quoted_value(rest: &str) -> Option<String> {
+    let rest = rest.trim_start();
+    let quote = rest.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let body = &rest[quote.len_utf8()..];
+    let end = body.find(quote)?;
+    Some(body[..end].to_string())
+}
+
+/// Um literal so e tratado como segredo se tiver entropia suficiente: nao
+/// marcamos `"private-key"`, `"secret_policy"` nem placeholders.
+fn looks_like_secret(value: &str) -> bool {
+    let value = value.trim();
+    if value.len() < 12 || value.contains(' ') {
+        return false;
+    }
+    if value.eq_ignore_ascii_case("[redacted]") {
+        return false;
+    }
+    let has_digit = value.chars().any(|c| c.is_ascii_digit());
+    let has_upper = value.chars().any(|c| c.is_ascii_uppercase());
+    let has_lower = value.chars().any(|c| c.is_ascii_lowercase());
+    has_digit || (has_upper && has_lower)
 }
 
 /// Mascara os segredos do conteudo e devolve quantos trechos foram mascarados.
@@ -385,6 +446,26 @@ mod tests {
     fn nao_marca_codigo_que_apenas_menciona_password() {
         assert_eq!(detect("let password = user_input;"), None);
         assert_eq!(detect("if senha.is_empty() { return; }"), None);
+    }
+
+    #[test]
+    fn nao_marca_falsos_positivos_do_proprio_codigo() {
+        // Linhas reais que ja foram bloqueadas por engano no indice do C2.
+        for line in [
+            r#"                "secret_policy": config.index.secret_policy,"#,
+            r#"        write(&base.join(".env"), b"SENHA=123456");"#,
+            r#"            SecretKind::PrivateKey => "private-key","#,
+            r#"    let token = generate_token();"#,
+            r#"    pub secret_allow: Vec<String>,"#,
+        ] {
+            assert_eq!(detect(line), None, "falso positivo em: {line}");
+        }
+    }
+
+    #[test]
+    fn marcador_por_linha_libera_fixture() {
+        let line = r#"let chave = "-----BEGIN RSA PRIVATE KEY-----"; // c2:allow-secret"#;
+        assert_eq!(detect(line), None);
     }
 
     #[test]
