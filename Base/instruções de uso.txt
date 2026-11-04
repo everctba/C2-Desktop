@@ -1,0 +1,3 @@
+Quando for ler um arquivo leia antes o arquivo .c2.json Existe um `.c2.json` ao lado de cada arquivo de código tocado (mesmo diretório, mesmo basename).
+
+ ele tem a inteção de lhe fornecer o contexto semantico, são metadados semanticos do código para ajudar a entender o objetivo.
