@@ -174,6 +174,27 @@ regex de import em `index.link_fallback`:
 O grupo 1 é o alvo; o C2 tenta `<dir do arquivo>/<alvo>`, `<alvo>.<ext>` e
 `<alvo>` na raiz. Regex inválida é ignorada com aviso (não derruba a indexação).
 
+## Tipografia
+
+- **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.
+- **Código/terminal:** **IBM Plex Mono** (woff2 embutido no app, licença SIL
+  OFL em `apps/desktop/src/styles/fonts/OFL.txt`). Funciona offline.
+
+## Troubleshooting
+
+### O build do desktop quebra com `missing field identifier`
+
+O Tauri lê **todo `.json`** dentro de `apps/desktop/src-tauri/capabilities/` como
+especificação de permissão. O metadado `default.json.c2.json` que o C2 gera ao
+lado do arquivo cai nessa regra e quebra o build.
+
+Solução: o `.c2ignore` da raiz já exclui essa pasta. Se você criar outro
+diretório que uma ferramenta varre por extensão, adicione-o ao `.c2ignore`:
+
+```gitignore
+apps/desktop/src-tauri/capabilities/
+```
+
 ## Comandos
 
 | Comando | Função |

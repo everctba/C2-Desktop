@@ -1,0 +1,6 @@
+# Pastas/arquivos que o C2 não deve indexar.
+# Sintaxe igual ao .gitignore; cada linha é um padrão relativo a este arquivo.
+
+# O Tauri lê TODO .json dentro de capabilities/ como especificação de permissão.
+# O metadado .c2.json gerado ao lado de default.json quebra o build do desktop.
+apps/desktop/src-tauri/capabilities/

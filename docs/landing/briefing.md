@@ -200,7 +200,11 @@ Sem atribuição, vira depoimento anônimo e perde força.
 
 Usar o Design System "Terminal Editorial" (`Design System/design-system-tokens.css`):
 tokens apenas, sem Tailwind, dark por padrão, cards sem borda com gap de 1 px,
-tipografia 10–13 px, mono para código. Pasta `site/` com build estático.
+tipografia 10–13 px. Pasta `site/` com build estático.
+
+**Tipografia:** UI em sans-serif do sistema (`Segoe UI`/`system-ui`) e **IBM Plex
+Mono** para código, comandos e números de benchmark (woff2 embutido, sem CDN —
+funciona offline). Licença SIL OFL, ver `apps/desktop/src/styles/fonts/OFL.txt`.
 
 ## 12. O que NÃO prometer
 
