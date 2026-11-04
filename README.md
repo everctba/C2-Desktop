@@ -2,12 +2,13 @@
 
 [![ci](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml)
 
-**Contexto semântico de projeto para agentes de IA.**
+**Comments 2.0 for AI** — contexto semântico de projeto para agentes de IA.
 Local. Incremental. Sem embeddings.
 
-O C2 lê seu projeto uma vez e deixa, ao lado de cada arquivo, um `.c2.json`
-com o significado daquele código. Agente consulta antes de ler:
-**menos tokens, menos erro, menos releitura.**
+O C2 comenta seu código automaticamente com IA local: `what`, `why`, `goal`,
+`summary`, `responsibility`. Um loop detecta o que mudou pelo hash e reescreve
+só o comentário afetado. Sua IA paga consome esse comentário atualizado em vez
+de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 
 ---
 

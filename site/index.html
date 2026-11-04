@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>C2 — contexto semântico de projeto para agentes de IA</title>
+    <title>C2 — Comments 2.0 for AI</title>
     <meta
       name="description"
-      content="O C2 indexa o significado do seu código uma vez e deixa agentes de IA encontrarem o arquivo certo sem reler o repositório. Local, incremental, sem embeddings."
+      content="Comments 2.0 for AI: o C2 comenta seu código automaticamente com IA local — what, why, goal, summary, responsibility — num loop que detecta mudanças. Sua IA entende o projeto e gasta menos tokens."
     />
     <link rel="stylesheet" href="styles/site.css" />
   </head>
@@ -31,20 +31,20 @@
       <div class="wrap">
         <section class="hero">
           <div>
-            <span class="eyebrow">Indexação semântica · local-first</span>
-            <h1>Sua IA para de reler o projeto.<br />O C2 já sabe onde tudo está.</h1>
+            <span class="eyebrow">Comments 2.0 for AI</span>
+            <h1>Seu código comentado por IA local.<br />Sua IA lê o comentário — não o projeto.</h1>
             <p class="lead">
-              O C2 lê o código uma vez e grava, ao lado de cada arquivo, um metadado com
-              <strong>o que é, por que existe, o que garante e do que depende</strong>.
-              Agentes consultam esse índice antes de abrir arquivos: menos tokens,
-              menos erro, menos releitura.
+              O C2 usa uma <strong>IA local</strong> para comentar cada arquivo com
+              <strong>what, why, goal, summary e responsibility</strong>, num loop que
+              detecta o que mudou e reescreve sozinho. Sua IA paga consome esse resumo
+              atualizado e gasta menos tokens — em vez de reler o projeto inteiro.
             </p>
             <div class="cta-row">
               <a class="btn btn-primary" href="#instalar">Instalar</a>
               <a class="btn btn-ghost" href="ajuda.html">Como usar</a>
             </div>
             <p class="hero-note">
-              Windows 10/11 · roda na sua máquina · sem embeddings · sem banco de dados
+              Windows 10/11 · IA local · comentário sempre atualizado · sem embeddings
             </p>
           </div>
 
@@ -73,6 +73,50 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
         </section>
       </div>
 
+      <!-- O COMENTÁRIO -->
+      <section class="section" id="comentario">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Comments 2.0</span>
+            <h2>O comentário que a sua IA deveria ler</h2>
+            <p>
+              Em vez de "// calcula o total", o C2 escreve o significado do arquivo —
+              e mantém isso atualizado sozinho.
+            </p>
+          </div>
+          <div class="grid grid-2" style="align-items: start">
+            <div>
+              <pre class="code">{
+  "file": "src/pricing.rs",
+  "semantic": {
+    "what": "cálculo de desconto por volume",
+    "why": "aplicar faixas sem duplicar regra no checkout",
+    "goal": "subtotal com desconto correto e determinístico",
+    "summary": "faixas de 0/5/10% acima de 200/500 reais",
+    "responsibility": "só desconto por volume; cupom fica em coupons.rs"
+  },
+  "links": [{ "to": "src/lib.rs", "type": "imports" }]
+}</pre>
+            </div>
+            <div>
+              <h3>Por que isso economiza tokens</h3>
+              <p>
+                O comentário diz <strong>o que o arquivo faz, por quê e até onde vai</strong> em
+                poucas linhas. Sua IA entende o projeto sem abrir cada arquivo — e, quando
+                precisa do detalhe, sabe exatamente onde clicar.
+              </p>
+              <ul>
+                <li><strong>what</strong> — o que é.</li>
+                <li><strong>why</strong> — por que existe.</li>
+                <li><strong>goal</strong> — que garantia entrega.</li>
+                <li><strong>summary</strong> — o resumo que substitui a leitura.</li>
+                <li><strong>responsibility</strong> — a fronteira: o que não é dele.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- PROBLEMA -->
       <section class="section">
         <div class="wrap">
@@ -92,7 +136,7 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
             </article>
             <article class="card">
               <span class="k">02 · vocabulário</span>
-              <h3>grep lexical falha</h3>
+              <h3>Sem C2, só grep</h3>
               <p>
                 Quem busca "onde impede valores acima do permitido" não encontra
                 <code class="inline">valor &lt;= self.limite</code>.
@@ -112,38 +156,37 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
         <div class="wrap">
           <div class="section-head">
             <span class="eyebrow">Como funciona</span>
-            <h2>Três passos. Zero infraestrutura.</h2>
-            <p>Sem banco, sem embeddings: o índice é feito de arquivos ao lado do seu código.</p>
+            <h2>Um loop que comenta sozinho</h2>
+            <p>IA local escreve; o hash decide quando reescrever; sua IA paga só lê o resultado.</p>
           </div>
 
           <ol class="steps">
             <li>
               <div>
-                <h3>Indexar</h3>
+                <h3>IA local comenta</h3>
                 <p>
-                  O C2 lê o projeto e pede a um modelo local
+                  O C2 lê o arquivo e pede a um modelo local
                   <span class="mono">what / why / goal / summary / responsibility</span>.
-                  Arquivo alterado é o único que chama o modelo.
+                  Nasce um comentário semântico de verdade.
                 </p>
               </div>
             </li>
             <li>
               <div>
-                <h3>Gravar</h3>
+                <h3>Loop detecta mudança</h3>
                 <p>
-                  O resultado vira <code class="inline">arquivo.c2.json</code> ao lado do
-                  arquivo, com hash SHA-256 e <code class="inline">links[]</code> extraídos
-                  estaticamente.
+                  Um hash por arquivo mostra o que mudou. Só o alterado chama o modelo —
+                  o comentário é reescrito e fica atualizado, sem trabalho manual.
                 </p>
               </div>
             </li>
             <li>
               <div>
-                <h3>Consultar</h3>
+                <h3>Sua IA consome</h3>
                 <p>
-                  Agente ou você usam <code class="inline">c2 grep</code>,
-                  <code class="inline">c2 related</code> e <code class="inline">c2 read</code>
-                  — ou o MCP, direto do seu cliente de IA.
+                  O comentário vira contexto barato: sua IA paga entende o projeto sem
+                  reler tudo, usando <code class="inline">c2 grep</code>,
+                  <code class="inline">c2 related</code> e o MCP.
                 </p>
               </div>
             </li>
@@ -203,7 +246,7 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
                 </tr>
                 <tr>
                   <td>Consulta semântica</td>
-                  <td><strong class="num">86 ms</strong> acha o que o grep lexical não encontra</td>
+                  <td><strong class="num">86 ms</strong> acha o que a busca sem C2 não encontra</td>
                 </tr>
                 <tr>
                   <td><span class="mono">c2 related</span></td>
@@ -234,7 +277,7 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
                 <tr>
                   <th>Consulta: "onde impede valores acima do permitido"</th>
                   <th>Com C2</th>
-                  <th>grep lexical</th>
+                  <th>Sem C2</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,6 +323,25 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
             <p style="margin-top: var(--space-s)">
               Também não vale para uma tarefa pontual num arquivo que você já sabe qual é.
             </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FRASE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="callout" style="border-left-color: var(--accent-8); padding: var(--space-6xl)">
+            <h2 style="font-size: clamp(1.5rem, 3.2vw, 2.3rem); line-height: 1.25">
+              Comente seu código de forma automatizada e semântica.<br />
+              Melhore a performance e o contexto da sua IA —<br />
+              e pare de gastar tokens relendo o projeto.
+            </h2>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#instalar">Instalar o C2</a>
+              <a class="btn btn-ghost" href="https://github.com/everctba/C2-Desktop" rel="noreferrer">
+                Ver no GitHub
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -437,7 +499,7 @@ c2 grep "onde valida permissão de usuário"</pre>
     </main>
 
     <footer class="footer wrap">
-      <span>C2 — contexto semântico de projeto · Windows 10/11</span>
+      <span>C2 — Comments 2.0 for AI · Windows 10/11</span>
       <span>
         <a href="ajuda.html">Ajuda</a> ·
         <a href="sobre.html">Sobre / apoiar</a> ·

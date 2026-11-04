@@ -1,6 +1,25 @@
 # Briefing da landing page — C2
 
-**Beads:** `c2-e18` (épico), `c2-e18t1` (estrutura/copy) · **Status:** material pronto, site adiado para depois do produto
+## 0. Slogan e copy
+
+**Slogan:** **Comments 2.0 for AI**
+
+**Frase-matadora (usar na landing e em posts):**
+> Comente seu código de forma automatizada e semântica. Melhore a performance e
+> o contexto da sua IA — e pare de gastar tokens relendo o projeto.
+
+**Ideia em um parágrafo (base para hero e apresentações):**
+O C2 comenta semanticamente cada arquivo com uma IA local: `what`, `why`,
+`goal`, `summary`, `responsibility`. Um loop detecta o que mudou pelo hash e
+reescreve só o comentário afetado. Sua IA paga consome esse comentário
+atualizado em vez de reler o projeto inteiro — é um resumo vivo do código,
+feito para consumo por IA. Comentário é código para humano; Comments 2.0 é
+comentário para IA.
+
+**Terminologia:** no comparativo, a coluna sem o C2 chama-se **"Sem C2"** (não
+"grep lexical").
+
+**Beads:** `c2-e18` (épico), `c2-e18t1` (estrutura/copy) · **Status:** material pronto e site implementado em site/ (landing, ajuda e sobre)
 **Fonte dos números:** `docs/bench-500.json`, `docs/bench-ab/resultado-piloto.md`,
 `docs/bench-ab/resultado-cego.md`, `docs/mvp-gate.md`.
 
@@ -11,8 +30,8 @@ estimativa: todo número tem medição registrada no repositório.
 
 ## 1. Posicionamento (uma frase)
 
-> O C2 indexa o **significado** do seu projeto uma vez e deixa agentes de IA
-> (e você) encontrarem o arquivo certo sem ler o repositório inteiro.
+> O C2 transforma seu código em **comentários semânticos** mantidos por IA
+> local — para sua IA paga entender o projeto sem reler o repositório inteiro.
 
 Público: desenvolvedores que usam agentes de IA (Claude Code, Cursor, etc.) em
 projetos médios/grandes e gastam contexto relendo o mesmo código.
