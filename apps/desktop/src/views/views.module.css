@@ -201,3 +201,49 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Busca visual rica (c2-e16t4) */
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  margin-top: var(--space-3xs);
+}
+
+.scoreBar {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-4);
+  overflow: hidden;
+}
+
+.scoreFill {
+  height: 100%;
+  background: var(--accent-3);
+  border-radius: var(--radius-pill);
+  transition: width 150ms ease;
+}
+
+.breakdown {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+  white-space: nowrap;
+}
+
+.mark {
+  background: var(--accent-10);
+  color: var(--text-bright);
+  border-radius: var(--radius-sm);
+  padding: 0 1px;
+}
+
+.relatedBox {
+  display: grid;
+  gap: var(--space-3xs);
+  margin-top: var(--space-2xs);
+  padding: var(--space-2xs) var(--space-s);
+  background: var(--bg-surface-2);
+  border-radius: var(--input-radius);
+}

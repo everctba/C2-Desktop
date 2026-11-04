@@ -93,7 +93,11 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
         results.appendChild(empty);
         return;
       }
-      for (const hit of hits) results.appendChild(resultRow(hit, ctx.root));
+      const maiorScore = Math.max(...hits.map((hit) => hit.score), 1);
+      const termos = [...new Set(hits.flatMap((hit) => hit.evidence.flatMap((item) => item.terms)))];
+      for (const hit of hits) {
+        results.appendChild(resultRow(hit, ctx.root, maiorScore, termos));
+      }
     } catch (error) {
       results.innerHTML = "";
       summary.textContent = "";
@@ -151,10 +155,58 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
   };
 }
 
-function resultRow(hit: Hit, root: string): HTMLElement {
+/** Escapa regex para montar o destaque dos termos. */
+function escaparRegex(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Texto com os termos do match destacados (<mark>). */
+function destacar(texto: string, termos: string[]): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  const unicos = [...new Set(termos.filter((termo) => termo.length >= 2))].sort(
+    (a, b) => b.length - a.length,
+  );
+  if (unicos.length === 0) {
+    frag.appendChild(document.createTextNode(texto));
+    return frag;
+  }
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(`(${unicos.map(escaparRegex).join("|")})`, "gi");
+  } catch {
+    frag.appendChild(document.createTextNode(texto));
+    return frag;
+  }
+
+  let ultimo = 0;
+  for (const match of texto.matchAll(regex)) {
+    const inicio = match.index ?? 0;
+    if (inicio > ultimo) {
+      frag.appendChild(document.createTextNode(texto.slice(ultimo, inicio)));
+    }
+    const marca = document.createElement("mark");
+    marca.className = styles.mark;
+    marca.textContent = match[0];
+    frag.appendChild(marca);
+    ultimo = inicio + match[0].length;
+  }
+  if (ultimo < texto.length) {
+    frag.appendChild(document.createTextNode(texto.slice(ultimo)));
+  }
+  return frag;
+}
+
+function resultRow(
+  hit: Hit,
+  root: string,
+  maiorScore: number,
+  termos: string[],
+): HTMLElement {
   const row = document.createElement("div");
   row.className = styles.resultRow;
 
+  /* cabecalho: arquivo + score */
   const head = document.createElement("div");
   head.className = styles.resultHead;
   const file = document.createElement("span");
@@ -165,13 +217,29 @@ function resultRow(hit: Hit, root: string): HTMLElement {
   head.appendChild(Pill(hit.score.toFixed(2), "accent", "xs"));
   row.appendChild(head);
 
+  /* barra de score relativa ao melhor resultado + breakdown por campo */
+  const scoreRow = document.createElement("div");
+  scoreRow.className = styles.scoreRow;
+  const barra = document.createElement("div");
+  barra.className = styles.scoreBar;
+  const preenchimento = document.createElement("div");
+  preenchimento.className = styles.scoreFill;
+  preenchimento.style.width = `${Math.round((hit.score / maiorScore) * 100)}%`;
+  barra.appendChild(preenchimento);
+  const detalhe = document.createElement("span");
+  detalhe.className = styles.breakdown;
+  detalhe.textContent = `path ${hit.path_score.toFixed(1)} · símbolo ${hit.symbol_score.toFixed(1)} · meta ${hit.semantic_score.toFixed(1)}`;
+  scoreRow.append(barra, detalhe);
+  row.appendChild(scoreRow);
+
   if (hit.summary) {
     const summary = document.createElement("div");
     summary.className = styles.resultSummary;
-    summary.textContent = hit.summary;
+    summary.appendChild(destacar(hit.summary, termos));
     row.appendChild(summary);
   }
 
+  /* evidencias por campo */
   const evidence = document.createElement("div");
   evidence.className = styles.evidence;
   evidence.appendChild(Pill(hit.symbol_score > 0 ? "símbolo" : "metadado", "neutral", "xs"));
@@ -189,9 +257,59 @@ function resultRow(hit: Hit, root: string): HTMLElement {
     const pre = document.createElement("pre");
     pre.className = styles.pre;
     pre.style.maxHeight = "160px";
-    pre.textContent = hit.snippet.text;
+    pre.appendChild(destacar(hit.snippet.text, termos));
     row.appendChild(pre);
   }
+
+  /* relacionados sem sair da busca */
+  const acoes = document.createElement("div");
+  acoes.className = styles.actions;
+  const relacionados = document.createElement("div");
+
+  const btnRelacionados = document.createElement("button");
+  btnRelacionados.type = "button";
+  btnRelacionados.textContent = "ver relacionados";
+  btnRelacionados.style.cssText =
+    "height:22px;padding:0 var(--space-xs);border:0;border-radius:var(--input-radius);" +
+    "background:var(--overlay-10);color:var(--text-muted);font-size:var(--text-2xs);" +
+    "font-weight:700;cursor:pointer";
+  btnRelacionados.addEventListener("click", async (evento) => {
+    evento.stopPropagation();
+    if (relacionados.childElementCount > 0) {
+      relacionados.replaceChildren();
+      btnRelacionados.textContent = "ver relacionados";
+      return;
+    }
+    try {
+      const rel = await api.related(root, hit.file);
+      const caixa = document.createElement("div");
+      caixa.className = styles.relatedBox;
+      const partes: string[] = [];
+      if (rel.uses.length > 0) {
+        partes.push(`usa: ${rel.uses.map((link) => link.to).join(", ")}`);
+      }
+      if (rel.used_by.length > 0) {
+        partes.push(`usado por: ${rel.used_by.map((link) => link.to).join(", ")}`);
+      }
+      if (partes.length === 0) {
+        partes.push("sem links estáticos");
+      }
+      const texto = document.createElement("span");
+      texto.className = styles.breakdown;
+      texto.textContent = partes.join(" · ");
+      caixa.appendChild(texto);
+      relacionados.appendChild(caixa);
+      btnRelacionados.textContent = "ocultar relacionados";
+    } catch (erro) {
+      relacionados.replaceChildren();
+      const falha = document.createElement("span");
+      falha.className = styles.breakdown;
+      falha.textContent = String(erro);
+      relacionados.appendChild(falha);
+    }
+  });
+  acoes.appendChild(btnRelacionados);
+  row.append(acoes, relacionados);
 
   row.addEventListener("click", () => void abrirMetadado(root, hit.file));
   return row;
