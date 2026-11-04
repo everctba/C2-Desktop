@@ -31,6 +31,25 @@ python -m http.server 8095 --directory site
   (O workflow de deploy ainda não está escrito; ver `c2-e18.5`.)
 - Qualquer host estático (Netlify, Cloudflare Pages, S3) aceita a pasta como está.
 
+## Configurar perfil e doações
+
+Tudo fica em **`site/config.js`** (nada sai do navegador):
+
+```js
+window.C2_SITE = {
+  nome: "Everton",
+  github: "everctba",        // foto/nome abrem este perfil
+  bio: "...",
+  paypal: "everctba",        // paypal.me/usuario; vazio esconde o cartão
+  pixChave: "chave@exemplo", // copia-e-cola; vazio esconde o cartão
+  pixNome: "Nome do titular",
+  githubSponsors: "",        // opcional, ex.: https://github.com/sponsors/everctba
+};
+```
+
+Foto: coloque `site/assets/img/avatar.jpg` — se não existir, aparece a inicial
+do nome. Os botões US$ 5/10/15 montam `paypal.me/<usuario>/<valor>`.
+
 ## Convenções
 
 - **Só tokens** de `styles/tokens.css`; nenhuma cor/medida solta e nenhum Tailwind.

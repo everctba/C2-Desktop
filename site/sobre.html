@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sobre e apoiar — C2</title>
+    <meta
+      name="description"
+      content="Quem faz o C2 e como apoiar o projeto com uma doação (PayPal ou PIX). O software é gratuito e continua gratuito."
+    />
+    <link rel="stylesheet" href="styles/site.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">c2</span>
+        C2
+      </a>
+      <div class="nav-links">
+        <a href="index.html">Início</a>
+        <a href="index.html#numeros">Números</a>
+        <a href="ajuda.html">Ajuda</a>
+        <a href="sobre.html">Sobre</a>
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </div>
+    </nav>
+
+    <main class="wrap">
+      <section class="section" style="padding-bottom: var(--space-6xl)">
+        <span class="eyebrow">Sobre</span>
+        <h1 style="font-size: clamp(1.8rem, 4vw, 2.8rem)">Quem faz o C2</h1>
+      </section>
+
+      <!-- PERFIL -->
+      <section class="section" style="padding-top: 0">
+        <div class="profile">
+          <a class="avatar" id="perfil-avatar" href="https://github.com/everctba" rel="noreferrer" aria-label="Perfil no GitHub">
+            <span id="perfil-inicial">E</span>
+          </a>
+          <div class="profile-info">
+            <h2 id="perfil-nome">Everton</h2>
+            <p id="perfil-bio" class="lead" style="margin-top: var(--space-s)"></p>
+            <div class="cta-row" style="margin-top: var(--space-l)">
+              <a class="btn btn-ghost" id="perfil-github" href="https://github.com/everctba" rel="noreferrer">
+                GitHub
+              </a>
+              <a class="btn btn-primary" href="#apoiar">Apoiar o projeto</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- APOIAR -->
+      <section class="section" id="apoiar">
+        <div class="section-head">
+          <span class="eyebrow">Apoie o C2</span>
+          <h2>O software é gratuito. A ajuda é opcional.</h2>
+          <p>
+            O C2 é open source e continuará gratuito: nenhuma funcionalidade fica
+            bloqueada por trás de doação. Se ele te economizou tempo, você pode
+            contribuir com qualquer valor para manter o desenvolvimento.
+          </p>
+        </div>
+
+        <!-- Valores -->
+        <div class="tiers" id="valores">
+          <button class="tier" data-valor="5" type="button">
+            <strong>US$ 5</strong>
+            <span>um café</span>
+          </button>
+          <button class="tier" data-valor="10" type="button">
+            <strong>US$ 10</strong>
+            <span>uma hora de trabalho</span>
+          </button>
+          <button class="tier" data-valor="15" type="button">
+            <strong>US$ 15</strong>
+            <span>ajuda de verdade</span>
+          </button>
+        </div>
+
+        <div class="grid grid-2" style="margin-top: var(--space-2xl)">
+          <!-- PayPal (internacional) -->
+          <article class="card" id="cartao-paypal">
+            <span class="k">Internacional</span>
+            <h3>PayPal</h3>
+            <p>Cartão ou saldo PayPal, em dólar. Funciona fora do Brasil.</p>
+            <div class="cta-row" style="margin-top: var(--space-l)">
+              <a class="btn btn-primary" id="paypal-link" href="#" rel="noreferrer">
+                Doar com PayPal
+              </a>
+            </div>
+            <p class="hero-note" id="paypal-aviso"></p>
+          </article>
+
+          <!-- PIX (Brasil) -->
+          <article class="card" id="cartao-pix">
+            <span class="k">Brasil</span>
+            <h3>PIX</h3>
+            <p>Instantâneo, sem taxa para quem envia. Copie a chave e cole no app do banco.</p>
+            <div class="pix-box">
+              <code class="inline" id="pix-chave">—</code>
+              <button class="btn btn-ghost" id="pix-copiar" type="button">Copiar chave</button>
+            </div>
+            <p class="hero-note" id="pix-aviso"></p>
+          </article>
+        </div>
+
+        <div class="callout" style="margin-top: var(--space-2xl)">
+          <h3>Transparência</h3>
+          <ul>
+            <li>Doação <strong>não</strong> compra licença, suporte prioritário ou feature exclusiva.</li>
+            <li>O código continua aberto; o dinheiro vai para tempo de desenvolvimento e infraestrutura.</li>
+            <li>Doação é voluntária e não é reembolsável; obrigado por considerar.</li>
+            <li id="sponsors-linha" style="display: none">
+              Prefere recorrente? <a id="sponsors-link" href="#" rel="noreferrer">GitHub Sponsors</a>.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- O QUE FINANCIA -->
+      <section class="section">
+        <div class="section-head">
+          <span class="eyebrow">Para onde vai</span>
+          <h2>O que a ajuda financia</h2>
+        </div>
+        <div class="grid grid-3">
+          <article class="card">
+            <h3>Tempo de desenvolvimento</h3>
+            <p>Validação em Linux, instalador, testes de integração e correções.</p>
+          </article>
+          <article class="card">
+            <h3>Hardware de teste</h3>
+            <p>Máquinas/GPUs diferentes para garantir que o C2 funciona fora daqui.</p>
+          </article>
+          <article class="card">
+            <h3>Distribuição</h3>
+            <p>Assinatura dos binários, hospedagem da landing e releases.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer wrap">
+      <span>C2 — sobre e apoio · Windows 10/11</span>
+      <span>
+        <a href="index.html">Início</a> ·
+        <a href="ajuda.html">Ajuda</a> ·
+        <a id="rodape-github" href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </span>
+    </footer>
+
+    <script src="config.js"></script>
+    <script>
+      (function () {
+        const cfg = window.C2_SITE || {};
+        const github = cfg.github || "everctba";
+        const githubUrl = "https://github.com/" + github;
+
+        // perfil
+        const nome = cfg.nome || github;
+        document.getElementById("perfil-nome").textContent = nome;
+        document.getElementById("perfil-bio").textContent = cfg.bio || "";
+        document.getElementById("perfil-inicial").textContent = nome.trim().charAt(0).toUpperCase();
+        document.getElementById("perfil-github").href = githubUrl;
+        document.getElementById("perfil-avatar").href = githubUrl;
+        document.getElementById("perfil-avatar").setAttribute("aria-label", "Perfil de " + nome + " no GitHub");
+        document.getElementById("rodape-github").href = githubUrl;
+
+        // foto opcional: site/assets/img/avatar.jpg
+        const img = new Image();
+        img.onload = function () {
+          const avatar = document.getElementById("perfil-avatar");
+          avatar.textContent = "";
+          img.alt = "Foto de " + nome;
+          img.className = "avatar-img";
+          avatar.appendChild(img);
+        };
+        img.src = "assets/img/avatar.jpg";
+
+        // PayPal
+        const paypal = (cfg.paypal || "").trim();
+        if (paypal) {
+          document.getElementById("paypal-link").href =
+            "https://www.paypal.com/paypalme/" + encodeURIComponent(paypal);
+          document.getElementById("paypal-aviso").textContent =
+            "Você escolhe o valor na página do PayPal.";
+        } else {
+          document.getElementById("paypal-link").removeAttribute("href");
+          document.getElementById("paypal-link").setAttribute("aria-disabled", "true");
+          document.getElementById("paypal-link").style.opacity = "0.5";
+          document.getElementById("paypal-aviso").textContent =
+            "PayPal ainda não configurado (site/config.js).";
+        }
+
+        // PIX
+        const pix = (cfg.pixChave || "").trim();
+        const pixChave = document.getElementById("pix-chave");
+        const pixCopiar = document.getElementById("pix-copiar");
+        if (pix) {
+          pixChave.textContent = pix;
+          pixCopiar.addEventListener("click", async function () {
+            try {
+              await navigator.clipboard.writeText(pix);
+              pixCopiar.textContent = "Copiado!";
+              setTimeout(function () { pixCopiar.textContent = "Copiar chave"; }, 1800);
+            } catch (_) {
+              pixCopiar.textContent = "Selecione e copie";
+            }
+          });
+          if (cfg.pixNome) {
+            document.getElementById("pix-aviso").textContent =
+              "Titular: " + cfg.pixNome + (cfg.pixCidade ? " · " + cfg.pixCidade : "");
+          }
+        } else {
+          pixChave.textContent = "não configurado";
+          pixCopiar.disabled = true;
+          pixCopiar.style.opacity = "0.5";
+          document.getElementById("pix-aviso").textContent =
+            "Chave PIX ainda não configurada (site/config.js).";
+        }
+
+        // Sponsors
+        if (cfg.githubSponsors) {
+          document.getElementById("sponsors-linha").style.display = "block";
+          document.getElementById("sponsors-link").href = cfg.githubSponsors;
+        }
+
+        // valores: monta o link do PayPal com o valor escolhido
+        document.querySelectorAll(".tier").forEach(function (botao) {
+          botao.addEventListener("click", function () {
+            const valor = botao.getAttribute("data-valor");
+            document.querySelectorAll(".tier").forEach(function (b) {
+              b.classList.toggle("selected", b === botao);
+            });
+            if (paypal) {
+              document.getElementById("paypal-link").href =
+                "https://www.paypal.com/paypalme/" + encodeURIComponent(paypal) + "/" + valor;
+              document.getElementById("paypal-link").textContent = "Doar US$ " + valor + " com PayPal";
+              document.getElementById("paypal-aviso").textContent =
+                "Você será levado ao PayPal com o valor de US$ " + valor + ".";
+              document.getElementById("apoiar").scrollIntoView({ behavior: "smooth", block: "start" });
+            } else {
+              document.getElementById("paypal-aviso").textContent =
+                "Selecione o método disponível (PIX) ou configure o PayPal.";
+            }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
