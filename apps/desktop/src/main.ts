@@ -12,6 +12,7 @@ import { loadingBar, memoryBar } from "./ui/MemoryBar";
 import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
 import { renderSettings } from "./views/Settings";
+import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
 
 const app = document.getElementById("app")!;
@@ -100,9 +101,9 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-async function pickProject(): Promise<void> {
+async function pickProject(): Promise<string | null> {
   const path = await api.pickFolder();
-  if (!path) return;
+  if (!path) return null;
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
   rememberProject(state.root);
@@ -110,6 +111,46 @@ async function pickProject(): Promise<void> {
   // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
   state.route = state.status?.initialized ? "engine" : "projects";
   render();
+  return state.root;
+}
+
+/** Abre o seletor, valida o cabeçalho e grava o modelo no workspace. */
+async function chooseModelForWelcome(): Promise<string | null> {
+  if (!state.root) return null;
+  const escolhido = await api.pickModel();
+  if (!escolhido) return null;
+  try {
+    await api.modelInspect(escolhido);
+    await api.modelSet(state.root, escolhido);
+    await loadStatus();
+    log(`modelo selecionado: ${escolhido}`);
+    return escolhido;
+  } catch (error) {
+    await openDialog({
+      title: "Modelo inválido",
+      body: dialogField("Erro", String(error), true),
+      confirmLabel: "Entendi",
+      cancelLabel: "",
+    });
+    return null;
+  }
+}
+
+/** Assistente de primeira execução: baixar modelo, abrir pasta, selecionar. */
+function openWelcomeFlow(): void {
+  openWelcome({
+    root: () => state.root,
+    pickProject: () => pickProject(),
+    chooseModel: () => chooseModelForWelcome(),
+    finish: () => {
+      localStorage.setItem("c2.onboarded", "1");
+      state.route = "engine";
+      render();
+    },
+    dismiss: () => {
+      localStorage.setItem("c2.onboarded", "1");
+    },
+  });
 }
 
 async function runReindex(full: boolean): Promise<void> {
@@ -475,6 +516,7 @@ function render(): void {
           recents: loadRecents(),
           onOpenRecent: (caminho) => void openRecent(caminho),
           onRemoveRecent: (caminho) => removeRecent(caminho),
+          onOnboarding: () => openWelcomeFlow(),
         });
     }
     disposeView = view.dispose ?? null;
@@ -514,6 +556,12 @@ async function boot(): Promise<void> {
   if (state.status) log("workspace carregado");
   subscribeEvents();
   render();
+
+  // Primeira execucao sem modelo: abre o assistente de primeiros passos.
+  const primeiraVez = localStorage.getItem("c2.onboarded") !== "1";
+  if (primeiraVez && !state.status?.model.path) {
+    window.setTimeout(openWelcomeFlow, 350);
+  }
 
   // As telas cuidam da propria atualizacao: a Engine assina eventos do Core
   // e atualiza contadores/log no DOM, sem re-render (c2-e14t2).

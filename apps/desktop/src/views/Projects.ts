@@ -27,6 +27,8 @@ export interface ProjectsContext {
   recents: RecentProject[];
   onOpenRecent: (path: string) => void;
   onRemoveRecent: (path: string) => void;
+  /// Reabre o assistente de primeiros passos.
+  onOnboarding: () => void;
 }
 
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
@@ -134,6 +136,13 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
       label: "Trocar projeto",
       iconName: "projects",
       onClick: ctx.onPickProject,
+    }),
+  );
+  actions.appendChild(
+    Button({
+      label: "Primeiros passos",
+      variant: "ghost",
+      onClick: ctx.onOnboarding,
     }),
   );
   page.appendChild(actions);
