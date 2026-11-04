@@ -281,7 +281,15 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
         println!("Linguagens: {}", top.join("  "));
     }
     println!();
-    println!("Proximo passo: `c2 start` para indexar.");
+    println!("Proximos passos:");
+    println!("  1. aponte o modelo:   c2 config set model.path \"<caminho>.gguf\"");
+    println!("  2. indexe o projeto:  c2 start        (continuo; Ctrl+C encerra)");
+    println!("     uma passada:       c2 reindex");
+    println!("  3. consulte:          c2 grep \"onde valida permissao\"");
+    println!("  4. abra a janela:     c2 open");
+    println!("  5. use com agentes:   c2 mcp          (MCP por STDIO; config na aba MCP)");
+    println!();
+    println!("Sem modelo configurado o `start` para com erro de configuracao.");
     Ok(())
 }
 
