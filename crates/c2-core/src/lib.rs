@@ -13,6 +13,7 @@ pub mod links;
 pub mod llm;
 pub mod schema;
 pub mod search;
+pub mod security;
 pub mod state;
 pub mod workspace;
 

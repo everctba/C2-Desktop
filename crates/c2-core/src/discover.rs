@@ -17,6 +17,7 @@ use serde::Serialize;
 use crate::config::Config;
 use crate::error::Result;
 use crate::schema::is_meta_path;
+use crate::security;
 
 const SNIFF_SIZE: usize = 8192;
 
@@ -49,6 +50,8 @@ pub struct Skipped {
     pub binary: usize,
     pub too_large: usize,
     pub unsupported_extension: usize,
+    /// Arquivo com nome de segredo/credencial, pulado antes de qualquer leitura.
+    pub sensitive: usize,
     pub other: usize,
 }
 
@@ -72,7 +75,7 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
 
     let mut builder = WalkBuilder::new(root);
     builder
-        .hidden(true)
+        .hidden(false)
         .follow_links(false)
         .require_git(false)
         .git_ignore(config.index.respect_gitignore)
@@ -84,6 +87,13 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
     builder.filter_entry(move |entry| {
         if entry.depth() == 0 {
             return true;
+        }
+        // Diretorios ocultos (.git, .cache...) sao podados; arquivos ocultos
+        // passam para que nomes sensiveis (.env) sejam contados como tal.
+        if entry.file_type().is_some_and(|kind| kind.is_dir())
+            && entry.file_name().to_string_lossy().starts_with('.')
+        {
+            return false;
         }
         let name = entry.file_name().to_string_lossy();
         !excluded_for_filter.iter().any(|dir| dir == &name)
@@ -109,6 +119,18 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
 
         let path = entry.path().to_path_buf();
         if is_meta_path(&path) {
+            continue;
+        }
+
+        let file_name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if security::is_sensitive_name(&file_name) {
+            discovery.skipped.sensitive += 1;
+            continue;
+        }
+        if file_name.starts_with('.') {
             continue;
         }
 
@@ -258,6 +280,43 @@ mod tests {
         assert_eq!(names, vec!["Makefile", "a.rs"]);
         assert_eq!(found.skipped.unsupported_extension, 1);
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn pula_arquivos_com_nome_de_segredo() {
+        let base = tmp("secret");
+        write(&base.join("src").join("a.rs"), b"ok");
+        write(&base.join(".env"), b"SENHA=123456");
+        write(&base.join("server.pem"), b"-----BEGIN CERTIFICATE-----");
+        write(&base.join("id_rsa"), b"chave");
+
+        let found = discover(&base, &Config::default()).unwrap();
+        let names: Vec<_> = found.files.iter().map(|f| f.rel.as_str()).collect();
+        assert_eq!(names, vec!["src/a.rs"]);
+        assert_eq!(found.skipped.sensitive, 3, "conta .env, .pem e id_rsa");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn nao_segue_symlink_para_fora_do_workspace() {
+        let base = tmp("symlink");
+        let outside = tmp("symlink-out");
+        write(&base.join("a.rs"), b"ok");
+        write(&outside.join("externo.rs"), b"segredo");
+
+        let link = base.join("atalho.rs");
+        if std::os::windows::fs::symlink_file(outside.join("externo.rs"), &link).is_err() {
+            // Sem privilegio de symlink (Windows sem modo desenvolvedor): nada a testar.
+            fs::remove_dir_all(&base).ok();
+            fs::remove_dir_all(&outside).ok();
+            return;
+        }
+
+        let found = discover(&base, &Config::default()).unwrap();
+        assert!(found.files.iter().all(|entry| entry.rel != "atalho.rs"));
+
+        fs::remove_dir_all(&base).ok();
+        fs::remove_dir_all(&outside).ok();
     }
 
     #[test]

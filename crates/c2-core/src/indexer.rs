@@ -21,6 +21,7 @@ use crate::hash;
 use crate::links;
 use crate::llm::SemanticProvider;
 use crate::schema::{meta_path_for, source_path_for, MetaFile};
+use crate::security::{self, SecretPolicy};
 use crate::workspace::Workspace;
 
 /// O que fazer com um arquivo neste ciclo.
@@ -86,6 +87,12 @@ pub struct IndexReport {
     pub deferred: usize,
     /// Metadados antigos que receberam links sem chamar o modelo.
     pub relinked: usize,
+    /// Arquivos pulados por conter segredo (politica `skip`).
+    pub blocked: usize,
+    /// Arquivos indexados com conteudo mascarado (politica `mask`).
+    pub masked: usize,
+    /// Bytes de conteudo enviados ao modelo neste ciclo.
+    pub bytes_sent: u64,
     pub calls: u32,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
@@ -95,7 +102,14 @@ pub struct IndexReport {
 
 impl IndexReport {
     pub fn total(&self) -> usize {
-        self.indexed + self.unchanged + self.removed + self.errors + self.deferred + self.relinked
+        self.indexed
+            + self.unchanged
+            + self.removed
+            + self.errors
+            + self.deferred
+            + self.relinked
+            + self.blocked
+            + self.masked
     }
 }
 
@@ -252,6 +266,16 @@ pub fn run<P: SemanticProvider>(
                 if options.dry_run {
                     continue;
                 }
+                // Teto de conteudo enviado ao modelo por ciclo (c2-e9t4).
+                let budget = config.index.max_total_bytes_per_run;
+                if budget > 0 && report.bytes_sent + item.size > budget {
+                    report.deferred += 1;
+                    report.last_error = Some(format!(
+                        "limite de {} bytes por ciclo atingido; `{}` fica para o proximo",
+                        budget, item.rel
+                    ));
+                    continue;
+                }
                 if let Err(err) = index_one(workspace, config, provider, item, &mut report) {
                     record_error(&mut report, err);
                 }
@@ -286,7 +310,32 @@ fn index_one<P: SemanticProvider>(
         None => hash::sha256_file(&item.path)?,
     };
 
-    let generated = provider.semantic_for(&item.rel, &content)?;
+    // Segredos nunca vao ao modelo (c2-e9t2). O hash continua sendo do conteudo
+    // original: mascarar nao muda a identidade do arquivo.
+    let prompt_content = match config.index.secret_policy {
+        SecretPolicy::Skip => {
+            if let Some(kind) = security::detect(&content) {
+                report.blocked += 1;
+                report.last_error = Some(format!(
+                    "segredo ({}) em {}: arquivo nao indexado",
+                    kind.label(),
+                    item.rel
+                ));
+                return Ok(());
+            }
+            content.clone()
+        }
+        SecretPolicy::Mask => {
+            let (masked, count) = security::mask(&content);
+            if count > 0 {
+                report.masked += 1;
+            }
+            masked
+        }
+    };
+
+    let generated = provider.semantic_for(&item.rel, &prompt_content)?;
+    report.bytes_sent += prompt_content.len() as u64;
     report.calls += 1;
     report.prompt_tokens += generated.prompt_tokens;
     report.completion_tokens += generated.completion_tokens;
@@ -362,6 +411,31 @@ mod tests {
         calls: AtomicUsize,
         fail: bool,
         on_call: Option<Box<dyn Fn() + Send + Sync>>,
+    }
+
+    /// Guarda o conteudo recebido, para provar que o segredo nao foi enviado.
+    #[derive(Default)]
+    struct CapturingProvider {
+        seen: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl SemanticProvider for CapturingProvider {
+        fn semantic_for(&self, _rel: &str, content: &str) -> Result<Generated> {
+            self.seen.lock().unwrap().push(content.to_string());
+            Ok(Generated {
+                semantic: Semantic {
+                    what: "w".into(),
+                    why: "y".into(),
+                    goal: "g".into(),
+                    summary: "s".into(),
+                    responsibility: "r".into(),
+                },
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                latency_ms: 1,
+                retries: 0,
+            })
+        }
     }
 
     impl MockProvider {
@@ -603,6 +677,62 @@ mod tests {
         assert_eq!(provider.calls(), calls_before, "relink nao chama o modelo");
         let meta = MetaFile::read(&meta_path).unwrap();
         assert!(!meta.links.is_empty());
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn arquivo_com_segredo_nao_e_indexado() {
+        let (base, workspace) = setup("secret");
+        let config = workspace.load_config().unwrap();
+        fs::write(
+            base.join("src/a.rs"),
+            "-----BEGIN RSA PRIVATE KEY-----\nabc\n",
+        )
+        .unwrap();
+        let provider = MockProvider::ok();
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.blocked, 1);
+        assert_eq!(report.indexed, 1, "b.rs continua sendo indexado");
+        assert!(!base.join("src/a.rs.c2.json").exists());
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn politica_mask_envia_conteudo_mascarado() {
+        let (base, workspace) = setup("mask");
+        let mut config = workspace.load_config().unwrap();
+        config.index.secret_policy = crate::security::SecretPolicy::Mask;
+        fs::write(
+            base.join("src/a.rs"),
+            "password = \"super-secreta-123\"\nfn a() {}\n",
+        )
+        .unwrap();
+        let provider = CapturingProvider::default();
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.masked, 1);
+
+        let seen = provider.seen.lock().unwrap();
+        let all: String = seen.join("\n");
+        assert!(all.contains("[REDACTED]"), "conteudo enviado: {all}");
+        assert!(!all.contains("super-secreta-123"));
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn teto_de_bytes_por_ciclo_adia_o_resto() {
+        let (base, workspace) = setup("budget");
+        let mut config = workspace.load_config().unwrap();
+        config.index.max_total_bytes_per_run = 12;
+        let provider = MockProvider::ok();
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert!(report.deferred >= 1, "deve adiar o que passa do teto");
+        assert!(report.bytes_sent <= 12);
 
         fs::remove_dir_all(&base).ok();
     }

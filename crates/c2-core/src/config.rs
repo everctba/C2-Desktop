@@ -7,6 +7,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{C2Error, IoContext, Result};
+use crate::security::SecretPolicy;
 
 /// Versao do formato de configuracao.
 pub const CONFIG_VERSION: u32 = 1;
@@ -88,6 +89,10 @@ pub struct IndexConfig {
     pub respect_gitignore: bool,
     /// Teto de arestas por arquivo, para nao inflar o metadado.
     pub max_links_per_file: usize,
+    /// O que fazer com arquivo que contem segredo.
+    pub secret_policy: SecretPolicy,
+    /// Teto de bytes de conteudo enviados ao modelo por ciclo (0 = ilimitado).
+    pub max_total_bytes_per_run: u64,
 }
 
 impl Default for IndexConfig {
@@ -98,6 +103,8 @@ impl Default for IndexConfig {
             excluded_dirs: default_excluded_dirs(),
             respect_gitignore: true,
             max_links_per_file: 64,
+            secret_policy: SecretPolicy::Skip,
+            max_total_bytes_per_run: 64 * 1024 * 1024,
         }
     }
 }

@@ -271,6 +271,8 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                 "index": {
                     "max_file_bytes": config.index.max_file_bytes,
                     "extensions": config.index.extensions.len(),
+                    "secret_policy": config.index.secret_policy,
+                    "max_total_bytes_per_run": config.index.max_total_bytes_per_run,
                 },
                 "engine": {
                     "poll_interval_secs": config.engine.poll_interval_secs,
@@ -304,10 +306,15 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
     println!("Arquivos:    {}", discovery.files.len());
     println!("Metadados:   {}", metadata.len());
     println!(
-        "Pulados:     {} binarios, {} grandes, {} extensao nao suportada",
+        "Pulados:     {} binarios, {} grandes, {} extensao nao suportada, {} sensiveis",
         discovery.skipped.binary,
         discovery.skipped.too_large,
-        discovery.skipped.unsupported_extension
+        discovery.skipped.unsupported_extension,
+        discovery.skipped.sensitive
+    );
+    println!(
+        "Segredos:    politica {:?} (c2 config set index.secret_policy mask|skip)",
+        config.index.secret_policy
     );
     match engine_pid {
         Some(pid) => println!("Engine:      rodando (pid {pid})"),
@@ -382,6 +389,11 @@ fn cmd_config_list(root: Option<&Path>, json_output: bool) -> Result<()> {
             ),
             ("model.max_tokens", config.get("model.max_tokens")),
             ("index.max_file_bytes", config.get("index.max_file_bytes")),
+            ("index.secret_policy", config.get("index.secret_policy")),
+            (
+                "index.max_total_bytes_per_run",
+                config.get("index.max_total_bytes_per_run"),
+            ),
             (
                 "index.respect_gitignore",
                 config.get("index.respect_gitignore"),
@@ -761,6 +773,9 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
                 "errors": report.errors,
                 "deferred": report.deferred,
                 "relinked": report.relinked,
+                "blocked": report.blocked,
+                "masked": report.masked,
+                "bytes_sent": report.bytes_sent,
                 "calls": report.calls,
                 "prompt_tokens": report.prompt_tokens,
                 "completion_tokens": report.completion_tokens,
@@ -780,6 +795,12 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
         report.errors,
         report.deferred
     );
+    if report.blocked > 0 || report.masked > 0 {
+        println!(
+            "seguranca: {} bloqueados por segredo, {} com conteudo mascarado",
+            report.blocked, report.masked
+        );
+    }
     if report.calls > 0 {
         let per_call = report.latency_ms / u64::from(report.calls);
         println!(
