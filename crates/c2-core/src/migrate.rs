@@ -189,6 +189,34 @@ mod tests {
     }
 
     #[test]
+    fn when_legado_vira_what_sem_perda() {
+        let base = tmp("when");
+        fs::create_dir_all(base.join("src")).unwrap();
+        fs::write(base.join("src/a.sh"), "#!/bin/bash\necho oi").unwrap();
+        fs::write(
+            base.join("src/a.sh.c2.json"),
+            r#"{
+                "file": "src/a.sh",
+                "hash": "sha256:abc",
+                "mtime": 1700000000,
+                "semantic": {"why": "porque", "when": "usado no deploy", "goal": "publicar", "summary": "resumo"}
+            }"#,
+        )
+        .unwrap();
+        let workspace = Workspace::at(&base);
+        workspace.init(false).unwrap();
+
+        let report = migrate(&workspace, true).unwrap();
+        assert_eq!(report.migrated, 1);
+        let meta = MetaFile::read(&base.join("src/a.sh.c2.json")).unwrap();
+        assert_eq!(meta.semantic.what, "usado no deploy");
+        assert_eq!(meta.semantic.why, "porque");
+        assert_eq!(meta.semantic.goal, "publicar");
+        assert_eq!(meta.schema_version, 1);
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
     fn segunda_execucao_nao_migra_de_novo() {
         let (base, workspace) = preparar("idem");
         migrate(&workspace, true).unwrap();

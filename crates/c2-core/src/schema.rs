@@ -165,9 +165,10 @@ impl MetaFile {
                 .to_string()
         };
 
-        // O prototipo bash usava `when`; nao existe no schema v1, mas e aceito
-        // sem erro para nao invalidar metadados antigos.
-        let _legacy_when = {
+        // O prototipo bash usava `when`; nao existe no schema v1, mas e aceito.
+        // Como nao ha campo equivalente, o conteudo vira `what` quando `what`
+        // esta vazio — migrar nao pode perder informacao (c2-e11t4).
+        let legacy_when = {
             let value = semantic_obj
                 .and_then(|m: &Map<String, Value>| m.get("when"))
                 .and_then(Value::as_str)
@@ -185,8 +186,17 @@ impl MetaFile {
             }
         };
 
+        let what = {
+            let value = pick("what");
+            if value.is_empty() {
+                legacy_when.clone().unwrap_or_default()
+            } else {
+                value
+            }
+        };
+
         let semantic = Semantic {
-            what: pick("what"),
+            what,
             why,
             goal: pick("goal"),
             summary: pick("summary"),
@@ -353,6 +363,25 @@ mod tests {
     }
 
     #[test]
+    fn when_do_prototipo_preserva_o_conteudo_em_what() {
+        let legacy = br#"{
+            "file": "src/a.sh",
+            "hash": "abc",
+            "mtime": 1,
+            "semantic": {
+                "why": "porque",
+                "when": "usado no build noturno",
+                "goal": "publicar",
+                "summary": "resumo"
+            }
+        }"#;
+        let meta = MetaFile::parse(legacy).unwrap();
+        assert_eq!(meta.semantic.what, "usado no build noturno");
+        assert_eq!(meta.semantic.why, "porque");
+        assert_eq!(meta.semantic.goal, "publicar");
+    }
+
+    #[test]
     fn parse_metadado_do_prototipo_bash() {
         // formato do loop_do-GPT_SEMANTIC_GENERATOR.sh: sem schema_version,
         // sem what/responsibility/links, com `when` no lugar.
@@ -366,7 +395,8 @@ mod tests {
         assert_eq!(meta.schema_version, SCHEMA_VERSION);
         assert_eq!(meta.semantic.why, "y");
         assert_eq!(meta.semantic.goal, "g");
-        assert!(meta.semantic.what.is_empty());
+        // `when` do prototipo vira `what` (nao se perde na leitura).
+        assert_eq!(meta.semantic.what, "quando");
         assert!(meta.links.is_empty());
     }
 
