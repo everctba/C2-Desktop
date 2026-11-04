@@ -25,10 +25,23 @@ cd apps/desktop
 pnpm install
 
 pnpm dev            # só o frontend, em http://127.0.0.1:1420 (modo preview)
-pnpm tauri dev      # janela real, falando com o Core
+pnpm tauri dev      # janela real com hot reload (sobe o Vite junto)
 pnpm build          # typecheck + build do frontend
-pnpm tauri build    # instalador (depois do MSVC)
+pnpm tauri build --debug --no-bundle   # binário standalone (assets embutidos)
+pnpm tauri build    # instalador (release)
 ```
+
+### Modos de execução (importante)
+
+| Comando | O que acontece |
+|---|---|
+| `pnpm tauri dev` | Janela aponta para o Vite (`devUrl`) e recarrega ao editar |
+| `pnpm tauri build --debug --no-bundle` | `src-tauri/target/debug/c2-desktop.exe` **standalone**: frontend embutido, não precisa do Vite |
+| `cargo build` (debug, direto) | Usa `devUrl`; **sem o Vite rodando** a janela mostra `ERR_CONNECTION_REFUSED` em `127.0.0.1:1420` |
+| `pnpm tauri build` | Release + instalador (msi/nsis) |
+
+Para testar rápido sem servidor: `pnpm tauri build --debug --no-bundle` e abra o
+`.exe` gerado. Para desenvolver: `pnpm tauri dev`.
 
 O modo preview detecta a ausência do Tauri (`__TAURI_INTERNALS__`) e usa
 `src/api.ts` → mock. Nenhuma tela quebra sem o Core.
