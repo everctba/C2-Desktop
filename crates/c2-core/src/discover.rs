@@ -339,4 +339,52 @@ mod tests {
         assert!(found.files[0].path.is_absolute() || found.files[0].path.exists());
         fs::remove_dir_all(&base).ok();
     }
+
+    #[test]
+    fn fixtures_cobrem_gitignore_binarios_espacos_e_acentos() {
+        let base = tmp("fixtures");
+
+        // .gitignore + arvore variada
+        fs::create_dir_all(base.join(".git")).unwrap();
+        write(&base.join(".gitignore"), b"ignorado/\n*.log\n");
+        write(&base.join("src").join("ok.rs"), b"fn ok() {}");
+        write(&base.join("src").join("com espaco.rs"), b"fn espaco() {}");
+        write(&base.join("src").join("acentuação").join("ã.rs"), b"fn acento() {}");
+        write(&base.join("ignorado").join("x.rs"), b"fn ignorado() {}");
+        write(&base.join("debug.log"), b"linha de log");
+        write(&base.join("binario.txt"), &[b'a', 0u8, b'b']);
+        write(&base.join(".env"), b"SECRET=abc");
+        write(&base.join("grande.rs"), &vec![b'x'; 64]);
+
+        let mut config = Config::default();
+        config.index.max_file_bytes = 32;
+
+        let found = discover(&base, &config).unwrap();
+        let rels: Vec<&str> = found.files.iter().map(|f| f.rel.as_str()).collect();
+
+        assert!(rels.contains(&"src/ok.rs"), "{rels:?}");
+        assert!(rels.contains(&"src/com espaco.rs"), "nome com espaco: {rels:?}");
+        assert!(
+            rels.contains(&"src/acentuação/ã.rs"),
+            "nome com acento: {rels:?}"
+        );
+        assert!(!rels.contains(&"ignorado/x.rs"), "gitignore: {rels:?}");
+        assert!(!rels.contains(&"debug.log"), "gitignore glob: {rels:?}");
+        assert!(!rels.contains(&".env"), "nome sensivel deve ser pulado");
+        assert!(!rels.contains(&"binario.txt"), "binario deve ser pulado");
+        assert!(!rels.contains(&"grande.rs"), "arquivo grande deve ser pulado");
+
+        assert!(found.skipped.sensitive >= 1);
+        assert!(found.skipped.binary >= 1);
+        assert!(found.skipped.too_large >= 1);
+
+        // sem gitignore, a pasta ignorada volta a ser descoberta
+        config.index.respect_gitignore = false;
+        let sem_ignore = discover(&base, &config).unwrap();
+        let rels2: Vec<&str> = sem_ignore.files.iter().map(|f| f.rel.as_str()).collect();
+        assert!(rels2.contains(&"ignorado/x.rs"), "{rels2:?}");
+
+        fs::remove_dir_all(&base).ok();
+    }
+
 }
