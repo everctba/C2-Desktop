@@ -104,6 +104,11 @@ pub struct MetaFile {
     pub links: Vec<Link>,
 }
 
+/// Remove o BOM UTF-8, se presente (alguns editores do Windows gravam).
+pub fn strip_bom(bytes: &[u8]) -> &[u8] {
+    bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes)
+}
+
 impl MetaFile {
     pub fn new(
         file: impl Into<String>,
@@ -243,9 +248,9 @@ impl MetaFile {
         }
     }
 
-    /// Parse tolerante de bytes JSON.
+    /// Parse tolerante de bytes JSON (aceita BOM UTF-8).
     pub fn parse(bytes: &[u8]) -> Result<Self> {
-        let value: Value = serde_json::from_slice(bytes)?;
+        let value: Value = serde_json::from_slice(strip_bom(bytes))?;
         Ok(Self::from_value(&value))
     }
 
@@ -337,6 +342,14 @@ mod tests {
         assert_eq!(meta.semantic.responsibility, "r");
         assert_eq!(meta.links.len(), 1);
         assert_eq!(meta.links[0].kind, "imports");
+    }
+
+    #[test]
+    fn aceita_bom_utf8() {
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(br#"{"file":"a.rs","hash":"h","mtime":1}"#);
+        let meta = MetaFile::parse(&bytes).unwrap();
+        assert_eq!(meta.file, "a.rs");
     }
 
     #[test]

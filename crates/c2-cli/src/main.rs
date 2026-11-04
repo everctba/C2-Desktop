@@ -54,6 +54,13 @@ enum Command {
     /// Abre a janela do C2 Desktop neste projeto
     Open,
 
+    /// Converte metadados do prototipo bash para o schema v1 (faz backup)
+    Migrate {
+        /// Aplica a migracao (sem isso e dry-run)
+        #[arg(long)]
+        yes: bool,
+    },
+
     /// Mostra as ultimas linhas do log do workspace
     Logs {
         /// Quantas linhas mostrar
@@ -166,6 +173,7 @@ fn run(cli: Cli) -> Result<()> {
         }
         Command::Open => cmd_open(cli.root.as_deref()),
         Command::Logs { lines } => cmd_logs(cli.root.as_deref(), lines, cli.json),
+        Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
@@ -1091,6 +1099,48 @@ fn cmd_logs(root: Option<&Path>, lines: usize, json_output: bool) -> Result<()> 
     }
     for linha in linhas {
         println!("{linha}");
+    }
+    Ok(())
+}
+
+fn cmd_migrate(root: Option<&Path>, apply: bool, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    let report = c2_core::migrate::migrate(&workspace, apply)?;
+
+    let logger = Logger::for_workspace(&workspace, &config);
+    logger.info(
+        "cli",
+        format!(
+            "migrate: {} analisados, {} migrados, {} ja v1, {} falhas (apply={apply})",
+            report.scanned,
+            report.migrated,
+            report.already_v1,
+            report.failed.len()
+        ),
+    );
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
+    println!(
+        "{} metadados analisados: {} migrados, {} ja no schema v1, {} falhas",
+        report.scanned,
+        report.migrated,
+        report.already_v1,
+        report.failed.len()
+    );
+    if !apply {
+        println!("nada foi gravado (use --yes para migrar)");
+    }
+    if let Some(pasta) = &report.backup_dir {
+        println!("backup: {}", pasta.display());
+        println!("para reverter: copie os arquivos do backup de volta para o projeto");
+    }
+    for falha in &report.failed {
+        eprintln!("  falhou: {falha}");
     }
     Ok(())
 }

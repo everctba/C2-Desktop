@@ -128,6 +128,9 @@ c2 config set engine.poll_interval_secs 5
 | `c2 read` | lê trecho com número de linha |
 | `c2 cleaner` | remove metadados (lista por padrão; `--yes` remove) |
 | `c2 config` | `get` / `set` / `list` |
+| `c2 logs` | últimas linhas de `.c2/logs/c2.log` (`--lines`) |
+| `c2 migrate` | converte metadados do protótipo bash para o schema v1 (`--yes`, backup) |
+| `c2 open` | abre a janela do C2 Desktop neste projeto |
 
 ## Limitações desta versão
 
