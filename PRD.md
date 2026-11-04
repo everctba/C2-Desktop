@@ -1,9 +1,15 @@
 
-**Versão:** 0.1
-**Status:** Proposta inicial
-**Plataformas:** Windows 10/11 e Linux
+**Versão:** 0.2
+**Status:** Revisado após a implementação do MVP (2026-11-04)
+**Plataformas:** Windows 10/11 (Linux adiado — ver §22)
 **Idioma inicial:** Português e inglês
 **Tecnologia principal:** Rust + Tauri + llama.cpp
+
+> **O que mudou da 0.1 para a 0.2:** o escopo do MVP foi fechado em Core + CLI
+> + desktop mínimo (`c2-dec2`); MCP e o desktop completo ficaram para depois;
+> o schema ganhou `what`, `responsibility`, `links[]` e `size` (`c2-dec1`); o
+> runtime passou a ser embarcado (llama.cpp oficial, sem LM Studio); Linux foi
+> adiado (`c2-uf5`). O detalhamento está na §22.
 
 ---
 
@@ -320,31 +326,41 @@ src/main.rs
 src/main.rs.c2.json
 ```
 
-## 6.2. Schema inicial
+## 6.2. Schema v1 (implementado)
 
 ```json
 {
   "schema_version": 1,
   "file": "src/main.rs",
-  "hash": "sha256...",
+  "hash": "sha256:<hex>",
+  "size": 1234,
   "mtime": 1790000000,
   "semantic": {
-    "why": "...",
-    "when": "...",
-    "goal": "...",
-    "summary": "..."
-  }
+    "what": "o que é",
+    "why": "por que existe",
+    "goal": "que objetivo busca",
+    "summary": "resumo de responsabilidade",
+    "responsibility": "fronteira de responsabilidade"
+  },
+  "links": [
+    { "to": "src/config.rs", "type": "imports" }
+  ]
 }
 ```
 
-Os campos iniciais:
-
 | Campo | Descrição |
 |---|---|
-| why | Por que o arquivo existe. |
-| when | Quando ou em quais condições é utilizado. |
-| goal | Qual objetivo ele busca alcançar. |
-| summary | Resumo de sua responsabilidade. |
+| what | O que o arquivo é/faz, em uma frase. |
+| why | Por que existe e o problema que resolve. |
+| goal | Objetivo ao ser executado/chamado. |
+| summary | Resumo da responsabilidade. |
+| responsibility | Fronteira: do que ele é dono e do que não é. |
+| links | Arestas estáticas (`imports`, `mod`, `includes`, `require`) extraídas sem LLM. |
+| size | Tamanho em bytes (detecta alteração junto com `hash`). |
+
+O leitor é tolerante com a 0.1 (sem `schema_version`, `when` em vez de `what`,
+campos soltos na raiz): `c2 migrate` converte para o formato acima com backup
+em `.c2/backups/<epoch>/`.
 
 ## 6.3. Evolução semântica
 
@@ -521,6 +537,9 @@ O sistema não deverá enviar automaticamente o projeto inteiro ao agente.
 
 # 9. MCP
 
+> **Status: adiado (pós-MVP)** — decisão `c2-dec2`. O servidor MCP usará a
+> mesma API do Core quando o núcleo estabilizar; nada aqui bloqueia o MVP.
+
 ## 9.1. Ferramentas iniciais
 
 | Ferramenta | Responsabilidade |
@@ -565,11 +584,17 @@ As ferramentas MCP deverão consultar o C2 Core, sem duplicar sua lógica.
 
 ## 10.1. Tecnologia
 
-Motor de inferência: llama.cpp.
+Motor de inferência: **llama.cpp oficial**, embarcado no pacote (build Vulkan
+com fallback CPU no Windows; `bin-ubuntu-vulkan`/`cpu` no Linux). O C2
+supervisiona o `llama-server` — sobe, espera o health check, reinicia e encerra.
 
-Modelo inicial: família Gemma 4 em formato GGUF, desde que disponível em uma variante compatível.
+Modelo inicial: **Gemma 4 E2B em Q4_K_M** (~3,2 GB), referenciado **por
+caminho** — o `.gguf` nunca é copiado para o workspace. O modelo é
+configurável (`model.path`), assim como contexto, camadas na GPU, threads,
+temperatura e limites de token.
 
-O modelo deverá ser configurável.
+Sem LM Studio, sem CUDA obrigatório e sem embeddings: a GPU é usada quando
+existe (Vulkan), a CPU é o fallback.
 
 ## 10.2. Gerenciamento
 
@@ -610,6 +635,10 @@ Uma futura versão poderá integrar o llama.cpp diretamente como biblioteca nati
 ---
 
 # 11. Desktop
+
+> **Escopo do MVP:** as telas Projetos, Engine, Busca e Config — mais o
+> assistente de primeiros passos e o modal de carga na GPU. O desktop completo
+> (painel MCP, grep visual rico) fica para o pós-MVP (`c2-e16`).
 
 ## 11.1. Tecnologia
 
@@ -869,7 +898,7 @@ Entregas:
 
 Critério de conclusão: o usuário consegue inicializar, configurar e controlar o C2 sem utilizar comandos manuais.
 
-## Fase 6 — Contexto arquitetural avançado
+## Fase 6 — Contexto arquitetural avançado (backlog pós-MVP)
 
 Entregas futuras:
 
@@ -954,3 +983,40 @@ Seu principal diferencial não é simplesmente indexar código, mas permitir que
 **Visão de longo prazo:**
 
 O C2 deverá permitir que qualquer agente de programação obtenha uma compreensão arquitetural útil de um projeto através de consultas estruturadas, sem precisar reconstruir esse conhecimento a cada interação.
+
+---
+
+# 22. Revisão v0.2 — o que foi decidido e implementado
+
+Esta seção substitui as suposições da 0.1 que mudaram durante a implementação.
+Cada item aponta a decisão registrada em `bd` e o estado real do código.
+
+| Tema | Decisão da 0.2 | Evidência |
+|---|---|---|
+| Escopo do MVP | Core + CLI + desktop mínimo (`c2-dec2`); MCP e desktop completo deferidos | `c2-e12t5`, `docs/mvp-gate.md` |
+| Schema | `what/why/goal/summary/responsibility` + `links[]` + `size` (`c2-dec1`) | `docs/schema.md`, `crates/c2-core/src/schema.rs` |
+| Incremental | hash sempre recalculado com **cache por (tamanho, mtime)**; rename reaproveita metadado por hash | `c2-e3t1`, `c2-e3t4` |
+| Runtime | llama.cpp oficial embarcado (Vulkan + CPU), sem LM Studio (`c2-dec5`) | `c2-e12.1`, `runtime/` no pacote |
+| Modelo | Gemma 4 E2B Q4_K_M recomendado, por caminho, com validação de cabeçalho e VRAM | `c2-e14.2`, modal de carga |
+| Segurança | segredos detectados antes do modelo (`skip`/`mask`), nada sai da máquina | `docs/mvp-gate.md` §2 |
+| Links | extração estática (sem LLM), resolvida contra a raiz do workspace | `c2-dec4`, `c2-e6` |
+| Busca | híbrida lexical + metadados, em duas fases (conteúdo só dos candidatos) | `c2-e8.1`: p50 92 ms em 500 arquivos sintéticos |
+| Medição | benchmark de **100 arquivos** como aceite; 500 opcional em CI | `c2-e12.3`, `docs/mvp-gate.md` §3 |
+| Desktop | Tauri v2; janela abre pelo `c2 open --root` e pelo instalador | `c2-e14`, `c2-e16.1` |
+| Plataforma | Windows 10/11 validado; Linux adiado (`c2-uf5`), build pronto em `scripts/build-linux.sh` | `c2-uf5`, `docs/linux-validation.md` |
+| Banco de dados | nenhum; estado em `.c2/state.json` (`c2-dec6`) | `crates/c2-core/src/state.rs` |
+
+## O que continua fora do MVP
+
+- Servidor MCP e painel MCP (`c2-e13`, pós-MVP).
+- Desktop completo: grep visual rico e configuração avançada por UI (`c2-e16`).
+- Linux rodando de verdade (`c2-e12.2`): código compila e build automatizado existe.
+- Embeddings e banco vetorial: decisão explícita de não usar (`c2-dec6`).
+
+## Números medidos (2026-11-04)
+
+- 101 arquivos `.rs`: primeira indexação em 5,7 min (~3,2 s/arquivo, 101 chamadas),
+  segunda passada em 0,1 s com **0 chamadas** e 101 hashes do cache.
+- `c2 grep`: p50 24 ms / p95 46 ms; `c2 related` 19 ms.
+- Grafo: 100 de 101 metadados com links após relink sem LLM.
+- Pacote Windows: 116,6 MB (app + CLI + runtime + instalador).
