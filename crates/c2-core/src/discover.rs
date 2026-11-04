@@ -1,4 +1,4 @@
-﻿//! Descoberta de arquivos indexaveis.
+//! Descoberta de arquivos indexaveis.
 //!
 //! Regras (beads `c2-e2`):
 //! - respeita `.gitignore` (mesmo fora de repo git) e `.c2ignore`;

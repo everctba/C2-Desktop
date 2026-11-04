@@ -1,4 +1,4 @@
-﻿//! Testes de integracao da CLI: exercitam o binario `c2` de verdade.
+//! Testes de integracao da CLI: exercitam o binario `c2` de verdade.
 
 use std::fs;
 use std::path::PathBuf;
@@ -137,11 +137,11 @@ fn comando_nao_implementado_sai_com_3() {
     let out = c2()
         .arg("--root")
         .arg(&base)
-        .args(["grep", "qualquer coisa"])
+        .args(["read", "qualquer.rs"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("c2-e8"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("c2-e7t7"));
 
     fs::remove_dir_all(&base).ok();
 }
@@ -157,5 +157,53 @@ fn status_sem_workspace_falha_com_mensagem() {
         .unwrap();
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("nao inicializado"));
+    fs::remove_dir_all(&base).ok();
+}
+
+#[test]
+fn grep_encontra_pelo_metadado() {
+    let base = tmp("grep");
+    c2().arg("--root").arg(&base).arg("init").output().unwrap();
+
+    let source = base.join("auth").join("session.rs");
+    fs::create_dir_all(source.parent().unwrap()).unwrap();
+    fs::write(&source, "pub fn valida_token() {}\n").unwrap();
+
+    let meta = serde_json::json!({
+        "schema_version": 1,
+        "file": "auth/session.rs",
+        "hash": "sha256:abc",
+        "size": 24,
+        "mtime": 1,
+        "semantic": {
+            "what": "sessao do usuario",
+            "why": "validar autenticacao",
+            "goal": "acesso seguro",
+            "summary": "sessao e token",
+            "responsibility": "dono da sessao"
+        },
+        "links": []
+    });
+    fs::write(
+        base.join("auth").join("session.rs.c2.json"),
+        meta.to_string(),
+    )
+    .unwrap();
+
+    let out = c2()
+        .arg("--root")
+        .arg(&base)
+        .args(["grep", "autenticacao", "--json", "--limit", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let hits: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(hits[0]["file"], "auth/session.rs");
+    assert!(hits[0]["score"].as_f64().unwrap() > 0.0);
+
     fs::remove_dir_all(&base).ok();
 }

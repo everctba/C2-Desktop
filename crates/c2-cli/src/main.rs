@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use c2_core::indexer::{self, IndexOptions, IndexReport};
+use c2_core::search::{self, SearchOptions};
 use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -20,7 +21,7 @@ const EXIT_NOT_IMPLEMENTED: u8 = 3;
 #[command(
     name = "c2",
     version,
-    about = "C2 — contexto semantico de projetos para agentes de IA",
+    about = "C2 â€” contexto semantico de projetos para agentes de IA",
     long_about = "Indexa semanticamente um projeto e permite que agentes consultem \
                   o contexto antes de ler o codigo.\n\n\
                   Fluxo: c2 init -> c2 start -> c2 grep/read -> c2 status"
@@ -89,13 +90,19 @@ enum Command {
     /// Para o engine em background
     Stop,
 
-    /// Busca semantica (a partir de c2-e8)
+    /// Busca semantica nos metadados do projeto
     Grep {
         /// Pergunta em linguagem natural
         query: String,
         /// Maximo de resultados
         #[arg(long, default_value_t = 5)]
         limit: usize,
+        /// Mostra apenas os caminhos
+        #[arg(long)]
+        files_only: bool,
+        /// Mostra a composicao do score e a evidencia
+        #[arg(long)]
+        explain: bool,
     },
 
     /// Le um arquivo ou trecho (a partir de c2-e7t7)
@@ -155,7 +162,19 @@ fn run(cli: Cli) -> Result<()> {
         } => cmd_reindex(cli.root.as_deref(), full, path, limit, dry_run, cli.json),
         Command::Start { once } => cmd_start(cli.root.as_deref(), once, cli.json),
         Command::Stop => cmd_stop(cli.root.as_deref()),
-        Command::Grep { .. } => not_implemented("c2 grep", "c2-e8"),
+        Command::Grep {
+            query,
+            limit,
+            files_only,
+            explain,
+        } => cmd_grep(
+            cli.root.as_deref(),
+            &query,
+            limit,
+            files_only,
+            explain,
+            cli.json,
+        ),
         Command::Read { .. } => not_implemented("c2 read", "c2-e7t7"),
         Command::Related { .. } => not_implemented("c2 related", "c2-e7t7"),
     }
@@ -520,6 +539,61 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
     Ok(())
 }
 
+fn cmd_grep(
+    root: Option<&Path>,
+    query: &str,
+    limit: usize,
+    files_only: bool,
+    explain: bool,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    let options = SearchOptions {
+        limit,
+        include_snippets: !files_only,
+    };
+    let hits = search::search(&workspace, &config, query, &options)?;
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&hits)?);
+        return Ok(());
+    }
+
+    if hits.is_empty() {
+        println!("nenhum resultado para: {query}");
+        return Ok(());
+    }
+
+    if files_only {
+        for hit in &hits {
+            println!("{}", hit.file);
+        }
+        return Ok(());
+    }
+
+    for (index, hit) in hits.iter().enumerate() {
+        println!("{}. {}   {:.2}", index + 1, hit.file, hit.score);
+        if !hit.summary.is_empty() {
+            println!("   {}", hit.summary);
+        }
+        if explain {
+            println!(
+                "   score: caminho {:.1} + simbolo {:.1} + semantica {:.1}",
+                hit.path_score, hit.symbol_score, hit.semantic_score
+            );
+        }
+        println!("   motivo: {}", hit.reason());
+        if let Some(snippet) = &hit.snippet {
+            println!("   linhas {}-{}:", snippet.line_start, snippet.line_end);
+            for line in snippet.text.lines() {
+                println!("     {line}");
+            }
+        }
+        println!();
+    }
+    Ok(())
+}
 fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Result<()> {
     if json_output {
         println!(

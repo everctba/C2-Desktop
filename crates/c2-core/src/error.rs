@@ -1,4 +1,4 @@
-﻿//! Erros e contexto de IO do nucleo.
+//! Erros e contexto de IO do nucleo.
 
 use std::path::{Path, PathBuf};
 

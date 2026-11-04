@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "c2-core"
 version.workspace = true
 edition.workspace = true

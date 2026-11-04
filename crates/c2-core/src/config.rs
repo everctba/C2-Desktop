@@ -1,4 +1,4 @@
-﻿//! Configuracao do workspace (`.c2/config.json`).
+//! Configuracao do workspace (`.c2/config.json`).
 
 use std::fs;
 use std::io::Write;
@@ -159,6 +159,31 @@ impl Default for EngineConfig {
     }
 }
 
+/// Parametros da busca semantica.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SearchConfig {
+    /// Sinonimos no formato `termo=sin1,sin2`, aplicados na consulta e nos
+    /// metadados (ex.: `auth=login,sessao,token`).
+    pub synonyms: Vec<String>,
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            synonyms: vec![
+                "auth=login,sessao,session,token,autenticacao".to_string(),
+                "db=banco,database,storage,persistencia".to_string(),
+                "ui=frontend,interface,view,tela".to_string(),
+                "erro=falha,error,exception".to_string(),
+                "config=configuracao,settings,ajuste".to_string(),
+                "busca=search,grep,pesquisa".to_string(),
+                "indice=index,indexacao,indexer".to_string(),
+            ],
+        }
+    }
+}
+
 /// Configuracao completa do workspace.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -167,6 +192,7 @@ pub struct Config {
     pub model: ModelConfig,
     pub index: IndexConfig,
     pub engine: EngineConfig,
+    pub search: SearchConfig,
 }
 
 impl Default for Config {
@@ -176,6 +202,7 @@ impl Default for Config {
             model: ModelConfig::default(),
             index: IndexConfig::default(),
             engine: EngineConfig::default(),
+            search: SearchConfig::default(),
         }
     }
 }

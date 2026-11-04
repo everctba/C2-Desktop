@@ -1,4 +1,4 @@
-﻿//! Remocao de metadados: equivalente dirigido ao `c2Cleaner.sh`.
+//! Remocao de metadados: equivalente dirigido ao `c2Cleaner.sh`.
 //!
 //! Diferencas propositais em relacao ao script do prototipo:
 //! - nunca remove nada sem `apply` (o CLI chama com `--yes`);

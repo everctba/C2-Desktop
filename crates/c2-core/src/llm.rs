@@ -1,4 +1,4 @@
-﻿//! Cliente do modelo local (API OpenAI-compat do `llama-server`).
+//! Cliente do modelo local (API OpenAI-compat do `llama-server`).
 //!
 //! Decisao medida (`c2-4sx`): modelos de raciocinio (Gemma 4 E2B) gastam
 //! ~630 tokens e 9,2 s por arquivo pensando antes de responder. Enviando
@@ -46,7 +46,7 @@ pub struct LlmClient {
     max_retries: u32,
 }
 
-/// Fonte de semantica: permite trocar o modelo por um dublÃƒÂª nos testes.
+/// Fonte de semantica: permite trocar o modelo por um dublê nos testes.
 pub trait SemanticProvider: Send + Sync {
     fn semantic_for(&self, rel_path: &str, content: &str) -> Result<Generated>;
 }
@@ -397,8 +397,8 @@ mod tests {
 
     #[test]
     fn truncamento_respeita_limite_de_caractere() {
-        let content = "ÃƒÆ’Ã‚Â¡".repeat(8000);
-        let truncated = truncate(&content, 8000);
+        let content = "á".repeat(4000);
+        let truncated = truncate(&content, 4000);
         assert!(truncated.contains("[conteudo truncado pelo C2]"));
     }
 }
