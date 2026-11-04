@@ -92,9 +92,12 @@ Requisitos
 
 Instalar
 --------
-    pwsh -File instalar.ps1
-    pwsh -File instalar.ps1 -Dest "D:\Apps\C2" -NoShortcut
+    pwsh -File instalar.ps1                       (abre o seletor de pasta)
+    pwsh -File instalar.ps1 -Dest "D:\Apps\C2"   (instala direto)
+    pwsh -File instalar.ps1 -NoPath               (nao mexe no PATH)
 
+O instalador coloca <dest>\cli no PATH do usuario: em um terminal novo,
+"c2 --version" funciona de qualquer pasta. O desinstalador remove a entrada.
 Sem instalar (modo portatil), basta abrir C2.exe desta pasta.
 
 Primeiro uso

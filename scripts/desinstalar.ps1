@@ -22,6 +22,23 @@ if (-not $Force) {
     }
 }
 
+# Remove o CLI do PATH do usuario, se estiver la.
+$pastaCli = (Join-Path $instalado 'cli').TrimEnd('\')
+$atual = [Environment]::GetEnvironmentVariable('Path', 'User')
+if ($atual) {
+    $entradas = @($atual -split ';' | Where-Object { $_.Trim() -ne '' })
+    $restantes = @($entradas | Where-Object { $_.TrimEnd('\') -ne $pastaCli })
+    if ($restantes.Count -ne $entradas.Count) {
+        [Environment]::SetEnvironmentVariable('Path', ($restantes -join ';'), 'User')
+        Write-Host "PATH: entrada removida ($pastaCli)"
+        try {
+            Add-Type -Namespace C2Inst -Name Win32B -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+            $resultado = [UIntPtr]::Zero
+            [C2Inst.Win32B]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 0x0002, 1000, [ref]$resultado) | Out-Null
+        } catch { }
+    }
+}
+
 $shell = New-Object -ComObject WScript.Shell
 foreach ($atalho in @(
         (Join-Path ([Environment]::GetFolderPath('Desktop')) 'C2.lnk'),

@@ -5,6 +5,7 @@
 #   pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
 #   pwsh -File instalar.ps1 -NoShortcut
 #   pwsh -File instalar.ps1 -NoGui        # sem dialogo: usa prompt de texto
+#   pwsh -File instalar.ps1 -NoPath       # nao adiciona o CLI ao PATH
 #
 # O que faz:
 #   1. escolhe a pasta de instalacao (padrao %LOCALAPPDATA%\C2);
@@ -16,7 +17,9 @@ param(
     [string]$Dest = '',
     [switch]$NoShortcut,
     # Nao abre o seletor grafico de pasta (usa prompt de texto)
-    [switch]$NoGui
+    [switch]$NoGui,
+    # Nao adiciona <dest>\cli ao PATH do usuario
+    [switch]$NoPath
 )
 
 $ErrorActionPreference = 'Continue'
@@ -87,6 +90,32 @@ if (Test-Path $desinstalador) {
     Copy-Item $desinstalador (Join-Path $Dest 'desinstalar.ps1') -Force
 }
 
+# CLI no PATH do usuario (nao precisa de admin); desinstalar remove depois.
+if (-not $NoPath) {
+    $pastaCli = (Join-Path $Dest 'cli').TrimEnd('\')
+    if (Test-Path (Join-Path $pastaCli 'c2.exe')) {
+        $atual = [Environment]::GetEnvironmentVariable('Path', 'User')
+        if ($null -eq $atual) { $atual = '' }
+        $entradas = @($atual -split ';' | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ -ne '' })
+        if ($entradas -contains $pastaCli) {
+            Write-Host "PATH: $pastaCli ja estava no PATH do usuario"
+        } else {
+            $novo = if ($atual.Trim().TrimEnd(';') -eq '') { $pastaCli } else { $atual.TrimEnd(';') + ';' + $pastaCli }
+            try {
+                [Environment]::SetEnvironmentVariable('Path', $novo, 'User')
+                try {
+                    Add-Type -Namespace C2Inst -Name Win32 -MemberDefinition '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+                    $resultado = [UIntPtr]::Zero
+                    [C2Inst.Win32]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 0x0002, 1000, [ref]$resultado) | Out-Null
+                } catch { }
+                Write-Host "PATH: $pastaCli adicionado ao PATH do usuario (vale em novos terminais)"
+            } catch {
+                Write-Warning "nao foi possivel alterar o PATH do usuario: $($_.Exception.Message)"
+            }
+        }
+    }
+}
+
 if (-not $NoShortcut) {
     $shell = New-Object -ComObject WScript.Shell
     $alvos = @(
@@ -115,5 +144,7 @@ Write-Host "  1. abra $Dest\C2.exe"
 Write-Host '  2. Abrir projeto -> escolha a pasta do projeto'
 Write-Host '  3. Selecionar .gguf (o modelo nao e copiado)'
 Write-Host '  4. Iniciar'
+Write-Host ''
+Write-Host "CLI: $Dest\cli\c2.exe (no PATH do usuario: abra um terminal novo e rode 'c2 --version')"
 Write-Host ''
 Write-Host "para remover: pwsh -File `"$Dest\desinstalar.ps1`""

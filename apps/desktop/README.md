@@ -80,6 +80,10 @@ pwsh -File instalar.ps1 -Dest "D:\Apps\C2"   # instala direto
 pwsh -File instalar.ps1 -NoGui                # prompt de texto
 ```
 
+O instalador também coloca `<dest>\cli` no **PATH do usuário**, então em um
+terminal novo `c2 --version` funciona de qualquer pasta (desinstalar remove a
+entrada). Use `-NoPath` para não alterar o PATH.
+
 ## Configurações
 
 A rota **Config** (engrenagem no rail) edita o `.c2/config.json` do projeto:
