@@ -1,0 +1,7 @@
+# Toolchain GNU: usa o rust-lld e as libs self-contained que já vêm com o
+# próprio toolchain, então não precisa de MSVC nem de MinGW instalados.
+# Vale para qualquer máquina que compile para x86_64-pc-windows-gnu; não afeta
+# builds MSVC (quando o Visual Studio Build Tools estiver instalado).
+[target.x86_64-pc-windows-gnu]
+linker = "rust-lld"
+rustflags = ["-Clink-self-contained=yes"]

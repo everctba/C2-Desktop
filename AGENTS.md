@@ -116,6 +116,24 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
+## Toolchain no Windows
+
+Esta máquina **não tem MSVC** (Visual Studio Build Tools). O build usa o
+toolchain GNU com o `rust-lld` e as libs self-contained que já vêm com o Rust —
+ver [.cargo/config.toml](.cargo/config.toml). Não precisa instalar nada além de
+ter `dlltool` de 64 bits no PATH (w64devkit).
+
+```bash
+rustup default stable-x86_64-pc-windows-gnu
+rustup component add clippy rustfmt --toolchain stable-x86_64-pc-windows-gnu
+```
+
+Atenção: `D:\MinGW\bin` (MinGW.org 6.3, 32-bit) *não* serve — precisa vir depois
+de `I:\P\Vim\w64devkit\bin` no PATH, senão o `dlltool` errado quebra o link.
+
+O desktop Tauri (`c2-e14`) exige MSVC: instale o Visual Studio Build Tools e
+rode `rustup default stable-x86_64-pc-windows-msvc`.
+
 ## Architecture Overview
 
 Um núcleo, múltiplas interfaces: `c2-core` (biblioteca Rust, sem UI) + `c2-cli`

@@ -3,3 +3,21 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# build Rust
+/target/
+
+# workspace C2 (estado e logs; a config e versionada)
+/.c2/logs/
+/.c2/state.json
+/.c2/*.lock
+
+# frontend do desktop (a partir de c2-e14t6)
+/node_modules/
+/dist/
+
+# editores / SO
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
