@@ -1,4 +1,4 @@
-//! Erros e contexto de IO do nucleo.
+﻿//! Erros e contexto de IO do nucleo.
 
 use std::path::{Path, PathBuf};
 
@@ -18,6 +18,9 @@ pub enum C2Error {
         path: PathBuf,
         source: serde_json::Error,
     },
+
+    #[error("falha no modelo local: {0}")]
+    Llm(String),
 
     #[error("json invalido: {0}")]
     Json(#[from] serde_json::Error),

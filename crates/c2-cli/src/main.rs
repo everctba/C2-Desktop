@@ -1,14 +1,15 @@
 //! CLI do C2.
 //!
-//! Superficie minima do MVP (`c2-e7`): inicializar, inspecionar, configurar e
-//! limpar. Comandos de indexacao e busca entram nas fases seguintes e hoje
-//! respondem com o bead correspondente.
+//! Superficie do MVP (`c2-e7`): inicializar, indexar, inspecionar, configurar e
+//! limpar. Busca e leitura (`c2 grep/read/related`) chegam nas fases seguintes.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use c2_core::{cleaner, discover, Config, Workspace};
+use c2_core::indexer::{self, IndexOptions, IndexReport};
+use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
 use clap::{Parser, Subcommand};
 use serde_json::json;
 
@@ -19,7 +20,7 @@ const EXIT_NOT_IMPLEMENTED: u8 = 3;
 #[command(
     name = "c2",
     version,
-    about = "C2 Ã¢â‚¬â€ contexto semantico de projetos para agentes de IA",
+    about = "C2 — contexto semantico de projetos para agentes de IA",
     long_about = "Indexa semanticamente um projeto e permite que agentes consultem \
                   o contexto antes de ler o codigo.\n\n\
                   Fluxo: c2 init -> c2 start -> c2 grep/read -> c2 status"
@@ -62,20 +63,30 @@ enum Command {
         yes: bool,
     },
 
-    /// Reindexa o projeto (a partir de c2-e5t4)
+    /// Indexa o projeto uma vez
     Reindex {
-        /// Ignora o cache de hash
+        /// Ignora o hash e reindexa tudo
         #[arg(long)]
         full: bool,
-        /// Restringe a um caminho
+        /// Restringe a um caminho relativo
         #[arg(long, value_name = "PATH")]
         path: Option<PathBuf>,
+        /// Processa no maximo N arquivos
+        #[arg(long, value_name = "N")]
+        limit: Option<usize>,
+        /// Mostra o plano sem chamar o modelo nem gravar
+        #[arg(long)]
+        dry_run: bool,
     },
 
-    /// Inicia o engine e o llama-server (a partir de c2-e7t3)
-    Start,
+    /// Indexa continuamente (foreground; Ctrl+C encerra)
+    Start {
+        /// Roda so um ciclo e sai
+        #[arg(long)]
+        once: bool,
+    },
 
-    /// Para o engine e o llama-server (a partir de c2-e7t3)
+    /// Para o engine em background
     Stop,
 
     /// Busca semantica (a partir de c2-e8)
@@ -136,9 +147,14 @@ fn run(cli: Cli) -> Result<()> {
             ConfigAction::List => cmd_config_list(cli.root.as_deref(), cli.json),
         },
         Command::Cleaner { yes } => cmd_cleaner(cli.root.as_deref(), !yes, cli.json),
-        Command::Reindex { .. } => not_implemented("c2 reindex", "c2-e5t4"),
-        Command::Start => not_implemented("c2 start", "c2-e7t3"),
-        Command::Stop => not_implemented("c2 stop", "c2-e7t3"),
+        Command::Reindex {
+            full,
+            path,
+            limit,
+            dry_run,
+        } => cmd_reindex(cli.root.as_deref(), full, path, limit, dry_run, cli.json),
+        Command::Start { once } => cmd_start(cli.root.as_deref(), once, cli.json),
+        Command::Stop => cmd_stop(cli.root.as_deref()),
         Command::Grep { .. } => not_implemented("c2 grep", "c2-e8"),
         Command::Read { .. } => not_implemented("c2 read", "c2-e7t7"),
         Command::Related { .. } => not_implemented("c2 related", "c2-e7t7"),
@@ -146,7 +162,7 @@ fn run(cli: Cli) -> Result<()> {
 }
 
 fn not_implemented(command: &str, bead: &str) -> Result<()> {
-    eprintln!("{command}: ainda nao implementado Ã¢â‚¬â€ ver bead {bead} (`bd show {bead}`)");
+    eprintln!("{command}: ainda nao implementado - ver bead {bead} (`bd show {bead}`)");
     std::process::exit(EXIT_NOT_IMPLEMENTED as i32);
 }
 
@@ -215,7 +231,7 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
         println!("Linguagens: {}", top.join("  "));
     }
     println!();
-    println!("Proximo passo: `c2 start` para indexar (a partir de c2-e7t3).");
+    println!("Proximo passo: `c2 start` para indexar.");
     Ok(())
 }
 
@@ -224,6 +240,8 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
     let config = workspace.load_config()?;
     let discovery = discover::discover(workspace.root(), &config)?;
     let metadata = cleaner::metadata_files(workspace.root())?;
+    let state = EngineState::load(&workspace.state_path())?;
+    let engine_pid = read_lock(&workspace);
 
     if json_output {
         println!(
@@ -233,21 +251,24 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                 "config_path": workspace.config_path(),
                 "model": {
                     "name": config.model.name,
+                    "path": config.model.path,
+                    "host": config.model.host,
                     "port": config.model.port,
-                    "ctx_size": config.model.ctx_size,
+                    "disable_thinking": config.model.disable_thinking,
                 },
                 "index": {
                     "max_file_bytes": config.index.max_file_bytes,
                     "extensions": config.index.extensions.len(),
-                    "excluded_dirs": config.index.excluded_dirs.len(),
                 },
                 "engine": {
                     "poll_interval_secs": config.engine.poll_interval_secs,
+                    "running": engine_pid.is_some(),
+                    "pid": engine_pid,
                 },
                 "files": discovery.files.len(),
                 "metadata": metadata.len(),
                 "skipped": discovery.skipped,
-                "engine_running": false,
+                "state": state,
             }))?
         );
         return Ok(());
@@ -256,9 +277,12 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
     println!("Workspace:   {}", workspace.root().display());
     println!("Config:      {}", workspace.config_path().display());
     println!(
-        "Modelo:      {} (porta {})",
-        config.model.name, config.model.port
+        "Modelo:      {} ({}:{})",
+        config.model.name, config.model.host, config.model.port
     );
+    if let Some(path) = &config.model.path {
+        println!("GGUF:        {path}");
+    }
     println!(
         "Indice:      max {} KiB por arquivo, {} extensoes, polling {}s",
         config.index.max_file_bytes / 1024,
@@ -273,8 +297,31 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         discovery.skipped.too_large,
         discovery.skipped.unsupported_extension
     );
-    println!("Engine:      parado (indexacao chega em c2-e5)");
+    match engine_pid {
+        Some(pid) => println!("Engine:      rodando (pid {pid})"),
+        None => println!("Engine:      parado"),
+    }
+    println!(
+        "Historico:   {} indexados, {} chamadas, {} tokens, {} erros (ultima varredura: {})",
+        state.indexed,
+        state.llm_calls,
+        state.prompt_tokens + state.completion_tokens,
+        state.errors,
+        if state.last_scan > 0 {
+            format_timestamp(state.last_scan)
+        } else {
+            "nunca".to_string()
+        }
+    );
     Ok(())
+}
+
+fn format_timestamp(secs: i64) -> String {
+    let moment = std::time::UNIX_EPOCH + Duration::from_secs(secs.max(0) as u64);
+    match moment.elapsed() {
+        Ok(age) => format!("ha {}s", age.as_secs()),
+        Err(_) => format!("{secs}"),
+    }
 }
 
 fn cmd_config_get(root: Option<&Path>, key: String, json_output: bool) -> Result<()> {
@@ -306,16 +353,22 @@ fn cmd_config_set(root: Option<&Path>, key: &str, value: &str, json_output: bool
 
 fn cmd_config_list(root: Option<&Path>, json_output: bool) -> Result<()> {
     let workspace = require_workspace(root)?;
-    let config: Config = workspace.load_config()?;
+    let config = workspace.load_config()?;
     if json_output {
         println!("{}", config.to_json()?);
     } else {
         for (key, value) in [
             ("model.name", config.get("model.name")),
             ("model.path", config.get("model.path")),
+            ("model.host", config.get("model.host")),
             ("model.port", config.get("model.port")),
             ("model.ctx_size", config.get("model.ctx_size")),
             ("model.temperature", config.get("model.temperature")),
+            (
+                "model.disable_thinking",
+                config.get("model.disable_thinking"),
+            ),
+            ("model.max_tokens", config.get("model.max_tokens")),
             ("index.max_file_bytes", config.get("index.max_file_bytes")),
             (
                 "index.respect_gitignore",
@@ -362,11 +415,226 @@ fn cmd_cleaner(root: Option<&Path>, dry_run: bool, json_output: bool) -> Result<
         }
     } else {
         println!("{} metadados removidos", report.removed.len());
-        if !report.failed.is_empty() {
-            for path in &report.failed {
-                eprintln!("  falhou: {path}");
-            }
+        for path in &report.failed {
+            eprintln!("  falhou: {path}");
         }
     }
     Ok(())
+}
+
+fn cmd_reindex(
+    root: Option<&Path>,
+    full: bool,
+    path: Option<PathBuf>,
+    limit: Option<usize>,
+    dry_run: bool,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    let client = LlmClient::from_config(&config);
+
+    if !dry_run && !client.health() {
+        bail!(
+            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1` \
+             ou ajuste model.host/model.port.",
+            config.model.health_url()
+        );
+    }
+
+    let options = IndexOptions {
+        full,
+        limit,
+        only_path: path
+            .as_ref()
+            .map(|p| p.to_string_lossy().replace('\\', "/")),
+        dry_run,
+    };
+
+    let report = indexer::run(&workspace, &config, &client, &options, |progress| {
+        if !json_output {
+            println!(
+                "  [{}/{}] {:<10} {}",
+                progress.index,
+                progress.total,
+                progress.decision.label(),
+                progress.rel
+            );
+        }
+    })?;
+
+    if !dry_run {
+        let mut state = EngineState::load(&workspace.state_path())?;
+        state.merge_report(&report);
+        state.save(&workspace.state_path())?;
+    }
+
+    print_report(&report, dry_run, json_output)
+}
+
+fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    let client = LlmClient::from_config(&config);
+
+    if !client.health() {
+        bail!(
+            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1`.",
+            config.model.health_url()
+        );
+    }
+
+    acquire_lock(&workspace)?;
+    let options = IndexOptions::default();
+    let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
+
+    loop {
+        let report = indexer::run(&workspace, &config, &client, &options, |progress| {
+            if !json_output {
+                println!(
+                    "  [{}/{}] {:<10} {}",
+                    progress.index,
+                    progress.total,
+                    progress.decision.label(),
+                    progress.rel
+                );
+            }
+        })?;
+
+        let mut state = EngineState::load(&workspace.state_path())?;
+        state.merge_report(&report);
+        state.save(&workspace.state_path())?;
+
+        print_report(&report, false, json_output)?;
+
+        if once {
+            break;
+        }
+        if !json_output {
+            println!("aguardando {interval:?} (Ctrl+C para parar)...\n");
+        }
+        std::thread::sleep(interval);
+    }
+
+    release_lock(&workspace);
+    Ok(())
+}
+
+fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Result<()> {
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "dry_run": dry_run,
+                "indexed": report.indexed,
+                "unchanged": report.unchanged,
+                "removed": report.removed,
+                "errors": report.errors,
+                "deferred": report.deferred,
+                "calls": report.calls,
+                "prompt_tokens": report.prompt_tokens,
+                "completion_tokens": report.completion_tokens,
+                "latency_ms": report.latency_ms,
+                "last_error": report.last_error,
+            }))?
+        );
+        return Ok(());
+    }
+
+    println!(
+        "{} indexados, {} inalterados, {} removidos, {} erros, {} adiados",
+        report.indexed, report.unchanged, report.removed, report.errors, report.deferred
+    );
+    if report.calls > 0 {
+        let per_call = report.latency_ms / u64::from(report.calls);
+        println!(
+            "modelo: {} chamadas, {} tokens, {} ms por arquivo",
+            report.calls,
+            report.prompt_tokens + report.completion_tokens,
+            per_call
+        );
+    }
+    if let Some(err) = &report.last_error {
+        eprintln!("ultimo erro: {err}");
+    }
+    Ok(())
+}
+
+fn lock_path(workspace: &Workspace) -> PathBuf {
+    workspace.c2_dir().join("engine.lock")
+}
+
+fn read_lock(workspace: &Workspace) -> Option<u32> {
+    let text = std::fs::read_to_string(lock_path(workspace)).ok()?;
+    let pid = text.trim().parse::<u32>().ok()?;
+    if pid_alive(pid) {
+        Some(pid)
+    } else {
+        None
+    }
+}
+
+fn acquire_lock(workspace: &Workspace) -> Result<()> {
+    if let Some(pid) = read_lock(workspace) {
+        bail!("ja existe um engine rodando neste workspace (pid {pid}); use `c2 stop`");
+    }
+    let path = lock_path(workspace);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, std::process::id().to_string())?;
+    Ok(())
+}
+
+fn release_lock(workspace: &Workspace) {
+    let _ = std::fs::remove_file(lock_path(workspace));
+}
+
+fn cmd_stop(root: Option<&Path>) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let Some(pid) = read_lock(&workspace) else {
+        let _ = std::fs::remove_file(lock_path(&workspace));
+        println!("nenhum engine rodando neste workspace");
+        return Ok(());
+    };
+
+    #[cfg(windows)]
+    let status = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .status();
+    #[cfg(not(windows))]
+    let status = std::process::Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .status();
+
+    match status {
+        Ok(exit) if exit.success() => {
+            release_lock(&workspace);
+            println!("engine {pid} encerrado");
+        }
+        Ok(_) => bail!("nao foi possivel encerrar o engine {pid}"),
+        Err(err) => bail!("falha ao encerrar o engine {pid}: {err}"),
+    }
+    Ok(())
+}
+
+fn pid_alive(pid: u32) -> bool {
+    #[cfg(windows)]
+    {
+        let output = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            .output();
+        match output {
+            Ok(out) => String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()),
+            Err(_) => false,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
 }

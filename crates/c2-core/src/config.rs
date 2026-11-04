@@ -19,6 +19,8 @@ pub struct ModelConfig {
     pub name: String,
     /// Caminho do GGUF; `None` usa o que o servidor ja estiver servindo.
     pub path: Option<String>,
+    /// Host do llama-server.
+    pub host: String,
     /// Porta HTTP local do llama-server.
     pub port: u16,
     pub ctx_size: u32,
@@ -27,6 +29,28 @@ pub struct ModelConfig {
     pub temperature: f64,
     pub timeout_secs: u64,
     pub max_retries: u32,
+    /// Desliga o raciocinio do modelo (`enable_thinking: false`).
+    /// Medido com Gemma 4 E2B: 1,4 s por arquivo contra 9,2 s pensando.
+    pub disable_thinking: bool,
+    /// Teto de tokens da resposta de metadado.
+    pub max_tokens: u32,
+    /// Teto maior usado quando a resposta anterior foi cortada por limite.
+    pub retry_max_tokens: u32,
+    /// Teto de caracteres do arquivo enviados no prompt. O cliente ainda
+    /// reduz isso se o servidor reclamar de contexto.
+    pub max_input_chars: usize,
+}
+
+impl ModelConfig {
+    /// URL do endpoint OpenAI-compat de chat.
+    pub fn chat_url(&self) -> String {
+        format!("http://{}:{}/v1/chat/completions", self.host, self.port)
+    }
+
+    /// URL do health check do llama-server.
+    pub fn health_url(&self) -> String {
+        format!("http://{}:{}/health", self.host, self.port)
+    }
 }
 
 impl Default for ModelConfig {
@@ -34,6 +58,7 @@ impl Default for ModelConfig {
         Self {
             name: "local-model".to_string(),
             path: None,
+            host: "127.0.0.1".to_string(),
             port: 8080,
             ctx_size: 8192,
             threads: 0,
@@ -41,6 +66,10 @@ impl Default for ModelConfig {
             temperature: 0.3,
             timeout_secs: 120,
             max_retries: 2,
+            disable_thinking: true,
+            max_tokens: 900,
+            retry_max_tokens: 1600,
+            max_input_chars: 16000,
         }
     }
 }
@@ -167,6 +196,18 @@ impl Config {
         }
         if self.model.timeout_secs == 0 {
             return invalid("model.timeout_secs deve ser > 0".to_string());
+        }
+        if self.model.host.trim().is_empty() {
+            return invalid("model.host nao pode ser vazio".to_string());
+        }
+        if self.model.max_tokens < 64 {
+            return invalid("model.max_tokens deve ser >= 64".to_string());
+        }
+        if self.model.max_input_chars < 1000 {
+            return invalid("model.max_input_chars deve ser >= 1000".to_string());
+        }
+        if self.model.retry_max_tokens < self.model.max_tokens {
+            return invalid("model.retry_max_tokens deve ser >= model.max_tokens".to_string());
         }
         if self.index.max_file_bytes == 0 {
             return invalid("index.max_file_bytes deve ser > 0".to_string());

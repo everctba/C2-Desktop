@@ -1,4 +1,4 @@
-//! Testes de integracao da CLI: exercitam o binario `c2` de verdade.
+﻿//! Testes de integracao da CLI: exercitam o binario `c2` de verdade.
 
 use std::fs;
 use std::path::PathBuf;
@@ -53,7 +53,7 @@ fn ciclo_init_status_cleaner() {
     let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(value["files"], 2);
     assert_eq!(value["metadata"], 0);
-    assert_eq!(value["engine_running"], false);
+    assert_eq!(value["engine"]["running"], false);
 
     let out = c2()
         .arg("--root")
@@ -134,9 +134,14 @@ fn comando_nao_implementado_sai_com_3() {
     let base = tmp("stub");
     c2().arg("--root").arg(&base).arg("init").output().unwrap();
 
-    let out = c2().arg("--root").arg(&base).arg("start").output().unwrap();
+    let out = c2()
+        .arg("--root")
+        .arg(&base)
+        .args(["grep", "qualquer coisa"])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("c2-e7t3"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("c2-e8"));
 
     fs::remove_dir_all(&base).ok();
 }

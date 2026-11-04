@@ -1,4 +1,4 @@
-[workspace]
+﻿[workspace]
 resolver = "2"
 members = ["crates/c2-core", "crates/c2-cli"]
 
@@ -16,6 +16,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
+ureq = { version = "2", default-features = false, features = ["json"] }
 
 [profile.release]
 lto = "thin"

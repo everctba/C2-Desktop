@@ -21,3 +21,6 @@
 Thumbs.db
 .idea/
 .vscode/
+
+# metadados gerados pelo C2 (regeneraveis com c2 start)
+*.c2.json
