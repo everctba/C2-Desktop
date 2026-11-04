@@ -1,7 +1,7 @@
 # Protocolo de contexto para agentes — C2
 
 **Versão:** 1.0 · **Status:** vigente · **Substitui:** `Base/instruções de uso.txt`
-**Fonte:** este arquivo · **Versão curta para colar nas regras:** [agent-snippet.md](agent-snippet.md)
+**Fonte:** este arquivo · **Versão curta para colar nas regras:** [agent-snippet.md](agent-snippet.md) · **Versão completa e autocontida:** [agent-instructions.md](agent-instructions.md)
 
 ---
 
