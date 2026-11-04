@@ -219,6 +219,16 @@ mod tests {
         p
     }
 
+    #[cfg(windows)]
+    fn criar_symlink(original: &Path, link: &Path) -> std::io::Result<()> {
+        std::os::windows::fs::symlink_file(original, link)
+    }
+
+    #[cfg(unix)]
+    fn criar_symlink(original: &Path, link: &Path) -> std::io::Result<()> {
+        std::os::unix::fs::symlink(original, link)
+    }
+
     fn write(path: &Path, content: &[u8]) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();
@@ -305,7 +315,7 @@ mod tests {
         write(&outside.join("externo.rs"), b"segredo");
 
         let link = base.join("atalho.rs");
-        if std::os::windows::fs::symlink_file(outside.join("externo.rs"), &link).is_err() {
+        if criar_symlink(&outside.join("externo.rs"), &link).is_err() {
             // Sem privilegio de symlink (Windows sem modo desenvolvedor): nada a testar.
             fs::remove_dir_all(&base).ok();
             fs::remove_dir_all(&outside).ok();

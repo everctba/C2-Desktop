@@ -23,10 +23,10 @@ pub mod workspace;
 
 pub use config::Config;
 pub use error::{C2Error, Result};
-pub use indexer::{IndexOptions, IndexReport};
-pub use llm::{Generated, LlmClient, SemanticProvider};
 pub use gguf::GgufInfo;
 pub use gpu::{GpuInfo, VramFit};
+pub use indexer::{IndexOptions, IndexReport};
+pub use llm::{Generated, LlmClient, SemanticProvider};
 pub use schema::{Link, MetaFile, Semantic};
 pub use search::{Hit, SearchOptions};
 pub use state::EngineState;

@@ -89,8 +89,14 @@ mod tests {
 
     #[test]
     fn classifica_encaixe() {
-        assert_eq!(vram_fit(3 * 1024 * 1024 * 1024, Some(&gpu(7000))), VramFit::Fits);
-        assert_eq!(vram_fit(6 * 1024 * 1024 * 1024, Some(&gpu(6000))), VramFit::TooBig);
+        assert_eq!(
+            vram_fit(3 * 1024 * 1024 * 1024, Some(&gpu(7000))),
+            VramFit::Fits
+        );
+        assert_eq!(
+            vram_fit(6 * 1024 * 1024 * 1024, Some(&gpu(6000))),
+            VramFit::TooBig
+        );
         assert_eq!(vram_fit(1024 * 1024 * 1024, None), VramFit::Unknown);
     }
 }

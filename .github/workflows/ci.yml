@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  core:
+    name: Core + CLI (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace
+      - name: build release
+        run: cargo build --workspace --release
+      - name: smoke test (linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./target/release/c2 --version
+          mkdir -p /tmp/c2-smoke
+          printf 'fn main() {}\n' > /tmp/c2-smoke/main.rs
+          printf '# doc\n' > /tmp/c2-smoke/README.md
+          ./target/release/c2 --root /tmp/c2-smoke init --json
+          ./target/release/c2 --root /tmp/c2-smoke status --json
+          ./target/release/c2 --root /tmp/c2-smoke reindex --dry-run
+          ./target/release/c2 --root /tmp/c2-smoke cleaner
+
+  desktop:
+    name: Desktop (windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo build --manifest-path src-tauri/Cargo.toml

@@ -127,11 +127,7 @@ pub fn read_info(path: &Path) -> Result<GgufInfo> {
 }
 
 /// Quantizacao: `general.file_type` > `general.size_label` > nome do arquivo.
-fn resolve_quantization(
-    file_type: Option<u32>,
-    size_label: Option<&str>,
-    path: &Path,
-) -> String {
+fn resolve_quantization(file_type: Option<u32>, size_label: Option<&str>, path: &Path) -> String {
     if file_type.is_some() {
         return quantization_label(file_type).to_string();
     }
@@ -159,9 +155,11 @@ fn resolve_quantization(
 
 fn looks_like_quant(label: &str) -> bool {
     let upper = label.to_uppercase();
-    ["Q2_", "Q3_", "Q4_", "Q5_", "Q6_", "Q8_", "IQ", "BF16", "F16", "F32"]
-        .iter()
-        .any(|prefixo| upper.starts_with(prefixo))
+    [
+        "Q2_", "Q3_", "Q4_", "Q5_", "Q6_", "Q8_", "IQ", "BF16", "F16", "F32",
+    ]
+    .iter()
+    .any(|prefixo| upper.starts_with(prefixo))
 }
 
 /// Rotulo de `general.file_type` (enum `llama_ftype` do llama.cpp).
@@ -322,9 +320,7 @@ fn skip_array<R: Read + Seek>(
                         "array de strings GGUF grande demais".to_string(),
                     ));
                 }
-                reader
-                    .seek(SeekFrom::Current(len as i64))
-                    .at(path)?;
+                reader.seek(SeekFrom::Current(len as i64)).at(path)?;
             }
             return Ok(());
         }
@@ -353,7 +349,10 @@ mod tests {
         bytes.extend_from_slice(&2u64.to_le_bytes()); // tensores
         bytes.extend_from_slice(&3u64.to_le_bytes()); // kv
 
-        for (key, value) in [("general.name", name), ("general.architecture", architecture)] {
+        for (key, value) in [
+            ("general.name", name),
+            ("general.architecture", architecture),
+        ] {
             bytes.extend_from_slice(&(key.len() as u64).to_le_bytes());
             bytes.extend_from_slice(key.as_bytes());
             bytes.extend_from_slice(&8u32.to_le_bytes()); // string
@@ -405,7 +404,11 @@ mod tests {
         let path = std::path::Path::new("modelo-Q4_K_M.gguf");
         assert_eq!(resolve_quantization(None, Some("Q4_K_M"), path), "Q4_K_M");
         assert_eq!(
-            resolve_quantization(None, None, std::path::Path::new("gemma-4-E2B-it-Q4_K_M.gguf")),
+            resolve_quantization(
+                None,
+                None,
+                std::path::Path::new("gemma-4-E2B-it-Q4_K_M.gguf")
+            ),
             "Q4_K_M"
         );
         assert_eq!(

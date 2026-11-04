@@ -127,7 +127,10 @@ pub fn resolve_binary(workspace: &Workspace, config: &Config) -> Result<Resolved
         )));
     }
 
-    let local = workspace.c2_dir().join("runtime").join(exe_name("llama-server"));
+    let local = workspace
+        .c2_dir()
+        .join("runtime")
+        .join(exe_name("llama-server"));
     if local.is_file() {
         return Ok(Resolved {
             binary: local,
@@ -186,7 +189,10 @@ fn bundled_runtime() -> Option<PathBuf> {
     if candidate.is_file() {
         return Some(candidate);
     }
-    let parent = dir.join("..").join("runtime").join(exe_name("llama-server"));
+    let parent = dir
+        .join("..")
+        .join("runtime")
+        .join(exe_name("llama-server"));
     if parent.is_file() {
         return Some(parent);
     }
