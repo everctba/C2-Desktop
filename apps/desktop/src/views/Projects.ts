@@ -5,6 +5,14 @@ import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
 import type { ModelInspection, StatusReport } from "../types";
 import type { View } from "./view";
+
+/** Modelo recomendado para o C2 (validado nesta máquina). */
+export const MODELO_RECOMENDADO = {
+  repo: "lmstudio-community/gemma-4-E2B-it-GGUF",
+  arquivo: "gemma-4-E2B-it-Q4_K_M.gguf",
+  tamanho: "~3,2 GB",
+  url: "https://huggingface.co/lmstudio-community/gemma-4-E2B-it-GGUF/tree/main",
+};
 import styles from "./views.module.css";
 
 export interface ProjectsContext {
@@ -171,8 +179,13 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
 
   const name = document.createElement("div");
   name.className = styles.fieldValue;
-  name.textContent = status.model.name;
+  name.textContent = status.model.path ? status.model.name : "nenhum modelo selecionado";
   body.appendChild(name);
+
+  if (!status.model.path) {
+    const aviso = Pill("selecione um .gguf para poder iniciar", "warning", "xs");
+    body.appendChild(aviso);
+  }
 
   const cfg = document.createElement("div");
   cfg.className = styles.field;
@@ -209,6 +222,8 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
   footer.appendChild(
     Pill(status.model.disable_thinking ? "sem raciocínio" : "com raciocínio", "neutral", "xs"),
   );
+
+  body.appendChild(modelInstructions());
   return card;
 }
 
@@ -294,4 +309,82 @@ function inspectionBody(inspection: ModelInspection): HTMLElement {
     dialogField("Caminho (não será copiado)", gguf.path, true),
   );
   return container;
+}
+
+/**
+ * Instruções para baixar um modelo do HuggingFace (sem copiar para o
+ * workspace: o C2 só guarda o caminho).
+ */
+export function modelInstructions(): HTMLElement {
+  const box = document.createElement("details");
+  box.style.display = "grid";
+  box.style.gap = "var(--space-2xs)";
+  box.style.marginTop = "var(--space-2xs)";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "Como baixar um modelo (HuggingFace)";
+  summary.style.cursor = "pointer";
+  summary.style.fontSize = "var(--text-2xs)";
+  summary.style.textTransform = "uppercase";
+  summary.style.letterSpacing = "0.07em";
+  summary.style.color = "var(--text-subtle)";
+  box.appendChild(summary);
+
+  const passos = document.createElement("ol");
+  passos.style.cssText =
+    "margin: var(--space-2xs) 0 0 var(--space-l); display: grid; gap: var(--space-3xs); " +
+    "font-size: var(--text-s); color: var(--text-muted); line-height: 1.45;";
+  const itens = [
+    "Abra o repositório recomendado no HuggingFace (link abaixo).",
+    `Baixe o arquivo ${MODELO_RECOMENDADO.arquivo} (${MODELO_RECOMENDADO.tamanho}, Q4_K_M).`,
+    "Salve numa pasta sua (ex.: D:\\modelos) — o C2 não copia o arquivo.",
+    "Clique em “Selecionar .gguf…” e escolha esse arquivo.",
+  ];
+  for (const texto of itens) {
+    const li = document.createElement("li");
+    li.textContent = texto;
+    passos.appendChild(li);
+  }
+  box.appendChild(passos);
+
+  const recomendado = document.createElement("div");
+  recomendado.className = styles.field;
+  const label = document.createElement("span");
+  label.className = styles.fieldLabel;
+  label.textContent = "recomendado · gemma 4 E2B";
+  const valor = document.createElement("span");
+  valor.className = styles.mono;
+  valor.textContent = MODELO_RECOMENDADO.repo;
+  recomendado.append(label, valor);
+  box.appendChild(recomendado);
+
+  const acoes = document.createElement("div");
+  acoes.className = styles.actions;
+
+  const link = document.createElement("a");
+  link.href = MODELO_RECOMENDADO.url;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.className = styles.mono;
+  link.textContent = MODELO_RECOMENDADO.url;
+  link.style.color = "var(--accent-3)";
+  acoes.appendChild(link);
+
+  acoes.appendChild(
+    Button({
+      label: "Copiar link",
+      size: "xs",
+      variant: "secondary",
+      onClick: async () => {
+        try {
+          await navigator.clipboard.writeText(MODELO_RECOMENDADO.url);
+        } catch {
+          /* sem clipboard: usuario copia manualmente */
+        }
+      },
+    }),
+  );
+
+  box.appendChild(acoes);
+  return box;
 }

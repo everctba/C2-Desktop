@@ -27,6 +27,20 @@ struct Engine {
     handle: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
+/// Recusa iniciar o engine sem um `.gguf` valido configurado.
+fn require_model(config: &c2_core::Config) -> Result<(), String> {
+    match config.model.path.as_deref() {
+        Some(path) if !path.trim().is_empty() => {
+            if Path::new(path).is_file() {
+                Ok(())
+            } else {
+                Err(format!("modelo GGUF nao encontrado: {path}"))
+            }
+        }
+        _ => Err("nenhum modelo .gguf selecionado (aba Modelo)".to_string()),
+    }
+}
+
 fn open_workspace(root: &str) -> Result<Workspace, String> {
     let path = c2_core::workspace::canonical_path(Path::new(root)).map_err(|err| err.to_string())?;
     let workspace = Workspace::at(path);
@@ -81,6 +95,7 @@ async fn workspace_reindex(
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = open_workspace(&root)?;
         let config = workspace.load_config().map_err(|err| err.to_string())?;
+        require_model(&config)?;
         let client = LlmClient::from_config(&config);
         runtime::ensure(&workspace, &config).map_err(|err| err.to_string())?;
 
@@ -118,6 +133,7 @@ fn engine_start(
 
     let workspace = open_workspace(&root)?;
     let config = workspace.load_config().map_err(|err| err.to_string())?;
+    require_model(&config)?;
     let client = LlmClient::from_config(&config);
     let running = Arc::clone(&engine.running);
     running.store(true, Ordering::SeqCst);

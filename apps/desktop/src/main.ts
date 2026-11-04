@@ -4,7 +4,8 @@ import { Rail, type Route } from "./ui/Rail";
 import { Toolbar } from "./ui/Toolbar";
 import type { StatusReport } from "./types";
 import { renderEngine } from "./views/Engine";
-import { renderProjects } from "./views/Projects";
+import { modelInstructions, renderProjects } from "./views/Projects";
+import { dialogField, openDialog } from "./ui/Dialog";
 import { renderSearch } from "./views/Search";
 import type { View } from "./views/view";
 
@@ -81,6 +82,68 @@ async function runReindex(full: boolean): Promise<void> {
   }
 }
 
+/**
+ * Garante que existe um `.gguf` valido antes de iniciar o engine.
+ * Sem modelo abre um popup explicativo e obriga a selecionar (c2-e14).
+ */
+async function ensureModel(): Promise<boolean> {
+  if (!state.root) {
+    await pickProject();
+    return false;
+  }
+  await loadStatus();
+
+  const configurado = state.status?.model.path ?? null;
+  let motivo = "";
+  if (!configurado) {
+    motivo = "Nenhum modelo .gguf selecionado neste workspace.";
+  } else {
+    try {
+      await api.modelInspect(configurado);
+    } catch (error) {
+      motivo = `O modelo configurado não pode ser lido: ${String(error)}`;
+    }
+  }
+  if (!motivo) return true;
+
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gap = "var(--space-s)";
+  body.appendChild(
+    dialogField(
+      "Para indexar, o C2 precisa de um modelo local (GGUF). Ele não é copiado: o workspace guarda só o caminho.",
+      motivo,
+    ),
+  );
+  body.appendChild(modelInstructions());
+
+  const escolher = await openDialog({
+    title: "Selecione um modelo para iniciar",
+    body,
+    confirmLabel: "Selecionar .gguf…",
+  });
+  if (!escolher) return false;
+
+  const escolhido = await api.pickModel();
+  if (!escolhido) return false;
+
+  try {
+    await api.modelInspect(escolhido);
+    await api.modelSet(state.root, escolhido);
+    await loadStatus();
+    log("modelo selecionado");
+    return true;
+  } catch (error) {
+    await openDialog({
+      title: "Modelo inválido",
+      body: dialogField("Erro", String(error), true),
+      confirmLabel: "Entendi",
+      cancelLabel: "",
+    });
+    return false;
+  }
+}
+
 async function toggleEngine(): Promise<void> {
   if (!state.root) return;
   state.busy = true;
@@ -91,6 +154,7 @@ async function toggleEngine(): Promise<void> {
       state.running = false;
       log("engine parado");
     } else {
+      if (!(await ensureModel())) return;
       await api.engineStart(state.root);
       state.running = true;
       log("engine iniciado");
