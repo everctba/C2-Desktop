@@ -96,6 +96,12 @@ c2 status                                    # estado do índice e do runtime
 - Conteúdo: `what`, `why`, `goal`, `summary`, `responsibility` e `links[]`
   (imports/mod/require…). Formato completo em [docs/schema.md](docs/schema.md).
 - Escrita atômica; metadado sem semântica é recusado.
+- **Cache de hash** (`.c2/hash-cache.json`): se `(tamanho, mtime)` não mudam, o
+  SHA-256 anterior é reaproveitado — 300 arquivos inalterados caem de ~1,2 s
+  para ~0,14 s na segunda passada. `--full` ignora o cache.
+- **Rename por hash**: arquivo movido com o mesmo conteúdo herda o metadado
+  existente, sem chamar o modelo, e os `links[]` que apontavam para o caminho
+  antigo são atualizados.
 - Re-hash depois da análise: se o arquivo mudou durante a inferência, o
   resultado é descartado e o arquivo entra no próximo ciclo.
 
