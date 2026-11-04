@@ -113,7 +113,7 @@ O C2 compensa a partir de projetos médios, quando o agente precisaria abrir
 ## Documentação
 
 - [Guia completo](docs/guia.md) — instalação, configuração, comandos, segurança
-- [Protocolo para agentes](docs/agent-protocol.md) — contexto antes de código
+- [Instruções completas para agentes](docs/agent-instructions.md) — guia autocontido para colar nas regras\n- [Protocolo para agentes](docs/agent-protocol.md) — contexto antes de código
 - [Schema do metadado](docs/schema.md)
 - [Gate do MVP](docs/mvp-gate.md) — critérios, benchmarks, veredito
 - [Landing briefing](docs/landing/briefing.md) — números e posicionamento

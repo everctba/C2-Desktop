@@ -2,7 +2,7 @@
 
 Cole este bloco no arquivo de regras do seu agente (CLAUDE.md, `.cursor/rules/`,
 `.github/copilot-instructions.md` ou `AGENTS.md`). Versão completa e exemplos:
-[agent-protocol.md](agent-protocol.md).
+[agent-protocol.md](agent-protocol.md). Versao completa e autocontida (para colar nas regras): [agent-instructions.md](agent-instructions.md).
 
 ---
 

@@ -534,7 +534,7 @@ pnpm tauri dev
 <span class="c"># pacote portátil</span>
 pwsh -File scripts/build-portable.ps1</pre>
             <p>
-              O repositório é indexado pelo próprio C2 (dogfooding): cada arquivo tem
+              Para o seu agente usar o índice, rode <span class="mono">c2 init --agent</span> (grava o bloco em <span class="mono">AGENTS.md</span>) ou copie o guia completo: <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/agent-instructions.md" rel="noreferrer">docs/agent-instructions.md</a>.<br /><br />\n              O repositório é indexado pelo próprio C2 (dogfooding): cada arquivo tem
               <span class="mono">.c2.json</span> e o agente consulta antes de ler.
               CI: <a href="https://github.com/everctba/C2-Desktop/actions" rel="noreferrer">GitHub Actions</a>
               (ubuntu + windows).
