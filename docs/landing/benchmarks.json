@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-11-04",
+  "fonte": "medicoes deste repositorio; ver docs/mvp-gate.md, docs/bench-500.json e docs/bench-ab/",
+  "plataforma": {
+    "os": "Windows 10/11 x64",
+    "gpu": "NVIDIA RTX 4060 Ti 8 GB",
+    "runtime": "llama.cpp b12110 (Vulkan + CPU), embarcado",
+    "modelo": "gemma-4-E2B-it-Q4_K_M"
+  },
+  "indexacao_501": {
+    "arquivos": 501,
+    "primeira_passada_segundos": 2203.2,
+    "primeira_passada_minutos": 36.7,
+    "chamadas_llm": 501,
+    "tokens": 359688,
+    "segundos_por_arquivo": 4.4,
+    "segunda_passada_segundos": 0.4,
+    "segunda_passada_chamadas": 0,
+    "hashes_do_cache": 501,
+    "grep_p50_ms": 60,
+    "grep_p95_ms": 82,
+    "related_ms": 49,
+    "metadados_com_links": 501
+  },
+  "indexacao_100": {
+    "arquivos": 101,
+    "primeira_passada_segundos": 343.6,
+    "chamadas_llm": 101,
+    "tokens": 65472,
+    "segunda_passada_segundos": 0.1,
+    "grep_p50_ms": 24,
+    "grep_p95_ms": 46,
+    "related_ms": 19
+  },
+  "ganhos_de_otimizacao": {
+    "cache_de_hash_300_arquivos": {
+      "antes_segundos": 1.17,
+      "depois_segundos": 0.138,
+      "fator": 8.5
+    },
+    "busca_duas_fases_500_arquivos": {
+      "p50_antes_ms": 449,
+      "p50_depois_ms": 92,
+      "p95_antes_ms": 767,
+      "p95_depois_ms": 95
+    }
+  },
+  "semantico_vs_lexical": {
+    "corpus": { "arquivos": 507, "bytes": 994560 },
+    "consulta": "onde impede valores acima do permitido",
+    "com_c2": {
+      "achou": true,
+      "topo": "src/mod01/arquivo_001.rs",
+      "score": 10.2,
+      "tempo_ms": 86,
+      "contexto_bytes": 1320
+    },
+    "lexical_direto": {
+      "achou": false,
+      "matches": 0,
+      "tempo_ms": 150,
+      "leitura_necessaria_bytes": 994560
+    }
+  },
+  "ab_cego_projeto_pequeno": {
+    "projeto": "examples/bench-ab/loja",
+    "arquivos": 8,
+    "bytes": 6535,
+    "nota_rubrica_max": 10,
+    "com_c2": { "nota": 10, "arquivos_abertos": 9, "comandos": 13, "contexto_bytes": 16300 },
+    "leitura_direta": { "nota": 10, "arquivos_abertos": 8, "comandos": 15, "contexto_bytes": 8500 },
+    "conclusao": "empate em acerto; em projeto pequeno o C2 custa mais contexto"
+  },
+  "ab_piloto_projeto_pequeno": {
+    "indexacao_segundos": 28.3,
+    "chamadas": 8,
+    "tokens": 4985,
+    "consulta_com_c2_bytes": 15938,
+    "leitura_direta_bytes": 6535
+  },
+  "ponto_de_equilibrio_estimado": {
+    "ate_20_arquivos": "ler direto",
+    "100_a_500_arquivos": "C2 ganha",
+    "milhares": "C2 ganha muito"
+  },
+  "pacote_windows": {
+    "tamanho_mb": 117.5,
+    "app_mb": 11.98,
+    "cli_mb": 4.28,
+    "runtime_mb": 101,
+    "testes": 141
+  },
+  "plataformas": {
+    "windows": "suportado e validado",
+    "linux": "build pronto (scripts/build-linux.sh), execucao adiada - nao anunciar como suportado",
+    "macos": "fora do escopo"
+  },
+  "fontes": [
+    "docs/mvp-gate.md",
+    "docs/bench-500.json",
+    "docs/bench-ab/resultado-piloto.md",
+    "docs/bench-ab/resultado-cego.md",
+    "docs/bench-ab/protocolo.md",
+    "docs/bench-ab/rubrica.md"
+  ]
+}
