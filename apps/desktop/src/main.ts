@@ -63,7 +63,8 @@ async function pickProject(): Promise<void> {
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
   await loadStatus();
-  if (!state.status) state.route = "projects";
+  // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
+  state.route = state.status?.initialized ? "engine" : "projects";
   render();
 }
 
@@ -421,6 +422,12 @@ function render(): void {
               await loadStatus();
               render();
             })(),
+          onInitialized: () =>
+            void (async () => {
+              await loadStatus();
+              state.route = "engine";
+              render();
+            })(),
         });
     }
     disposeView = view.dispose ?? null;
@@ -450,7 +457,12 @@ async function boot(): Promise<void> {
     localStorage.setItem("c2.root", state.root);
   }
   await loadStatus();
-  if (!state.status && state.root) state.route = "projects";
+  if (fromArgs && state.status?.initialized) {
+    // `c2 open --root` abre direto na Engine.
+    state.route = "engine";
+  } else if (!state.status && state.root) {
+    state.route = "projects";
+  }
   if (state.status) log("workspace carregado");
   subscribeEvents();
   render();

@@ -21,6 +21,8 @@ export interface ProjectsContext {
   error: string | null;
   onPickProject: () => void;
   onChanged: () => void;
+  /// Chamado depois de criar o .c2/config.json (a janela vai para a Engine).
+  onInitialized: () => void;
 }
 
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
@@ -78,7 +80,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
             } catch (error) {
               console.error(error);
             }
-            location.reload();
+            ctx.onInitialized();
           },
         }),
       );
