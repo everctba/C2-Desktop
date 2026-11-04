@@ -5,8 +5,6 @@ on:
     branches: [master, main]
   pull_request:
 
-# Linux esta adiado no escopo do alpha (decisao c2-uf5); o job ubuntu
-# fica preparado para quando o escopo reabrir.
 jobs:
   core:
     name: Core + CLI (${{ matrix.os }})
@@ -31,6 +29,7 @@ jobs:
       - name: smoke test (linux)
         if: runner.os == 'Linux'
         run: |
+          file ./target/release/c2
           ./target/release/c2 --version
           mkdir -p /tmp/c2-smoke
           printf 'fn main() {}\n' > /tmp/c2-smoke/main.rs
@@ -39,6 +38,20 @@ jobs:
           ./target/release/c2 --root /tmp/c2-smoke status --json
           ./target/release/c2 --root /tmp/c2-smoke reindex --dry-run
           ./target/release/c2 --root /tmp/c2-smoke cleaner
+      - name: artefato (CLI Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-cli-linux-x64
+          path: target/release/c2
+          if-no-files-found: error
+      - name: artefato (CLI Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-cli-windows-x64
+          path: target/release/c2.exe
+          if-no-files-found: error
 
   desktop:
     name: Desktop (windows)
@@ -60,3 +73,41 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: cargo build --manifest-path src-tauri/Cargo.toml
+
+  desktop-linux:
+    name: Desktop (ubuntu)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - name: dependencias do Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf libssl-dev libxdo-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: dependencias do frontend
+        run: pnpm install --frozen-lockfile
+      - name: build do desktop (Tauri, sem bundle)
+        run: pnpm tauri build --no-bundle
+      - name: conferir binario
+        run: |
+          file src-tauri/target/release/c2-desktop
+          ldd src-tauri/target/release/c2-desktop | head -20
+      - name: artefato (desktop Linux)
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-desktop-linux-x64
+          path: apps/desktop/src-tauri/target/release/c2-desktop
+          if-no-files-found: error

@@ -1,5 +1,7 @@
 # C2
 
+[![ci](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml)
+
 **Contexto semântico de projeto para agentes de IA.**
 Local. Incremental. Sem embeddings.
 
