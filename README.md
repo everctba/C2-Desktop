@@ -28,6 +28,24 @@ cargo build --release
 # binário em target/release/c2 (Windows: c2.exe)
 ```
 
+## Pacote portátil (Windows)
+
+```bash
+pwsh -File scripts/build-portable.ps1
+```
+
+Gera `dist/desktop/`:
+
+| Arquivo | O que é |
+|---|---|
+| `C2.exe` | app desktop (janela), frontend embutido, ~12 MB |
+| `cli/c2.exe` | CLI do Core (init, status, grep, related, read) |
+| `LEIA-ME.txt` | requisitos e primeiros passos |
+
+A CLI fica numa subpasta porque no Windows `c2.exe` e `C2.exe` são o **mesmo**
+arquivo. O pacote não embarca o llama.cpp: aponte `model.binary` (ou use um
+`llama-server` no PATH).
+
 ## Primeiro uso
 
 ```bash
