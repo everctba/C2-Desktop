@@ -20,6 +20,29 @@ encerramento de processo (`kill`).
 
 ---
 
+## Evidência real do CI (2026-11-04)
+
+O CI roda em `ubuntu-latest` e **passa** — não é compilação cruzada, é execução
+em Linux de verdade:
+
+| Verificação | Resultado |
+|---|---|
+| `cargo fmt --check` | ✅ |
+| `cargo clippy --workspace --all-targets -- -D warnings` | ✅ |
+| `cargo test --workspace` — **141 testes** (unit + integração) | ✅ |
+| `cargo build --workspace --release` | ✅ |
+| Smoke da CLI: `file`, `--version`, `init --json`, `status --json`, `reindex --dry-run`, `cleaner` | ✅ |
+| Build do **desktop Tauri** (WebKitGTK/GTK) — `tauri build --no-bundle` | ✅ |
+
+Artefatos gerados no run: `c2-cli-linux-x64` (1,8 MB), `c2-cli-windows-x64`
+(1,8 MB) e **`c2-desktop-linux-x64`** (4,4 MB, binário ELF do app).
+Run: [actions/runs/41916289763](https://github.com/everctba/C2-Desktop/actions/runs/41916289763).
+
+**O que ainda falta em Linux:** exercitar o fluxo com **runtime + modelo**
+(`llama-server` Linux baixado por `scripts/fetch-runtime.sh` e um `.gguf`) e
+rodar uma indexação real. Isso precisa de CPU/GPU e de um modelo baixado — o CI
+não faz isso hoje; fica para o Mint ou para um job dedicado.
+
 ## Linux Mint (dual boot) — caminho pronto
 
 O projeto já tem script de build e download de runtime para Linux. No Mint:
@@ -178,12 +201,13 @@ PGREP=$(pgrep -f llama-server || true); echo "processos llama-server: ${PGREP:-0
 
 ---
 
-## Roteiro B — CI (automático)
+## Roteiro B — CI (automático, já em uso)
 
-O workflow [`ci.yml`](../.github/workflows/ci.yml) roda em `ubuntu-latest`:
-`fmt`, `clippy -D warnings`, `test`, `build --release` e smoke test
-(`init`, `status`, `reindex --dry-run`, `cleaner`). Basta haver um remote git
-para o job executar — depois o link do run serve como evidência do bead.
+O workflow [`ci.yml`](../.github/workflows/ci.yml) roda em `ubuntu-latest` e
+`windows-latest`: `fmt`, `clippy -D warnings`, `test`, `build --release`,
+smoke test e artefatos. Também builda o desktop Tauri em Ubuntu.
+Remote: `https://github.com/everctba/C2-Desktop` — cada push dispara o run;
+o link do run é a evidência.
 
 ---
 

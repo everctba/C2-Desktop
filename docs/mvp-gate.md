@@ -81,10 +81,11 @@ teste de regressão; o corpus agora tem o grafo completo e `related` mostra
 
 Fora do escopo desta fase, por decisão registrada:
 
-1. **Linux** — adiado (`c2-uf5`); o código compila e passa clippy para
-   `x86_64-unknown-linux-gnu` e o roteiro/CI ficam preparados para quando
-   o escopo reabrir (`c2-e12.2`).
-2. **MCP** — deferido (`c2-dec2` / `c2-e13`).
+1. **Linux** — adiado (`c2-uf5`), mas com evidência crescente: CI
+   `ubuntu-latest` verde (fmt/clippy, **141 testes**, build release, smoke da
+   CLI e build do **desktop Tauri**), com artefatos
+   `c2-cli-linux-x64` e `c2-desktop-linux-x64`. Falta exercitar o fluxo com
+   runtime + modelo em Linux (Mint ou job dedicado).
 
 O desktop mínimo existe e roda (pacote portátil com instalador), o runtime do
 llama.cpp vai embarcado (sem LM Studio) e os critérios 3 e 5 do PRD são
