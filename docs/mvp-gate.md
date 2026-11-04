@@ -43,38 +43,36 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 | Desktop mínimo | ✅ | janela Tauri com Projetos/Engine/Busca, seletor de `.gguf` com validação, PLAY/STOP/REINDEX e `c2 open` |
 | Migração do protótipo bash | ✅ | `c2 migrate` converte para o schema v1 com backup reversível (`c2-e11t2`) |
 
-## 3. Benchmark de indexação e busca (100 arquivos)
+## 3. Benchmark de indexação e busca (500 arquivos)
 
-Corpus sintético: 101 arquivos `.rs` em 20 módulos (100 + `src/lib.rs`), com
+Corpus sintético: 501 arquivos `.rs` em 20 módulos (500 + `src/lib.rs`), com
 `use crate::modNN::arquivo_XXX` ligando os arquivos. Script: `scripts/bench.ps1`.
+Evidência: [`docs/bench-500.json`](bench-500.json).
 
 | Métrica | Valor medido | Como |
 |---|---|---|
-| Primeira indexação | **343,6 s (5,7 min)** | `pwsh -File scripts/bench.ps1 -Files 100` |
-| Throughput | **0,29 arquivo/s (~3,2 s/arquivo)** | 101 ÷ 343,6 |
-| Modelo | **101 chamadas, 65.472 tokens** | resumo do `c2 reindex` |
-| Segunda passada | **0,1 s · 0 chamadas · 101 hashes do cache** | `c2 reindex` repetido |
-| `c2 grep` p50 | **24 ms** | 5 consultas no índice de 101 |
-| `c2 grep` p95 | **46 ms** | idem |
-| `c2 related` | **19 ms** | 1 arquivo |
-| Grafo | **100 de 101** metadados com links | `c2 reindex` (relink sem LLM) |
+| Primeira indexação | **2203 s (36,7 min)** | `pwsh -File scripts/bench.ps1 -Files 500` |
+| Throughput | **0,23 arquivo/s (~4,4 s/arquivo)** | 501 ÷ 2203 |
+| Modelo | **501 chamadas, 359.688 tokens** | resumo do `c2 reindex` |
+| Segunda passada | **0,4 s · 0 chamadas · 501 hashes do cache** | `c2 reindex` repetido |
+| `c2 grep` p50 / p95 | **60 ms / 82 ms** | 5 consultas no índice de 501 |
+| `c2 related` | **49 ms** | 1 arquivo (1 `usa`, 1 `usado por`) |
+| Grafo | 501 metadados com links | relink estático |
 | Pacote portátil | 116,6 MB (app + CLI + runtime) | `scripts/build-portable.ps1` |
 
-**Leitura honesta:** a indexação inicial é o gargalo (~3,2 s/arquivo com Gemma 4
-E2B Q4 numa GPU de 8 GB), não a busca. A segunda passada é gratuita e quase
-instantânea (0,1 s para 101 arquivos) graças ao cache de hash. Para 500 arquivos
-a projeção é ~29 min de máquina, uma única vez; a busca continua abaixo da meta
-de 150 ms mesmo com o processo de CLI frio.
+**Leitura honesta:** a indexação inicial é o gargalo (~4,4 s/arquivo com Gemma 4
+E2B Q4 numa GPU de 8 GB), não a busca; para 500 arquivos é meia hora de máquina,
+uma única vez. A segunda passada é gratuita e quase instantânea (0,4 s para 501
+arquivos) graças ao cache de hash. A busca fica bem abaixo da meta de 150 ms
+mesmo com o processo de CLI frio.
 
-Benchmark de 500 arquivos fica **opcional** (rodada longa/CI): o aceite do gate
-passou a ser 100 arquivos por decisão do usuário (2026-11-04). O histórico do run
-interrompido em 188 arquivos (0,26 arquivo/s, p50 49 ms) permanece no bead
-`c2-e12.3`.
+O benchmark de **100 arquivos** continua como verificação rápida
+(`-Files 100`): 343,6 s na primeira passada, 0,1 s na segunda, grep p50 24 ms.
 
-Achado corrigido nesta rodada: `crate_root_of` verificava `src/lib.rs` relativo
-ao diretório do processo, então `use crate::modNN::…` nunca resolvia e o grafo
-saía vazio. Corrigido para resolver contra a raiz do workspace, com teste de
-regressão; o corpus agora tem 100/101 metadados com links e `related` mostra
+Achado corrigido na rodada anterior: `crate_root_of` verificava `src/lib.rs`
+relativo ao diretório do processo, então `use crate::modNN::…` nunca resolvia e
+o grafo saía vazio. Corrigido para resolver contra a raiz do workspace, com
+teste de regressão; o corpus agora tem o grafo completo e `related` mostra
 `uses`/`used_by` reais.
 
 ## 4. Veredito

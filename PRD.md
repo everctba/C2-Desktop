@@ -1015,8 +1015,11 @@ Cada item aponta a decisão registrada em `bd` e o estado real do código.
 
 ## Números medidos (2026-11-04)
 
-- 101 arquivos `.rs`: primeira indexação em 5,7 min (~3,2 s/arquivo, 101 chamadas),
-  segunda passada em 0,1 s com **0 chamadas** e 101 hashes do cache.
-- `c2 grep`: p50 24 ms / p95 46 ms; `c2 related` 19 ms.
+- **501 arquivos `.rs`** (corpus completo): primeira indexação em **36,7 min**
+  (501 chamadas, ~4,4 s/arquivo), segunda passada em **0,4 s com 0 chamadas** e
+  501 hashes do cache.
+- `c2 grep`: p50 **60 ms** / p95 **82 ms**; `c2 related` **49 ms**.
+- Verificação rápida (100 arquivos): 5,7 min na primeira passada, 0,1 s na segunda.
+- Evidência: [`docs/bench-500.json`](docs/bench-500.json).
 - Grafo: 100 de 101 metadados com links após relink sem LLM.
 - Pacote Windows: 116,6 MB (app + CLI + runtime + instalador).

@@ -181,4 +181,20 @@ No Windows sem MSVC, o projeto usa o toolchain GNU com `rust-lld` — ver
 [AGENTS.md](AGENTS.md). O backend de inferência para desenvolvimento pode ser
 subido com `pwsh -File scripts/dev-llama.ps1`.
 
-Benchmark de indexação e busca: `pwsh -File scripts/bench.ps1 -Files 500`.
+Benchmark de indexação e busca:
+
+```powershell
+pwsh -File scripts/bench.ps1            # 100 arquivos (verificação rápida)
+pwsh -File scripts/bench.ps1 -Files 500 # corpus completo
+```
+
+Medido em 501 arquivos `.rs` (Windows, Gemma 4 E2B Q4, runtime embarcado):
+
+| Métrica | Valor |
+|---|---|
+| Primeira indexação | 36,7 min (501 chamadas, ~4,4 s/arquivo) |
+| Segunda passada | **0,4 s, 0 chamadas** (501 hashes do cache) |
+| `c2 grep` p50 / p95 | **60 ms / 82 ms** |
+| `c2 related` | 49 ms |
+
+Evidência: [`docs/bench-500.json`](docs/bench-500.json).

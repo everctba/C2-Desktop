@@ -1,0 +1,40 @@
+﻿{
+    "files":  500,
+    "binary":  "H:\\TUDO\\Codigo\\Codigo\\C2 Desktop\\dist\\desktop\\cli\\c2.exe",
+    "first_index_seconds":  2203.2,
+    "first_index_summary":  "  [501/501] novo       src/mod19/arquivo_024.rs | 501 indexados, 0 inalterados, 0 removidos, 0 religados, 0 renomeados, 0 erros, 0 adiados | modelo: 501 chamadas, 359688 tokens, 4361 ms por arquivo",
+    "second_pass_seconds":  0.4,
+    "second_pass_summary":  "0 indexados, 501 inalterados, 0 removidos, 0 religados, 0 renomeados, 0 erros, 0 adiados | cache: 501 hash(es) reaproveitados por (tamanho, mtime)",
+    "grep":  [
+                 {
+                     "query":  "onde valida o limite de estoque",
+                     "ms":  82,
+                     "hits":  5
+                 },
+                 {
+                     "query":  "processamento de faturamento",
+                     "ms":  60,
+                     "hits":  5
+                 },
+                 {
+                     "query":  "conciliacao bancaria e auditoria",
+                     "ms":  65,
+                     "hits":  5
+                 },
+                 {
+                     "query":  "permissoes de acesso do usuario",
+                     "ms":  59,
+                     "hits":  5
+                 },
+                 {
+                     "query":  "relatorio gerencial",
+                     "ms":  59,
+                     "hits":  5
+                 }
+             ],
+    "grep_p50_ms":  60,
+    "grep_p95_ms":  82,
+    "related_ms":  49,
+    "related_uses":  1,
+    "related_used_by":  1
+}
