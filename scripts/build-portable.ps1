@@ -74,8 +74,11 @@ if (Test-Path (Join-Path $runtimeSrc 'llama-server.exe')) {
 
 Write-Host '4/4 escrevendo LEIA-ME...'
 $readme = @'
-C2 - pacote portatil
-====================
+C2 - pacote portatil - Comments 2.0 for AI
+============================================
+
+O C2 comenta seu codigo automaticamente com IA local e mantem o comentario
+atualizado (hash) para a sua IA gastar menos tokens entendendo o projeto.
 
 O que tem aqui
 --------------
