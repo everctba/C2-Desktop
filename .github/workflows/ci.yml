@@ -5,7 +5,7 @@ on:
     branches: [master, main]
   pull_request:
 
-# Linux esta adiado no escopo do alpha (decisao c2-aa1); o job ubuntu
+# Linux esta adiado no escopo do alpha (decisao c2-uf5); o job ubuntu
 # fica preparado para quando o escopo reabrir.
 jobs:
   core:

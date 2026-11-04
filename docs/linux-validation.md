@@ -1,6 +1,7 @@
 # Validação em Linux
 
-**Bead:** `c2-e12.2` · **Status:** roteiro pronto, execução pendente (esta máquina não tem distro WSL)
+**Bead:** `c2-e12.2` · **Status:** **adiado** — escopo do alpha é Windows (`c2-uf5`)
+**Decisões:** `c2-uf5` (Windows-only nesta fase) · `c2-aa0` (validação Linux via CI, não em máquina local)
 
 ---
 
