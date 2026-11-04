@@ -32,3 +32,6 @@ Thumbs.db
 
 # cache do runtime baixado por scripts/fetch-runtime.ps1
 /build/
+
+# scripts temporarios de patch
+scripts/pf_*.py
