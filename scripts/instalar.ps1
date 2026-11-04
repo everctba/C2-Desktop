@@ -6,6 +6,7 @@
 #   pwsh -File instalar.ps1 -NoShortcut
 #   pwsh -File instalar.ps1 -NoGui        # sem dialogo: usa prompt de texto
 #   pwsh -File instalar.ps1 -NoPath       # nao adiciona o CLI ao PATH
+#   pwsh -File instalar.ps1 -PrependPath  # poe o CLI antes no PATH (ver conflito)
 #
 # O que faz:
 #   1. escolhe a pasta de instalacao (padrao %LOCALAPPDATA%\C2);
@@ -19,7 +20,9 @@ param(
     # Nao abre o seletor grafico de pasta (usa prompt de texto)
     [switch]$NoGui,
     # Nao adiciona <dest>\cli ao PATH do usuario
-    [switch]$NoPath
+    [switch]$NoPath,
+    # Coloca o CLI no inicio do PATH do usuario (pode sombrear outro "c2")
+    [switch]$PrependPath
 )
 
 $ErrorActionPreference = 'Continue'
@@ -91,16 +94,33 @@ if (Test-Path $desinstalador) {
 }
 
 # CLI no PATH do usuario (nao precisa de admin); desinstalar remove depois.
-if (-not $NoPath) {
-    $pastaCli = (Join-Path $Dest 'cli').TrimEnd('\')
-    if (Test-Path (Join-Path $pastaCli 'c2.exe')) {
+$pastaCli = (Join-Path $Dest 'cli').TrimEnd('\')
+$c2Proprio = Join-Path $pastaCli 'c2.exe'
+if (Test-Path $c2Proprio) {
+    # Outro "c2" no PATH? O Windows procura primeiro no PATH do sistema.
+    $outros = @(Get-Command c2 -All -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -and ($_.Source.TrimEnd('\') -ne $c2Proprio.TrimEnd('\')) })
+    if ($outros.Count -gt 0) {
+        $outro = $outros[0].Source
+        Write-Warning "ja existe outro 'c2' no PATH: $outro"
+        Write-Warning "  o Windows procura primeiro no PATH do SISTEMA; se o outro estiver la, ele vence mesmo com o C2 no PATH do usuario."
+        Write-Warning "  para usar o C2: `"$c2Proprio`" --version, ou remova/renomeie o outro, ou use -PrependPath (so ajuda se o outro estiver no PATH do usuario)."
+    }
+
+    if (-not $NoPath) {
         $atual = [Environment]::GetEnvironmentVariable('Path', 'User')
         if ($null -eq $atual) { $atual = '' }
         $entradas = @($atual -split ';' | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ -ne '' })
         if ($entradas -contains $pastaCli) {
             Write-Host "PATH: $pastaCli ja estava no PATH do usuario"
         } else {
-            $novo = if ($atual.Trim().TrimEnd(';') -eq '') { $pastaCli } else { $atual.TrimEnd(';') + ';' + $pastaCli }
+            $novo = if ($atual.Trim().TrimEnd(';') -eq '') {
+                $pastaCli
+            } elseif ($PrependPath) {
+                $pastaCli + ';' + $atual.TrimEnd(';')
+            } else {
+                $atual.TrimEnd(';') + ';' + $pastaCli
+            }
             try {
                 [Environment]::SetEnvironmentVariable('Path', $novo, 'User')
                 try {
@@ -108,7 +128,11 @@ if (-not $NoPath) {
                     $resultado = [UIntPtr]::Zero
                     [C2Inst.Win32]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 0x0002, 1000, [ref]$resultado) | Out-Null
                 } catch { }
-                Write-Host "PATH: $pastaCli adicionado ao PATH do usuario (vale em novos terminais)"
+                if ($PrependPath) {
+                    Write-Host "PATH: $pastaCli adicionado no INICIO do PATH do usuario"
+                } else {
+                    Write-Host "PATH: $pastaCli adicionado ao PATH do usuario (vale em novos terminais)"
+                }
             } catch {
                 Write-Warning "nao foi possivel alterar o PATH do usuario: $($_.Exception.Message)"
             }

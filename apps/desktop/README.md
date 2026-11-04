@@ -84,6 +84,14 @@ O instalador também coloca `<dest>\cli` no **PATH do usuário**, então em um
 terminal novo `c2 --version` funciona de qualquer pasta (desinstalar remove a
 entrada). Use `-NoPath` para não alterar o PATH.
 
+**Conflito com outro `c2`:** o Windows procura primeiro no PATH do *sistema*, e
+só depois no do usuário. Se já existir outro `c2.exe` (outro produto, script ou
+versão antiga), o instalador **detecta e avisa** com o caminho encontrado; nesse
+caso `c2` continuará chamando o outro. Opções: usar o caminho completo
+(`<dest>\cli\c2.exe`), remover o outro do PATH, ou `-PrependPath` (coloca o C2
+no início do PATH do usuário — resolve só se o outro também estiver no PATH do
+usuário).
+
 ## Configurações
 
 A rota **Config** (engrenagem no rail) edita o `.c2/config.json` do projeto:
