@@ -15,7 +15,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 
 | # | Critério | Status | Evidência | Lacuna |
 |---|---|---|---|---|
-| 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: `cargo build --release` → `c2.exe` de 3,6 MB em 32 s, roda sem Git Bash | Linux não validado (`c2-e12.2`) |
+| 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: `pwsh -File instalar.ps1 -Dest <pasta>` instala app + CLI + runtime (116 MB) com escolha de pasta, atalho e desinstalador | Linux não validado (`c2-e12.2`) |
 | 2 | Executar `c2 init` dentro de um projeto | ✅ | cria `.c2/config.json`, detecta linguagens, idempotente (teste de integração) | — |
 | 3 | O desktop reconhecer o workspace | ❌ | desktop Tauri não existe | `c2-e14`, bloqueado por MSVC (`c2-e14.1`) |
 | 4 | Configurar um modelo local | ✅ | `c2 config set model.path|binary|port` + validação por `--version` | — |
@@ -26,7 +26,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 | 9 | Arquivos excluídos terem metadados órfãos removidos | ✅ | remoção de 5 arquivos removidos detectada e metadados apagados | — |
 | 10 | Pesquisas pelo Semantic Grep | ✅ | `c2 grep` com motivo, trecho e `--json`; 78+ testes | — |
 | 11 | Um agente MCP consultar o projeto | ⏸️ | decisão `c2-dec2`: MCP fora do MVP | `c2-e13` (deferido) |
-| 12 | Funcionar sem LM Studio ou Git Bash | ⚠️ | sem Git Bash ✅; runtime próprio supervisionado ✅, mas o binário usado ainda é o do LM Studio (fallback) | `c2-e12.1` |
+| 12 | Funcionar sem LM Studio ou Git Bash | ✅ | sem Git Bash; `runtime/` com llama.cpp oficial (Vulkan+CPU) embarcado no pacote — `Origem: runtime embarcado`; LM Studio desligado por padrão (`allow_lmstudio=false`) | — |
 
 ## 2. Critérios do MVP definido em `c2-dec2` (Core + CLI + desktop mínimo)
 
@@ -77,13 +77,13 @@ Duas ressalvas registradas:
 
 ## 4. Veredito
 
-**NO-GO para "MVP fechado"** — três critérios do PRD não são atendidos e dois
-são parciais, todos já mapeados em beads:
+**NO-GO para "MVP fechado"** — restam dois critérios:
 
-1. Desktop mínimo (`c2-e14`) — depende de MSVC (`c2-e14.1`).
-2. Runtime empacotado sem LM Studio (`c2-e12.1`).
-3. Linux sem validação (`c2-e12.2`).
-4. MCP fora do escopo por decisão (`c2-dec2` / `c2-e13`).
+1. Linux sem validação (`c2-e12.2`).
+2. MCP fora do escopo por decisão (`c2-dec2` / `c2-e13`).
+
+O desktop mínimo agora existe e roda (pacote portátil com instalador), e o
+runtime do llama.cpp vai embarcado — não depende mais do LM Studio (`c2-e12.1`).
 
 **GO para "alpha usável Core + CLI"**: init, indexação incremental, grafo,
 busca, leitura e segurança funcionam de ponta a ponta, com testes e evidência.

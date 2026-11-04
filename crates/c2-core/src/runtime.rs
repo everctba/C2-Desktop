@@ -5,8 +5,10 @@
 //!
 //! 1. `model.binary` na configuracao;
 //! 2. `<workspace>/.c2/runtime/llama-server`;
-//! 3. `llama-server` no PATH;
-//! 4. backends do LM Studio (fallback de desenvolvimento, `model.allow_lmstudio`).
+//! 3. **runtime embarcado**: `<dir do C2>/runtime/llama-server` (e `../runtime`,
+//!    para a CLI que fica em `cli/`);
+//! 4. `llama-server` no PATH;
+//! 5. backends do LM Studio (opt-in de desenvolvimento, `model.allow_lmstudio`).
 //!
 //! O item 4 existe so para desenvolvimento: o instalador do C2 vai embarcar o
 //! runtime proprio (`c2-e12.1`), e entao o LM Studio deixa de ser necessario.
@@ -47,7 +49,7 @@ pub enum Ensure {
     Started { attempts: u32 },
 }
 
-fn exe(name: &str) -> String {
+fn exe_name(name: &str) -> String {
     if cfg!(windows) {
         format!("{name}.exe")
     } else {
@@ -125,12 +127,20 @@ pub fn resolve_binary(workspace: &Workspace, config: &Config) -> Result<Resolved
         )));
     }
 
-    let local = workspace.c2_dir().join("runtime").join(exe("llama-server"));
+    let local = workspace.c2_dir().join("runtime").join(exe_name("llama-server"));
     if local.is_file() {
         return Ok(Resolved {
             binary: local,
             dll_dirs,
             source: "workspace .c2/runtime".to_string(),
+        });
+    }
+
+    if let Some(bundled) = bundled_runtime() {
+        return Ok(Resolved {
+            binary: bundled,
+            dll_dirs,
+            source: "runtime embarcado".to_string(),
         });
     }
 
@@ -165,6 +175,24 @@ pub fn resolve_binary(workspace: &Workspace, config: &Config) -> Result<Resolved
     )))
 }
 
+/// `llama-server` embarcado ao lado do executavel do C2.
+///
+/// Procura `<exe_dir>/runtime` e `<exe_dir>/../runtime` — a CLI fica em
+/// `cli/c2.exe` no pacote portatil, entao sobe um nivel.
+fn bundled_runtime() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidate = dir.join("runtime").join(exe_name("llama-server"));
+    if candidate.is_file() {
+        return Some(candidate);
+    }
+    let parent = dir.join("..").join("runtime").join(exe_name("llama-server"));
+    if parent.is_file() {
+        return Some(parent);
+    }
+    None
+}
+
 fn configured_dll_dirs(config: &Config) -> Result<Vec<PathBuf>> {
     let mut dirs = Vec::new();
     for entry in &config.model.dll_dirs {
@@ -181,7 +209,7 @@ fn configured_dll_dirs(config: &Config) -> Result<Vec<PathBuf>> {
 
 /// Busca `name[.exe]` no PATH.
 pub fn which(name: &str) -> Option<PathBuf> {
-    let candidate = exe(name);
+    let candidate = exe_name(name);
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path)
         .map(|dir| dir.join(&candidate))
@@ -209,7 +237,7 @@ fn lmstudio_backend() -> Option<(PathBuf, Option<PathBuf>)> {
                     .file_name()
                     .map(|name| name.to_string_lossy().contains("llama.cpp-"))
                     .unwrap_or(false)
-                && path.join(exe("llama-server")).is_file()
+                && path.join(exe_name("llama-server")).is_file()
         })
         .collect();
     candidates.sort();
@@ -224,7 +252,7 @@ fn lmstudio_backend() -> Option<(PathBuf, Option<PathBuf>)> {
     .map(|relative| backends.join(relative))
     .find(|path| path.is_dir());
 
-    Some((binary.join(exe("llama-server")), vendor))
+    Some((binary.join(exe_name("llama-server")), vendor))
 }
 
 /// Monta o PATH do processo: DLLs configuradas primeiro.
@@ -493,7 +521,7 @@ mod tests {
 
         let runtime_dir = workspace.c2_dir().join("runtime");
         fs::create_dir_all(&runtime_dir).unwrap();
-        let binary = runtime_dir.join(exe("llama-server"));
+        let binary = runtime_dir.join(exe_name("llama-server"));
         fs::write(&binary, b"fake").unwrap();
 
         let config = workspace.load_config().unwrap();

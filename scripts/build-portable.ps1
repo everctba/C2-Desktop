@@ -59,36 +59,61 @@ if (Test-Path $coreExe) {
     Write-Warning "CLI c2.exe nao encontrada em target\$buildProfile"
 }
 
+# runtime oficial embutido (build/runtime, baixado por fetch-runtime.ps1)
+$runtimeSrc = Join-Path $root 'build\runtime'
+$runtimeDst = Join-Path $out 'runtime'
+if (Test-Path (Join-Path $runtimeSrc 'llama-server.exe')) {
+    Write-Host '    incluindo runtime embarcado...'
+    if (Test-Path $runtimeDst) { Remove-Item $runtimeDst -Recurse -Force }
+    Copy-Item $runtimeSrc $runtimeDst -Recurse -Force
+    Copy-Item (Join-Path $root 'scripts\instalar.ps1') (Join-Path $out 'instalar.ps1') -Force
+    Copy-Item (Join-Path $root 'scripts\desinstalar.ps1') (Join-Path $out 'desinstalar.ps1') -Force
+} else {
+    Write-Warning 'sem build/runtime: rode scripts/fetch-runtime.ps1 para embarcar o llama.cpp'
+}
+
 Write-Host '4/4 escrevendo LEIA-ME...'
 $readme = @'
 C2 - pacote portatil
 ====================
 
+O que tem aqui
+--------------
+C2.exe             app desktop (janela), com o frontend embutido
+cli\c2.exe         CLI do Core (init, status, grep, related, read)
+runtime\            llama-server oficial do llama.cpp (Vulkan + CPU)
+instalar.ps1       instalador com escolha de pasta
+desinstalar.ps1    remove a instalacao (preserva os projetos)
+
 Requisitos
 ----------
-- Windows 10/11 com WebView2 (ja vem no Windows 11; no 10 pode vir do Edge).
-- Um modelo .gguf no seu disco (o C2 NAO copia o modelo) e um llama-server.
-  Configure uma vez no projeto:
+- Windows 10/11 com WebView2.
+- Um modelo .gguf no seu disco (o C2 NAO copia o modelo).
 
-    cli\c2.exe config set model.path  "H:\modelos\modelo.gguf"
-    cli\c2.exe config set model.binary "C:\runtime\llama-server.exe"   (opcional)
+Instalar
+--------
+    pwsh -File instalar.ps1
+    pwsh -File instalar.ps1 -Dest "D:\Apps\C2" -NoShortcut
+
+Sem instalar (modo portatil), basta abrir C2.exe desta pasta.
 
 Primeiro uso
 ------------
-1. Abra C2.exe.
+1. Abra C2.exe (atalho criado pelo instalador ou direto da pasta).
 2. "Abrir projeto" e escolha a pasta do projeto.
 3. Se ainda nao existir .c2/config.json, clique em "Inicializar".
-4. Configure o modelo (o caminho acima) e clique em "Iniciar".
+4. "Selecionar .gguf" e escolha o modelo (mostra tamanho, quantizacao e VRAM).
+5. "Iniciar".
+
+O runtime do llama.cpp ja vai junto: nao precisa de LM Studio nem de CUDA.
+A CLI em cli\c2.exe usa o mesmo runtime (procura ..\runtime).
 
 O indice fica em <projeto>/.c2 e os metadados em <arquivo>.c2.json ao lado de
-cada arquivo. A CLI em cli\c2.exe faz init/status/grep/related/read.
-
-Observacao: este pacote ainda NAO embarca o llama.cpp. Enquanto isso, aponte
-model.binary para um llama-server existente (o do LM Studio serve para
-desenvolvimento).
+cada arquivo.
 '@
 Set-Content -Path (Join-Path $out 'LEIA-ME.txt') -Value $readme -Encoding utf8
 
 Write-Host ''
-Get-ChildItem $out | Select-Object Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+Get-ChildItem $out | Select-Object Name, @{ n = 'MB'; e = { if ($_.PSIsContainer) { '' } else { [math]::Round($_.Length / 1MB, 1) } } } | Format-Table -AutoSize
+Write-Host "tamanho total do pacote: $([math]::Round(((Get-ChildItem $out -Recurse -File | Measure-Object Length -Sum).Sum) / 1MB, 1)) MB"
 Write-Host "pronto: $out"

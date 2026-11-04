@@ -40,7 +40,13 @@ Gera `dist/desktop/`:
 |---|---|
 | `C2.exe` | app desktop (janela), frontend embutido, ~12 MB |
 | `cli/c2.exe` | CLI do Core (init, status, grep, related, read) |
+| `runtime/` | **llama-server oficial** (Vulkan + CPU, ~101 MB) — sem LM Studio |
+| `instalar.ps1` | instalador com escolha de pasta, atalho e desinstalador |
 | `LEIA-ME.txt` | requisitos e primeiros passos |
+
+```powershell
+pwsh -File dist/desktop/instalar.ps1 -Dest "D:\Apps\C2"
+```
 
 A CLI fica numa subpasta porque no Windows `c2.exe` e `C2.exe` são o **mesmo**
 arquivo. O pacote não embarca o llama.cpp: aponte `model.binary` (ou use um

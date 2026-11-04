@@ -25,7 +25,7 @@ pub struct ModelConfig {
     /// Diretorios extras com DLLs do runtime (ex.: vendor CUDA).
     pub dll_dirs: Vec<String>,
     /// Permite usar os backends do LM Studio como fallback de desenvolvimento.
-    /// O produto final embarca o runtime proprio (c2-e12.1).
+    /// Desligado por padrao: o pacote embarca o runtime proprio (c2-e12.1).
     pub allow_lmstudio: bool,
     /// Host do llama-server.
     pub host: String,
@@ -68,7 +68,7 @@ impl Default for ModelConfig {
             path: None,
             binary: None,
             dll_dirs: Vec::new(),
-            allow_lmstudio: true,
+            allow_lmstudio: false,
             host: "127.0.0.1".to_string(),
             port: 8080,
             ctx_size: 8192,
