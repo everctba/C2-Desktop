@@ -52,6 +52,9 @@ enum Command {
         /// Abre a janela do C2 neste projeto ao terminar
         #[arg(long)]
         open: bool,
+        /// Grava o bloco de regras do agente em AGENTS.md
+        #[arg(long)]
+        agent: bool,
     },
 
     /// Abre a janela do C2 Desktop neste projeto
@@ -170,8 +173,8 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init { force, open } => {
-            cmd_init(cli.root.as_deref(), force, cli.json)?;
+        Command::Init { force, open, agent } => {
+            cmd_init(cli.root.as_deref(), force, cli.json, agent)?;
             if open {
                 cmd_open(cli.root.as_deref())?;
             }
@@ -242,9 +245,14 @@ fn require_workspace(root: Option<&Path>) -> Result<Workspace> {
     Ok(workspace)
 }
 
-fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
+fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) -> Result<()> {
     let workspace = resolve_workspace(root)?;
     let outcome = workspace.init(force)?;
+    let agents_path = if agent {
+        Some(write_agents_snippet(workspace.root())?)
+    } else {
+        None
+    };
 
     if json_output {
         println!(
@@ -255,6 +263,7 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
                 "config_path": outcome.config_path,
                 "files": outcome.files,
                 "languages": outcome.languages,
+                "agents_path": agents_path.as_ref().map(|caminho| caminho.display().to_string()),
             }))?
         );
         return Ok(());
@@ -290,7 +299,61 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool) -> Result<()> {
     println!("  5. use com agentes:   c2 mcp          (MCP por STDIO; config na aba MCP)");
     println!();
     println!("Sem modelo configurado o `start` para com erro de configuracao.");
+
+    if let Some(caminho) = &agents_path {
+        println!();
+        println!("Regras do agente gravadas em {}", caminho.display());
+        println!("(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)");
+    } else {
+        println!();
+        println!("Para o seu agente usar o indice, cole o bloco abaixo no");
+        println!("AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):");
+        println!();
+        for linha in AGENT_SNIPPET.lines() {
+            if linha.is_empty() {
+                println!();
+            } else {
+                println!("  {linha}");
+            }
+        }
+    }
     Ok(())
+}
+
+/// Bloco de regras que ensina um agente a consultar o indice antes do codigo.
+const AGENT_SNIPPET: &str = "## Contexto antes de codigo (C2)
+
+Este projeto e indexado pelo C2: ao lado de cada arquivo existe um
+`<arquivo>.c2.json` com what/why/goal/summary/responsibility e links[].
+
+Ordem de investigacao:
+1. `c2 status` - o indice esta atualizado?
+2. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
+3. Leia o `.c2.json` do candidato ANTES do arquivo de codigo.
+4. `c2 related <arquivo>` - vizinhos do grafo.
+5. `c2 read <arquivo> --lines A:B` - so o trecho necessario.
+
+Metadado e hipotese; codigo e evidencia. Se divergir, `c2 reindex --path <arquivo>`.
+Nao leia o projeto inteiro: comece com --limit 5.";
+
+/// Cria/atualiza AGENTS.md com o bloco de regras, sem duplicar.
+fn write_agents_snippet(root: &Path) -> Result<PathBuf> {
+    const INICIO: &str = "<!-- c2:agent:begin -->";
+    const FIM: &str = "<!-- c2:agent:end -->";
+    let caminho = root.join("AGENTS.md");
+    let atual = std::fs::read_to_string(&caminho).unwrap_or_default();
+    if atual.contains(INICIO) {
+        return Ok(caminho);
+    }
+    let bloco = format!("{INICIO}\n{AGENT_SNIPPET}\n{FIM}");
+    let novo = if atual.trim().is_empty() {
+        format!("# AGENTS.md\n\n{bloco}\n")
+    } else {
+        format!("{}\n\n{bloco}\n", atual.trim_end())
+    };
+    std::fs::write(&caminho, novo)
+        .with_context(|| format!("nao foi possivel gravar {}", caminho.display()))?;
+    Ok(caminho)
 }
 
 /// Localiza o executavel do C2 Desktop ao lado da CLI, no PATH ou na

@@ -248,7 +248,7 @@ c2 reindex</pre>
                   <tr><th>Comando</th><th>O que faz / opções</th></tr>
                 </thead>
                 <tbody>
-                  <tr><td class="mono">c2 init [--force] [--open]</td><td>Cria <span class="mono">.c2/config.json</span> (idempotente). <span class="mono">--open</span> abre a janela depois.</td></tr>
+                  <tr><td class="mono">c2 init [--force] [--open] [--agent]</td><td>Cria <span class="mono">.c2/config.json</span> (idempotente). <span class="mono">--open</span> abre a janela; <span class="mono">--agent</span> grava o bloco de regras em <span class="mono">AGENTS.md</span>.</td></tr>
                   <tr><td class="mono">c2 status [--json]</td><td>Arquivos, metadados, pendentes, fila, runtime, log e últimas operações.</td></tr>
                   <tr><td class="mono">c2 reindex [--full] [--path P] [--limit N] [--dry-run] [--json]</td><td>Uma passada. <span class="mono">--full</span> ignora cache; <span class="mono">--dry-run</span> mostra o plano sem chamar modelo.</td></tr>
                   <tr><td class="mono">c2 start [--once] [--json]</td><td>Indexa continuamente (Ctrl+C encerra limpo).</td></tr>

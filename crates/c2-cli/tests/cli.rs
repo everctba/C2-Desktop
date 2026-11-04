@@ -323,3 +323,41 @@ fn mcp_responde_handshake_e_tools_list() {
     assert!(tudo.contains("c2_map"), "{tudo}");
     fs::remove_dir_all(&base).ok();
 }
+
+#[test]
+fn init_agent_grava_bloco_de_regras_idempotente() {
+    let base = tmp("init-agent");
+    fs::write(base.join("a.rs"), "fn a() {}").unwrap();
+
+    let out = c2()
+        .arg("--root")
+        .arg(&base)
+        .arg("init")
+        .arg("--agent")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let agents = fs::read_to_string(base.join("AGENTS.md")).unwrap();
+    assert!(agents.contains("c2:agent:begin"));
+    assert!(agents.contains("c2 grep"));
+    assert!(agents.contains("Metadado e hipotese"));
+
+    // segunda execucao nao duplica o bloco
+    let out2 = c2()
+        .arg("--root")
+        .arg(&base)
+        .arg("init")
+        .arg("--agent")
+        .output()
+        .unwrap();
+    assert!(out2.status.success());
+    let agents2 = fs::read_to_string(base.join("AGENTS.md")).unwrap();
+    assert_eq!(agents2.matches("c2:agent:begin").count(), 1);
+
+    fs::remove_dir_all(&base).ok();
+}
