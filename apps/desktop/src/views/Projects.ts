@@ -4,6 +4,7 @@ import { Card, cardBody, cardFooter } from "../ui/Card";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
 import type { ModelInspection, StatusReport } from "../types";
+import type { View } from "./view";
 import styles from "./views.module.css";
 
 export interface ProjectsContext {
@@ -15,7 +16,7 @@ export interface ProjectsContext {
 }
 
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
-export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement> {
+export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   const page = document.createElement("div");
   page.className = `${styles.page} ${"content"}`;
 
@@ -76,7 +77,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement>
     }
     empty.appendChild(actions);
     page.appendChild(empty);
-    return page;
+    return { element: page };
   }
 
   const status = ctx.status;
@@ -131,7 +132,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement>
     page.appendChild(note);
   }
 
-  return page;
+  return { element: page };
 }
 
 function projectCard(title: string, headline: string, fields: Array<[string, string]>): HTMLElement {

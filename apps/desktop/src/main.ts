@@ -6,6 +6,7 @@ import type { StatusReport } from "./types";
 import { renderEngine } from "./views/Engine";
 import { renderProjects } from "./views/Projects";
 import { renderSearch } from "./views/Search";
+import type { View } from "./views/view";
 
 const app = document.getElementById("app")!;
 
@@ -141,9 +142,13 @@ function shell(content: HTMLElement): void {
   app.appendChild(workspace);
 }
 
+let disposeView: (() => void) | null = null;
+
 function render(): void {
   void (async () => {
-    let view: HTMLElement;
+    disposeView?.();
+    disposeView = null;
+    let view: View;
     switch (state.route) {
       case "engine":
         view = await renderEngine({
@@ -172,7 +177,8 @@ function render(): void {
             })(),
         });
     }
-    shell(view);
+    disposeView = view.dispose ?? null;
+    shell(view.element);
   })();
 }
 
@@ -197,13 +203,8 @@ async function boot(): Promise<void> {
   subscribeEvents();
   render();
 
-  window.setInterval(() => {
-    void (async () => {
-      if (!state.root || state.busy) return;
-      await loadStatus();
-      if (state.route === "engine") render();
-    })();
-  }, 4000);
+  // As telas cuidam da propria atualizacao: a Engine assina eventos do Core
+  // e atualiza contadores/log no DOM, sem re-render (c2-e14t2).
 }
 
 void boot();

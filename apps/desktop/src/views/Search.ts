@@ -3,6 +3,7 @@ import type { Hit } from "../types";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
+import type { View } from "./view";
 import styles from "./views.module.css";
 
 export interface SearchContext {
@@ -10,7 +11,7 @@ export interface SearchContext {
 }
 
 /** Semantic Grep: pergunta em linguagem natural, com motivo e trecho. */
-export async function renderSearch(ctx: SearchContext): Promise<HTMLElement> {
+export async function renderSearch(ctx: SearchContext): Promise<View> {
   const page = document.createElement("div");
   page.className = styles.page;
 
@@ -89,7 +90,7 @@ export async function renderSearch(ctx: SearchContext): Promise<HTMLElement> {
   page.appendChild(actions);
 
   page.appendChild(results);
-  return page;
+  return { element: page };
 }
 
 function resultRow(hit: Hit): HTMLElement {
