@@ -41,7 +41,7 @@ projetos médios/grandes e gastam contexto relendo o mesmo código.
 - Agente de IA começa cada tarefa sem saber onde as coisas estão: gasta tokens
   redescobrindo estrutura.
 - `grep` lexical falha quando o vocabulário da tarefa não é o vocabulário do
-  código (medido: consulta semântica achou em 86 ms; grep lexical, 0 resultados).
+  código (medido: consulta semântica achou em 86 ms; busca sem C2, 0 resultados).
 - Índices tradicionais (embeddings/banco vetorial) pedem infraestrutura e
   tiram o dado da máquina. O C2 é local, sem banco e sem embeddings.
 
@@ -96,7 +96,7 @@ Evidência: `docs/bench-500.json`, `docs/mvp-gate.md` §3.
 Consulta cujas palavras **não existem literalmente** no código
 ("onde impede valores acima do permitido"):
 
-| | Com C2 | Grep lexical direto |
+| | Com C2 | Sem C2 |
 |---|---|---|
 | Resultado | **achou** (`src/mod01/arquivo_001.rs`, score 10,20) | 0 resultados |
 | Contexto | **1,3 KB** | 0 B (sem resposta) |
@@ -180,7 +180,7 @@ Sem atribuição, vira depoimento anônimo e perde força.
 ## 8. Estrutura da página
 
 1. **Hero** — frase de posicionamento + print da tela Engine (log ao vivo).
-2. **Problema** — tokens redescobrindo estrutura; grep lexical falha.
+2. **Problema** — tokens redescobrindo estrutura; Sem C2, só grep falha.
 3. **Como funciona** — os 6 cartões da §3.
 4. **Demonstração** — GIF/AVIF do fluxo: abrir → carregar modelo na GPU →
    indexar → buscar → metadado.
