@@ -113,6 +113,19 @@ cada arquivo.
 '@
 Set-Content -Path (Join-Path $out 'LEIA-ME.txt') -Value $readme -Encoding utf8
 
+# checksums do artefato (verificacao de integridade do pacote)
+$checksumFile = Join-Path $out 'CHECKSUMS.txt'
+$linhas = @()
+foreach ($relativo in @('C2.exe', 'cli\c2.exe', 'runtime\llama-server.exe', 'runtime\.version')) {
+    $arquivo = Join-Path $out $relativo
+    if (Test-Path $arquivo) {
+        $hash = (Get-FileHash $arquivo -Algorithm SHA256).Hash.ToLower()
+        $linhas += "$hash  $relativo"
+    }
+}
+Set-Content -Path $checksumFile -Value $linhas -Encoding utf8
+Write-Host "    checksums: $checksumFile"
+
 Write-Host ''
 Get-ChildItem $out | Select-Object Name, @{ n = 'MB'; e = { if ($_.PSIsContainer) { '' } else { [math]::Round($_.Length / 1MB, 1) } } } | Format-Table -AutoSize
 Write-Host "tamanho total do pacote: $([math]::Round(((Get-ChildItem $out -Recurse -File | Measure-Object Length -Sum).Sum) / 1MB, 1)) MB"

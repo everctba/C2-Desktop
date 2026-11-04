@@ -15,7 +15,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 
 | # | Critério | Status | Evidência | Lacuna |
 |---|---|---|---|---|
-| 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: `pwsh -File instalar.ps1 -Dest <pasta>` instala app + CLI + runtime (116 MB) com escolha de pasta, atalho e desinstalador | Linux não validado (`c2-e12.2`) |
+| 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: instalador com escolha de pasta (app + CLI + runtime, 116 MB); artefato de release validado fora do repo: checksums OK, `c2 init/status/reindex` com runtime embarcado e janela abrindo por `--root` | Linux não validado (`c2-e12.2`) |
 | 2 | Executar `c2 init` dentro de um projeto | ✅ | cria `.c2/config.json`, detecta linguagens, idempotente (teste de integração) | — |
 | 3 | O desktop reconhecer o workspace | ✅ | `C2.exe` abre com projeto (`c2 open --root <dir>` via `initial_root`, ou escolha de pasta) | — |
 | 4 | Configurar um modelo local | ✅ | `c2 config set model.path|binary|port` + validação por `--version` | — |

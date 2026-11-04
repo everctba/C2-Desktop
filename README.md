@@ -43,6 +43,7 @@ Gera `dist/desktop/`:
 | `runtime/` | **llama-server oficial** (Vulkan + CPU, ~101 MB) — sem LM Studio |
 | `instalar.ps1` | instalador com escolha de pasta, atalho e desinstalador |
 | `LEIA-ME.txt` | requisitos e primeiros passos |
+| `CHECKSUMS.txt` | SHA-256 de C2.exe, cli/c2.exe e do runtime |
 
 ```powershell
 pwsh -File dist/desktop/instalar.ps1 -Dest "D:\Apps\C2"
