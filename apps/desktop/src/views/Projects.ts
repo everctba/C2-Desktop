@@ -1,8 +1,9 @@
 import { api, hasTauri } from "../api";
 import { Button } from "../ui/Button";
 import { Card, cardBody, cardFooter } from "../ui/Card";
+import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
-import type { StatusReport } from "../types";
+import type { ModelInspection, StatusReport } from "../types";
 import styles from "./views.module.css";
 
 export interface ProjectsContext {
@@ -10,6 +11,7 @@ export interface ProjectsContext {
   status: StatusReport | null;
   error: string | null;
   onPickProject: () => void;
+  onChanged: () => void;
 }
 
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
@@ -89,13 +91,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement>
     ]),
   );
 
-  grid.appendChild(
-    projectCard("Modelo", status.model.name, [
-      ["GGUF", status.model.path ?? "não configurado"],
-      ["Endpoint", `${status.model.host}:${status.model.port}`],
-      ["Raciocínio", status.model.disable_thinking ? "desligado" : "ligado"],
-    ]),
-  );
+  grid.appendChild(modelCard(ctx, status));
 
   grid.appendChild(
     projectCard("Runtime", status.runtime.healthy ? "saudável" : "parado", [
@@ -123,18 +119,6 @@ export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement>
       label: "Trocar projeto",
       iconName: "projects",
       onClick: ctx.onPickProject,
-    }),
-  );
-  actions.appendChild(
-    Button({
-      label: "Selecionar modelo",
-      variant: "secondary",
-      onClick: async () => {
-        const path = await api.pickModel();
-        if (!path) return;
-        await api.configSet(ctx.root, "model.path", path);
-        location.reload();
-      },
     }),
   );
   page.appendChild(actions);
@@ -177,4 +161,136 @@ function projectCard(title: string, headline: string, fields: Array<[string, str
   const footer = cardFooter(card);
   footer.appendChild(Pill("workspace", "neutral", "xs"));
   return card;
+}
+
+/** Card do modelo: mostra o GGUF atual e abre o seletor com validação. */
+function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
+  const card = Card({ title: "Modelo", accent: 4 });
+  const body = cardBody(card);
+
+  const name = document.createElement("div");
+  name.className = styles.fieldValue;
+  name.textContent = status.model.name;
+  body.appendChild(name);
+
+  const cfg = document.createElement("div");
+  cfg.className = styles.field;
+  const cfgLabel = document.createElement("span");
+  cfgLabel.className = styles.fieldLabel;
+  cfgLabel.textContent = "GGUF";
+  const cfgPath = document.createElement("span");
+  cfgPath.className = styles.mono;
+  cfgPath.textContent = status.model.path ?? "não configurado";
+  cfgPath.title = status.model.path ?? "";
+  cfg.append(cfgLabel, cfgPath);
+  body.appendChild(cfg);
+
+  const endpoint = document.createElement("div");
+  endpoint.className = styles.field;
+  const endpointLabel = document.createElement("span");
+  endpointLabel.className = styles.fieldLabel;
+  endpointLabel.textContent = "Endpoint";
+  const endpointValue = document.createElement("span");
+  endpointValue.className = styles.fieldValue;
+  endpointValue.textContent = `${status.model.host}:${status.model.port}`;
+  endpoint.append(endpointLabel, endpointValue);
+  body.appendChild(endpoint);
+
+  const footer = cardFooter(card);
+  footer.appendChild(
+    Button({
+      label: "Selecionar .gguf…",
+      iconName: "projects",
+      size: "sm",
+      onClick: () => void pickModelFlow(ctx),
+    }),
+  );
+  footer.appendChild(
+    Pill(status.model.disable_thinking ? "sem raciocínio" : "com raciocínio", "neutral", "xs"),
+  );
+  return card;
+}
+
+async function pickModelFlow(ctx: ProjectsContext): Promise<void> {
+  const path = await api.pickModel();
+  if (!path) return;
+
+  let inspection: ModelInspection;
+  try {
+    inspection = await api.modelInspect(path);
+  } catch (error) {
+    await openDialog({
+      title: "Modelo inválido",
+      body: dialogField("Erro", String(error), true),
+      confirmLabel: "Entendi",
+      cancelLabel: "",
+    });
+    return;
+  }
+
+  const confirm = await openDialog({
+    title: "Usar este modelo?",
+    body: inspectionBody(inspection),
+    confirmLabel: "Usar modelo",
+  });
+  if (!confirm) return;
+
+  try {
+    await api.modelSet(ctx.root, path);
+    ctx.onChanged();
+  } catch (error) {
+    await openDialog({
+      title: "Falha ao salvar",
+      body: dialogField("Erro", String(error), true),
+      confirmLabel: "Entendi",
+      cancelLabel: "",
+    });
+  }
+}
+
+function inspectionBody(inspection: ModelInspection): HTMLElement {
+  const container = document.createElement("div");
+  container.style.display = "grid";
+  container.style.gap = "var(--space-s)";
+
+  const gguf = inspection.gguf;
+  container.appendChild(dialogField("Nome", gguf.name ?? "sem nome no cabeçalho"));
+  container.appendChild(
+    dialogField("Arquitetura", gguf.architecture ?? "desconhecida"),
+  );
+  container.appendChild(
+    dialogField(
+      "Tamanho",
+      `${(gguf.size_bytes / 1024 / 1024 / 1024).toFixed(2)} GB · ${gguf.tensor_count} tensores · GGUF v${gguf.version}`,
+    ),
+  );
+
+  const pills = dialogPills();
+  pills.appendChild(Pill(gguf.quantization, "accent", "xs"));
+
+  if (inspection.gpu) {
+    const gpu = inspection.gpu;
+    pills.appendChild(
+      Pill(
+        `VRAM livre ${(gpu.free_mb / 1024).toFixed(1)} de ${(gpu.total_mb / 1024).toFixed(1)} GB`,
+        "neutral",
+        "xs",
+      ),
+    );
+  }
+
+  const fits: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
+    fits: { label: "cabe na VRAM", tone: "success" },
+    tight: { label: "no limite da VRAM", tone: "warning" },
+    too_big: { label: "não cabe na VRAM livre", tone: "danger" },
+    unknown: { label: "sem GPU detectada", tone: "neutral" },
+  };
+  const verdict = fits[inspection.fit] ?? fits.unknown;
+  pills.appendChild(Pill(verdict.label, verdict.tone, "xs"));
+  container.appendChild(pills);
+
+  container.appendChild(
+    dialogField("Caminho (não será copiado)", gguf.path, true),
+  );
+  return container;
 }

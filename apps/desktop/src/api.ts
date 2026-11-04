@@ -8,6 +8,7 @@
 import type {
   FileEntry,
   Hit,
+  ModelInspection,
   IndexReport,
   InitResult,
   MetaFile,
@@ -45,6 +46,9 @@ export function onEngineEvent(
 }
 
 export const api = {
+  modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
+  modelSet: (root: string, path: string) =>
+    invoke<ModelInspection>("model_set", { root, path }),
   status: (root: string) => invoke<StatusReport | null>("workspace_status", { root }),
   init: (root: string) => invoke<InitResult>("workspace_init", { root }),
   reindex: (root: string, full = false, limit?: number) =>
@@ -209,6 +213,22 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return MOCK_ROOT as T;
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
+    case "model_inspect":
+    case "model_set":
+      return {
+        gguf: {
+          path: String(args?.path ?? "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf"),
+          size_bytes: 3412060300,
+          version: 3,
+          tensor_count: 307,
+          architecture: "gemma",
+          name: "gemma-4-E2B-it",
+          quantization: "Q4_K_M",
+          file_type: 15,
+        },
+        gpu: { name: "NVIDIA GeForce RTX 4060 Ti", total_mb: 8188, used_mb: 320, free_mb: 7868 },
+        fit: "fits",
+      } as T;
     default:
       throw new Error(`comando sem mock: ${command}`);
   }

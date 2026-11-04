@@ -357,6 +357,42 @@ fn pick_folder(app: tauri::AppHandle) -> Option<String> {
         .map(|path| path.to_string())
 }
 
+#[derive(Serialize)]
+struct ModelInspection {
+    gguf: c2_core::gguf::GgufInfo,
+    gpu: Option<c2_core::gpu::GpuInfo>,
+    fit: c2_core::gpu::VramFit,
+}
+
+fn inspect_model(path: &str) -> Result<ModelInspection, String> {
+    let gguf = c2_core::gguf::read_info(Path::new(path)).map_err(|err| err.to_string())?;
+    let gpu = c2_core::gpu::detect();
+    let fit = c2_core::gpu::vram_fit(gguf.size_bytes, gpu.as_ref());
+    Ok(ModelInspection { gguf, gpu, fit })
+}
+
+/// Valida um `.gguf` pelo cabecalho (sem carregar o modelo) e devolve detalhes.
+#[tauri::command]
+fn model_inspect(path: String) -> Result<ModelInspection, String> {
+    inspect_model(&path)
+}
+
+/// Grava `model.path` e o nome do modelo. Nunca copia o arquivo.
+#[tauri::command]
+fn model_set(root: String, path: String) -> Result<ModelInspection, String> {
+    let workspace = open_workspace(&root)?;
+    let inspection = inspect_model(&path)?;
+    let mut config = workspace.load_config().map_err(|err| err.to_string())?;
+    config.model.path = Some(path);
+    if let Some(name) = &inspection.gguf.name {
+        config.model.name = name.clone();
+    }
+    workspace
+        .save_config(&config)
+        .map_err(|err| err.to_string())?;
+    Ok(inspection)
+}
+
 #[tauri::command]
 fn pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
@@ -387,7 +423,9 @@ pub fn run() {
             config_get,
             config_set,
             pick_folder,
-            pick_model
+            pick_model,
+            model_inspect,
+            model_set
         ])
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o C2 Desktop");

@@ -165,6 +165,11 @@ function render(): void {
           status: state.status,
           error: state.error,
           onPickProject: () => void pickProject(),
+          onChanged: () =>
+            void (async () => {
+              await loadStatus();
+              render();
+            })(),
         });
     }
     shell(view);

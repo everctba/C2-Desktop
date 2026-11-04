@@ -37,7 +37,14 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 $buildProfile = if ($Debug) { 'debug' } else { 'release' }
 $appExe = Join-Path $desktop "src-tauri\target\$buildProfile\c2-desktop.exe"
 if (-not (Test-Path $appExe)) { throw "executavel nao encontrado: $appExe" }
-Copy-Item $appExe (Join-Path $out 'C2.exe') -Force
+# O exe em execucao trava o arquivo: avisa em vez de copiar pela metade.
+Get-Process C2, c2-desktop -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -like '*dist\desktop*' } |
+    ForEach-Object { throw "feche o C2.exe que esta rodando (pid $($_.Id)) antes de gerar o pacote" }
+
+$destExe = Join-Path $out 'C2.exe'
+Copy-Item $appExe $destExe -Force
+if (-not (Test-Path $destExe)) { throw 'falha ao copiar C2.exe para dist/desktop' }
 
 # Windows e case-insensitive: a CLI vai para cli\c2.exe para nao sobrescrever C2.exe
 $cliDir = Join-Path $out 'cli'

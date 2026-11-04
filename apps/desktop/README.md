@@ -69,6 +69,21 @@ apps/desktop/
     └── tauri.conf.json
 ```
 
+## Selecionar modelo (`.gguf`)
+
+Na tela **Projetos**, o card *Modelo* tem o botão **Selecionar .gguf…**:
+
+1. abre o seletor de arquivos (filtrado por `.gguf`);
+2. o Core lê **apenas o cabeçalho** do arquivo (`c2_core::gguf`) e mostra nome,
+   arquitetura, tamanho, número de tensores, versão GGUF e quantização
+   (`general.file_type`, senão `general.size_label`, senão o nome do arquivo);
+3. consulta a GPU via `nvidia-smi` e mostra se cabe na VRAM livre
+   (estimativa: tamanho + 10% + 512 MiB de KV cache);
+4. só ao confirmar grava `model.path` e o nome em `.c2/config.json`.
+
+O arquivo **nunca é copiado** — o workspace guarda apenas o caminho. Um `.gguf`
+inválido é recusado antes de qualquer escrita.
+
 ## Design System
 
 O frontend segue o **"Terminal Editorial"** (`Design System/DESIGN-SYSTEM.md`):

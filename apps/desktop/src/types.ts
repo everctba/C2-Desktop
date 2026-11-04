@@ -46,6 +46,32 @@ export interface Skipped {
   other: number;
 }
 
+export interface GgufInfo {
+  path: string;
+  size_bytes: number;
+  version: number;
+  tensor_count: number;
+  architecture: string | null;
+  name: string | null;
+  quantization: string;
+  file_type: number | null;
+}
+
+export interface GpuInfo {
+  name: string;
+  total_mb: number;
+  used_mb: number;
+  free_mb: number;
+}
+
+export type VramFit = "fits" | "tight" | "too_big" | "unknown";
+
+export interface ModelInspection {
+  gguf: GgufInfo;
+  gpu: GpuInfo | null;
+  fit: VramFit;
+}
+
 export interface StatusReport {
   root: string;
   initialized: boolean;
