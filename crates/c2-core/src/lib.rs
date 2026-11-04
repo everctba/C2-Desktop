@@ -9,6 +9,7 @@ pub mod discover;
 pub mod error;
 pub mod hash;
 pub mod indexer;
+pub mod links;
 pub mod llm;
 pub mod schema;
 pub mod search;

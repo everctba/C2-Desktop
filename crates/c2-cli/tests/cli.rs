@@ -130,18 +130,85 @@ fn config_roundtrip_pela_cli() {
 }
 
 #[test]
-fn comando_nao_implementado_sai_com_3() {
-    let base = tmp("stub");
+fn read_mostra_faixa_de_linhas() {
+    let base = tmp("read");
     c2().arg("--root").arg(&base).arg("init").output().unwrap();
+    fs::write(base.join("a.rs"), "linha1\nlinha2\nlinha3\nlinha4\n").unwrap();
 
     let out = c2()
         .arg("--root")
         .arg(&base)
-        .args(["read", "qualquer.rs"])
+        .args(["read", "a.rs", "--lines", "2:3"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("c2-e7t7"));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = stdout_of(&out);
+    assert!(text.contains("linha2"));
+    assert!(text.contains("linha3"));
+    assert!(!text.contains("linha4"));
+
+    let out = c2()
+        .arg("--root")
+        .arg(&base)
+        .args(["read", "fora.rs"])
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "arquivo inexistente deve falhar");
+
+    fs::remove_dir_all(&base).ok();
+}
+
+#[test]
+fn related_lista_dependencias() {
+    let base = tmp("related");
+    c2().arg("--root").arg(&base).arg("init").output().unwrap();
+
+    let meta = |file: &str, links: serde_json::Value| {
+        serde_json::json!({
+            "schema_version": 1,
+            "file": file,
+            "hash": "sha256:abc",
+            "size": 10,
+            "mtime": 1,
+            "semantic": {
+                "what": "coisa", "why": "porque", "goal": "objetivo",
+                "summary": "resumo", "responsibility": "dono"
+            },
+            "links": links
+        })
+        .to_string()
+    };
+    fs::write(base.join("b.rs"), "fn b() {}\n").unwrap();
+    fs::write(
+        base.join("b.rs.c2.json"),
+        meta("b.rs", serde_json::json!([])),
+    )
+    .unwrap();
+    fs::write(base.join("a.rs"), "mod b;\n").unwrap();
+    fs::write(
+        base.join("a.rs.c2.json"),
+        meta("a.rs", serde_json::json!([{ "to": "b.rs", "type": "mod" }])),
+    )
+    .unwrap();
+
+    let out = c2()
+        .arg("--root")
+        .arg(&base)
+        .args(["related", "b.rs", "--json"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(value["used_by"][0]["from"], "a.rs");
+    assert_eq!(value["used_by"][0]["type"], "mod");
 
     fs::remove_dir_all(&base).ok();
 }

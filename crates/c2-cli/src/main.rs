@@ -9,13 +9,11 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use c2_core::indexer::{self, IndexOptions, IndexReport};
+use c2_core::schema::MetaFile;
 use c2_core::search::{self, SearchOptions};
 use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
 use clap::{Parser, Subcommand};
 use serde_json::json;
-
-/// Codigo de saida para comando ainda nao implementado.
-const EXIT_NOT_IMPLEMENTED: u8 = 3;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -175,14 +173,9 @@ fn run(cli: Cli) -> Result<()> {
             explain,
             cli.json,
         ),
-        Command::Read { .. } => not_implemented("c2 read", "c2-e7t7"),
-        Command::Related { .. } => not_implemented("c2 related", "c2-e7t7"),
+        Command::Read { file, lines } => cmd_read(cli.root.as_deref(), file, lines, cli.json),
+        Command::Related { file } => cmd_related(cli.root.as_deref(), file, cli.json),
     }
-}
-
-fn not_implemented(command: &str, bead: &str) -> Result<()> {
-    eprintln!("{command}: ainda nao implementado - ver bead {bead} (`bd show {bead}`)");
-    std::process::exit(EXIT_NOT_IMPLEMENTED as i32);
 }
 
 /// Workspace do comando: a raiz explicita, a raiz descoberta ou o diretorio atual.
@@ -453,14 +446,6 @@ fn cmd_reindex(
     let config = workspace.load_config()?;
     let client = LlmClient::from_config(&config);
 
-    if !dry_run && !client.health() {
-        bail!(
-            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1` \
-             ou ajuste model.host/model.port.",
-            config.model.health_url()
-        );
-    }
-
     let options = IndexOptions {
         full,
         limit,
@@ -469,6 +454,24 @@ fn cmd_reindex(
             .map(|p| p.to_string_lossy().replace('\\', "/")),
         dry_run,
     };
+
+    // Completar links de metadados existentes nao chama o modelo: so exigimos
+    // o runtime quando existe arquivo novo ou alterado para inferir.
+    let precisa_modelo = indexer::plan(&workspace, &config, full, options.only_path.as_deref())?
+        .iter()
+        .any(|item| {
+            matches!(
+                item.decision,
+                indexer::Decision::New | indexer::Decision::Changed
+            )
+        });
+    if !dry_run && precisa_modelo && !client.health() {
+        bail!(
+            "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1` \
+             ou ajuste model.host/model.port.",
+            config.model.health_url()
+        );
+    }
 
     let report = indexer::run(&workspace, &config, &client, &options, |progress| {
         if !json_output {
@@ -496,7 +499,16 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
     let config = workspace.load_config()?;
     let client = LlmClient::from_config(&config);
 
-    if !client.health() {
+    let options = IndexOptions::default();
+    let precisa_modelo = indexer::plan(&workspace, &config, false, None)?
+        .iter()
+        .any(|item| {
+            matches!(
+                item.decision,
+                indexer::Decision::New | indexer::Decision::Changed
+            )
+        });
+    if precisa_modelo && !client.health() {
         bail!(
             "llama-server nao respondeu em {}. Suba o runtime com `scripts/dev-llama.ps1`.",
             config.model.health_url()
@@ -504,7 +516,6 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
     }
 
     acquire_lock(&workspace)?;
-    let options = IndexOptions::default();
     let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
 
     loop {
@@ -594,6 +605,150 @@ fn cmd_grep(
     }
     Ok(())
 }
+
+fn cmd_read(
+    root: Option<&Path>,
+    file: PathBuf,
+    lines: Option<String>,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let rel = file.to_string_lossy().replace('\\', "/");
+    let path = workspace
+        .root()
+        .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
+    let safe = workspace
+        .ensure_inside(&path)
+        .with_context(|| format!("arquivo fora do workspace: {rel}"))?;
+    let content =
+        std::fs::read_to_string(&safe).with_context(|| format!("nao foi possivel ler {rel}"))?;
+
+    let all: Vec<&str> = content.lines().collect();
+    let (start, end) = parse_line_range(lines.as_deref(), all.len())?;
+    let slice = &all[start - 1..end];
+
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "file": rel,
+                "line_start": start,
+                "line_end": end,
+                "lines": slice,
+            }))?
+        );
+        return Ok(());
+    }
+
+    println!("{rel} (linhas {start}-{end} de {})", all.len());
+    let width = end.to_string().len();
+    for (offset, line) in slice.iter().enumerate() {
+        let number = start + offset;
+        println!("{number:>width$} | {line}");
+    }
+    Ok(())
+}
+
+/// Interpreta `A:B` (1-based, inclusivo) ou devolve a faixa padrao.
+fn parse_line_range(spec: Option<&str>, total: usize) -> Result<(usize, usize)> {
+    if total == 0 {
+        bail!("arquivo vazio");
+    }
+    let (start, end) = match spec {
+        None => (1, total.min(200)),
+        Some(spec) => {
+            let (a, b) = spec
+                .split_once(':')
+                .with_context(|| format!("faixa invalida: {spec} (use A:B)"))?;
+            let start: usize = a
+                .trim()
+                .parse()
+                .with_context(|| format!("inicio invalido: {a}"))?;
+            let end: usize = b
+                .trim()
+                .parse()
+                .with_context(|| format!("fim invalido: {b}"))?;
+            (start, end)
+        }
+    };
+    if start == 0 || start > end || start > total {
+        bail!("faixa invalida para arquivo de {total} linhas: {start}:{end}");
+    }
+    Ok((start, end.min(total)))
+}
+
+fn cmd_related(root: Option<&Path>, file: PathBuf, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let rel = file.to_string_lossy().replace('\\', "/");
+    let meta_path =
+        c2_core::schema::meta_path_for(Path::new(&rel.replace('/', std::path::MAIN_SEPARATOR_STR)));
+
+    let mut all: Vec<MetaFile> = Vec::new();
+    for path in cleaner::metadata_files(workspace.root())? {
+        if let Ok(meta) = MetaFile::read(&path) {
+            all.push(meta);
+        }
+    }
+
+    let target = all.iter().find(|meta| meta.file == rel).cloned();
+    let Some(target) = target else {
+        bail!(
+            "nenhum metadado para {rel} (esperado em {}); rode `c2 reindex`",
+            meta_path.display()
+        );
+    };
+
+    let uses: Vec<serde_json::Value> = target
+        .links
+        .iter()
+        .map(|link| json!({ "to": link.to, "type": link.kind }))
+        .collect();
+
+    let mut used_by: Vec<serde_json::Value> = Vec::new();
+    for meta in &all {
+        if meta.file == rel {
+            continue;
+        }
+        for link in &meta.links {
+            if link.to == rel {
+                used_by.push(json!({ "from": meta.file, "type": link.kind }));
+            }
+        }
+    }
+
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "file": rel,
+                "what": target.semantic.what,
+                "summary": target.semantic.summary,
+                "uses": uses,
+                "used_by": used_by,
+            }))?
+        );
+        return Ok(());
+    }
+
+    println!("{rel}");
+    if !target.semantic.what.is_empty() {
+        println!("  {}", target.semantic.what);
+    }
+    println!("usa ({}):", uses.len());
+    for link in &target.links {
+        println!("  {:<40} {}", link.to, link.kind);
+    }
+    println!("usado por ({}):", used_by.len());
+    for meta in &all {
+        for link in &meta.links {
+            if link.to == rel {
+                println!("  {:<40} {}", meta.file, link.kind);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Result<()> {
     if json_output {
         println!(
@@ -605,6 +760,7 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
                 "removed": report.removed,
                 "errors": report.errors,
                 "deferred": report.deferred,
+                "relinked": report.relinked,
                 "calls": report.calls,
                 "prompt_tokens": report.prompt_tokens,
                 "completion_tokens": report.completion_tokens,
@@ -616,8 +772,13 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
     }
 
     println!(
-        "{} indexados, {} inalterados, {} removidos, {} erros, {} adiados",
-        report.indexed, report.unchanged, report.removed, report.errors, report.deferred
+        "{} indexados, {} inalterados, {} removidos, {} religados, {} erros, {} adiados",
+        report.indexed,
+        report.unchanged,
+        report.removed,
+        report.relinked,
+        report.errors,
+        report.deferred
     );
     if report.calls > 0 {
         let per_call = report.latency_ms / u64::from(report.calls);

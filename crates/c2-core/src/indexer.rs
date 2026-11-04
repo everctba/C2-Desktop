@@ -18,6 +18,7 @@ use crate::config::Config;
 use crate::discover;
 use crate::error::{C2Error, IoContext, Result};
 use crate::hash;
+use crate::links;
 use crate::llm::SemanticProvider;
 use crate::schema::{meta_path_for, source_path_for, MetaFile};
 use crate::workspace::Workspace;
@@ -52,6 +53,8 @@ pub struct PlanItem {
     pub size: u64,
     pub mtime: i64,
     pub hash: Option<String>,
+    /// Metadado ja existente, quando houver.
+    pub existing: Option<MetaFile>,
 }
 
 /// Opcoes de um ciclo.
@@ -81,6 +84,8 @@ pub struct IndexReport {
     pub errors: usize,
     /// Arquivos que mudaram durante a analise e ficam para o proximo ciclo.
     pub deferred: usize,
+    /// Metadados antigos que receberam links sem chamar o modelo.
+    pub relinked: usize,
     pub calls: u32,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
@@ -90,7 +95,7 @@ pub struct IndexReport {
 
 impl IndexReport {
     pub fn total(&self) -> usize {
-        self.indexed + self.unchanged + self.removed + self.errors + self.deferred
+        self.indexed + self.unchanged + self.removed + self.errors + self.deferred + self.relinked
     }
 }
 
@@ -119,7 +124,7 @@ pub fn plan(
             None
         };
 
-        let (decision, current_hash) = match existing {
+        let (decision, current_hash) = match &existing {
             None => (Decision::New, Some(hash::sha256_file(&entry.path)?)),
             Some(meta) => {
                 let current = hash::sha256_file(&entry.path)?;
@@ -139,6 +144,7 @@ pub fn plan(
             size: entry.size,
             mtime: entry.mtime,
             hash: current_hash,
+            existing,
         });
     }
 
@@ -166,6 +172,7 @@ pub fn plan(
             size: 0,
             mtime: 0,
             hash: None,
+            existing: None,
         });
     }
 
@@ -206,7 +213,30 @@ pub fn run<P: SemanticProvider>(
         });
 
         match item.decision {
-            Decision::Unchanged => report.unchanged += 1,
+            Decision::Unchanged => {
+                report.unchanged += 1;
+                if !options.dry_run {
+                    if let Some(meta) = &item.existing {
+                        // Metadado antigo (ou de versao anterior do extrator) sem
+                        // arestas: completa o grafo sem chamar o modelo.
+                        if meta.links.is_empty() {
+                            let extracted = extract_links(workspace, config, item)?;
+                            if !extracted.is_empty() {
+                                let updated = MetaFile::new(
+                                    meta.file.clone(),
+                                    meta.hash.clone(),
+                                    meta.size,
+                                    meta.mtime,
+                                    meta.semantic.clone(),
+                                    extracted,
+                                );
+                                updated.write_atomic(&item.meta_path)?;
+                                report.relinked += 1;
+                            }
+                        }
+                    }
+                }
+            }
             Decision::Removed => {
                 if options.dry_run {
                     report.removed += 1;
@@ -270,18 +300,40 @@ fn index_one<P: SemanticProvider>(
     }
 
     let metadata = fs::metadata(&item.path).at(&item.path)?;
+
+    // Arestas estaticas: custo zero de inferencia (bead c2-e6).
+    let extracted = links::extract(
+        workspace.root(),
+        &item.rel,
+        &content,
+        config.index.max_links_per_file,
+    );
+
     let meta = MetaFile::new(
         item.rel.clone(),
         hash_after,
         metadata.len(),
         mtime_secs(&metadata),
         generated.semantic,
-        Vec::new(),
+        extracted,
     );
-    let _ = workspace; // reservado para links/seguranca nas proximas fases
     meta.write_atomic(&item.meta_path)?;
     report.indexed += 1;
     Ok(())
+}
+
+fn extract_links(
+    workspace: &Workspace,
+    config: &Config,
+    item: &PlanItem,
+) -> Result<Vec<crate::schema::Link>> {
+    let content = fs::read_to_string(&item.path).at(&item.path)?;
+    Ok(links::extract(
+        workspace.root(),
+        &item.rel,
+        &content,
+        config.index.max_links_per_file,
+    ))
 }
 
 fn record_error(report: &mut IndexReport, err: C2Error) {
@@ -506,6 +558,51 @@ mod tests {
         assert_eq!(report.indexed, 0);
         assert!(!base.join("src/a.rs.c2.json").exists());
         assert_eq!(provider.calls(), 0);
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn grava_links_estaticos_no_metadado() {
+        let (base, workspace) = setup("links");
+        let config = workspace.load_config().unwrap();
+        fs::write(base.join("src/a.rs"), "mod b;\nfn a() {}\n").unwrap();
+        let provider = MockProvider::ok();
+
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        let meta = MetaFile::read(&base.join("src/a.rs.c2.json")).unwrap();
+        assert!(
+            meta.links
+                .iter()
+                .any(|l| l.to == "src/b.rs" && l.kind == "mod"),
+            "links: {:?}",
+            meta.links
+        );
+
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn completa_links_de_metadado_existente_sem_chamar_o_modelo() {
+        let (base, workspace) = setup("relink");
+        let config = workspace.load_config().unwrap();
+        fs::write(base.join("src/a.rs"), "mod b;\nfn a() {}\n").unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        // Simula metadado de versao anterior do extrator: sem arestas.
+        let meta_path = base.join("src/a.rs.c2.json");
+        let mut meta = MetaFile::read(&meta_path).unwrap();
+        meta.links.clear();
+        meta.write_atomic(&meta_path).unwrap();
+
+        let calls_before = provider.calls();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.relinked, 1);
+        assert_eq!(provider.calls(), calls_before, "relink nao chama o modelo");
+        let meta = MetaFile::read(&meta_path).unwrap();
+        assert!(!meta.links.is_empty());
 
         fs::remove_dir_all(&base).ok();
     }
