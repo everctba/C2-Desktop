@@ -15,7 +15,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 
 | # | Critério | Status | Evidência | Lacuna |
 |---|---|---|---|---|
-| 1 | Instalar o C2 em Windows ou Linux | ⚠️ | Windows: instalador com escolha de pasta (app + CLI + runtime, 116 MB); artefato de release validado fora do repo: checksums OK, `c2 init/status/reindex` com runtime embarcado e janela abrindo por `--root` | Linux: código compila e passa clippy (`x86_64-unknown-linux-gnu`), execução real fica para o CI — `c2-e12.2` deferida por decisão `c2-aa0` |
+| 1 | Instalar o C2 em Windows | ✅ | Instalador com escolha de pasta (app + CLI + runtime, 116 MB), atalhos e desinstalador; artefato de release validado fora do repo (checksums OK, `init/status/reindex` com runtime embarcado, janela por `--root`) | — (Linux adiado: `c2-aa1`) |
 | 2 | Executar `c2 init` dentro de um projeto | ✅ | cria `.c2/config.json`, detecta linguagens, idempotente (teste de integração) | — |
 | 3 | O desktop reconhecer o workspace | ✅ | `C2.exe` abre com projeto (`c2 open --root <dir>` via `initial_root`, ou escolha de pasta) | — |
 | 4 | Configurar um modelo local | ✅ | `c2 config set model.path|binary|port` + validação por `--version` | — |
@@ -77,11 +77,14 @@ Duas ressalvas registradas:
 
 ## 4. Veredito
 
-**GO para "alpha Windows"** · **NO-GO para "MVP fechado"** — restam dois itens, ambos **externos**:
+**GO para "alpha Windows"** — escopo do MVP fechado em Windows por decisão (`c2-aa1`).
 
-1. Linux: execução real não é validável nesta máquina (sem WSL, decisão `c2-aa0`);
-   o job `ubuntu-latest` do CI assume isso quando houver remote git.
-2. MCP fora do escopo por decisão (`c2-dec2` / `c2-e13`).
+Fora do escopo desta fase, por decisão registrada:
+
+1. **Linux** — adiado (`c2-aa1`); o código compila e passa clippy para
+   `x86_64-unknown-linux-gnu` e o roteiro/CI ficam preparados para quando
+   o escopo reabrir (`c2-e12.2`).
+2. **MCP** — deferido (`c2-dec2` / `c2-e13`).
 
 O desktop mínimo existe e roda (pacote portátil com instalador), o runtime do
 llama.cpp vai embarcado (sem LM Studio) e os critérios 3 e 5 do PRD são

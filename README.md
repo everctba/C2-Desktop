@@ -12,6 +12,13 @@ tokens e errando menos.
 - **Local por padrão:** modelo GGUF rodando via `llama-server` na sua máquina.
 - **Sem banco de dados, sem embeddings:** busca híbrida (lexical + metadados).
 
+## Plataformas
+
+- **Windows 10/11 (x64)** — suportado e validado nesta fase.
+- **Linux** — planejado para uma fase seguinte; o Core já compila para
+  `x86_64-unknown-linux-gnu` (decisão `c2-aa1`).
+- **macOS** — fora do escopo.
+
 ## Requisitos
 
 | Item | Versão |
