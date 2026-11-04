@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "model": {
-    "name": "local-model",
-    "path": null,
-    "port": 8080,
+    "name": "gemma-4-e2b",
+    "path": "H:\\ChatRTX\\LocalAI\\models\\lmstudio-community\\gemma-4-E2B-it-GGUF\\gemma-4-E2B-it-Q4_K_M.gguf",
+    "port": 8099,
     "ctx_size": 8192,
     "threads": 0,
     "gpu_layers": 0,
