@@ -18,6 +18,7 @@ pub mod llm_fake;
 pub mod log;
 pub mod mcp;
 pub mod migrate;
+pub mod process;
 pub mod runtime;
 pub mod schema;
 pub mod search;

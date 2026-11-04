@@ -556,15 +556,15 @@ async fn mcp_smoke(root: String) -> McpStatus {
         };
 
         use std::io::{BufRead, BufReader, Write};
-        let mut filho = match std::process::Command::new(&cli)
+        let mut comando = std::process::Command::new(&cli);
+        comando
             .arg("--root")
             .arg(&root)
             .arg("mcp")
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-        {
+            .stderr(std::process::Stdio::null());
+        let mut filho = match c2_core::process::spawn(comando) {
             Ok(filho) => filho,
             Err(erro) => {
                 return McpStatus {

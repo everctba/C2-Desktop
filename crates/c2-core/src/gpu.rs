@@ -18,13 +18,13 @@ pub struct GpuInfo {
 
 /// Consulta a primeira GPU NVIDIA.
 pub fn detect() -> Option<GpuInfo> {
-    let output = Command::new("nvidia-smi")
-        .args([
-            "--query-gpu=name,memory.total,memory.used",
-            "--format=csv,noheader,nounits",
-        ])
-        .output()
-        .ok()?;
+    let mut comando = Command::new("nvidia-smi");
+    comando.args([
+        "--query-gpu=name,memory.total,memory.used",
+        "--format=csv,noheader,nounits",
+    ]);
+    crate::process::sem_janela(&mut comando);
+    let output = comando.output().ok()?;
 
     if !output.status.success() {
         return None;

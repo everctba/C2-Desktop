@@ -68,9 +68,9 @@ pub fn pid_file(workspace: &Workspace) -> PathBuf {
 pub fn pid_alive(pid: u32) -> bool {
     #[cfg(windows)]
     {
-        let output = Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
-            .output();
+        let mut comando = Command::new("tasklist");
+        comando.args(["/FI", &format!("PID eq {pid}"), "/NH"]);
+        let output = crate::process::output(comando);
         match output {
             Ok(out) => String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()),
             Err(_) => false,
@@ -78,9 +78,9 @@ pub fn pid_alive(pid: u32) -> bool {
     }
     #[cfg(not(windows))]
     {
-        Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .status()
+        let mut comando = Command::new("kill");
+        comando.args(["-0", &pid.to_string()]);
+        crate::process::status(comando)
             .map(|status| status.success())
             .unwrap_or(false)
     }
@@ -278,7 +278,7 @@ pub fn validate_binary(resolved: &Resolved) -> Result<String> {
     if let Some(path) = path_with_dlls(&resolved.dll_dirs) {
         command.env("PATH", path);
     }
-    let output = command.output().map_err(|err| {
+    let output = crate::process::output(command).map_err(|err| {
         C2Error::InvalidConfig(format!(
             "nao foi possivel executar {}: {err}",
             resolved.binary.display()
@@ -423,7 +423,7 @@ pub fn start(workspace: &Workspace, config: &Config, resolved: &Resolved) -> Res
         command.env("PATH", path);
     }
 
-    let child = command.spawn().map_err(|err| {
+    let child = crate::process::spawn(command).map_err(|err| {
         C2Error::InvalidConfig(format!(
             "nao foi possivel iniciar {}: {err}",
             resolved.binary.display()
@@ -486,15 +486,20 @@ pub fn stop(workspace: &Workspace) -> Result<bool> {
     };
 
     #[cfg(windows)]
-    let status = Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/T", "/F"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+    let status = crate::process::status({
+        let mut comando = Command::new("taskkill");
+        comando
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        comando
+    });
     #[cfg(not(windows))]
-    let status = Command::new("kill")
-        .args(["-TERM", &pid.to_string()])
-        .status();
+    let status = {
+        let mut comando = Command::new("kill");
+        comando.args(["-TERM", &pid.to_string()]);
+        crate::process::status(comando)
+    };
 
     let killeed = status.map(|status| status.success()).unwrap_or(false);
 
@@ -508,15 +513,20 @@ pub fn stop(workspace: &Workspace) -> Result<bool> {
     if pid_alive(pid) {
         #[cfg(windows)]
         {
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/F"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+            let _ = crate::process::status({
+                let mut comando = Command::new("taskkill");
+                comando
+                    .args(["/PID", &pid.to_string(), "/F"])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+                comando
+            });
         }
         #[cfg(not(windows))]
         {
-            let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+            let mut comando = Command::new("kill");
+            comando.args(["-9", &pid.to_string()]);
+            let _ = crate::process::status(comando);
         }
     }
 
