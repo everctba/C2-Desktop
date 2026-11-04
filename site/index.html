@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>C2 — contexto semântico de projeto para agentes de IA</title>
+    <meta
+      name="description"
+      content="O C2 indexa o significado do seu código uma vez e deixa agentes de IA encontrarem o arquivo certo sem reler o repositório. Local, incremental, sem embeddings."
+    />
+    <link rel="stylesheet" href="styles/site.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">c2</span>
+        C2
+      </a>
+      <div class="nav-links">
+        <a href="#como-funciona">Como funciona</a>
+        <a href="#numeros">Números</a>
+        <a href="#instalar">Instalar</a>
+        <a href="ajuda.html">Ajuda</a>
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </div>
+    </nav>
+
+    <main>
+      <!-- HERO -->
+      <div class="wrap">
+        <section class="hero">
+          <div>
+            <span class="eyebrow">Indexação semântica · local-first</span>
+            <h1>Sua IA para de reler o projeto.<br />O C2 já sabe onde tudo está.</h1>
+            <p class="lead">
+              O C2 lê o código uma vez e grava, ao lado de cada arquivo, um metadado com
+              <strong>o que é, por que existe, o que garante e do que depende</strong>.
+              Agentes consultam esse índice antes de abrir arquivos: menos tokens,
+              menos erro, menos releitura.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#instalar">Instalar</a>
+              <a class="btn btn-ghost" href="ajuda.html">Como usar</a>
+            </div>
+            <p class="hero-note">
+              Windows 10/11 · roda na sua máquina · sem embeddings · sem banco de dados
+            </p>
+          </div>
+
+          <div class="terminal" aria-label="Exemplo de uso da CLI">
+            <div class="terminal-bar">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="terminal-title">c2 — terminal</span>
+            </div>
+            <pre>
+<span class="acc">$</span> c2 status
+Arquivos:    132
+Metadados:   127
+Pendentes:   5
+Runtime:     parado
+
+<span class="acc">$</span> c2 grep "onde valida o limite de estoque" --limit 2
+1. src/mod00/arquivo_001.rs   <span class="ok">10.20</span>
+   Servico2 struct e sua implementação
+2. src/mod01/arquivo_002.rs   <span class="ok">8.40</span>
+   Servico3 struct e sua implementação
+
+<span class="acc">$</span> c2 related src/mod00/arquivo_002.rs
+usa (1):     src/mod00/arquivo_003.rs (imports)
+usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
+          </div>
+        </section>
+      </div>
+
+      <!-- PROBLEMA -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">O problema</span>
+            <h2>Toda tarefa começa com "onde fica isso mesmo?"</h2>
+            <p>
+              Um agente de IA chega sem mapa. Ele gasta contexto redesenhando a estrutura
+              do projeto — e ainda pode errar o arquivo.
+            </p>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <span class="k">01 · tokens</span>
+              <h3>Contexto desperdiçado</h3>
+              <p>Ler arquivos para descobrir a arquitetura consome a janela antes da tarefa começar.</p>
+            </article>
+            <article class="card">
+              <span class="k">02 · vocabulário</span>
+              <h3>grep lexical falha</h3>
+              <p>
+                Quem busca "onde impede valores acima do permitido" não encontra
+                <code class="inline">valor &lt;= self.limite</code>.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">03 · infraestrutura</span>
+              <h3>Índice tradicional pesa</h3>
+              <p>Embeddings e banco vetorial trazem infra, custo e tiraram o dado da sua máquina.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMO FUNCIONA -->
+      <section class="section" id="como-funciona">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Como funciona</span>
+            <h2>Três passos. Zero infraestrutura.</h2>
+            <p>Sem banco, sem embeddings: o índice é feito de arquivos ao lado do seu código.</p>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <div>
+                <h3>Indexar</h3>
+                <p>
+                  O C2 lê o projeto e pede a um modelo local
+                  <span class="mono">what / why / goal / summary / responsibility</span>.
+                  Arquivo alterado é o único que chama o modelo.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Gravar</h3>
+                <p>
+                  O resultado vira <code class="inline">arquivo.c2.json</code> ao lado do
+                  arquivo, com hash SHA-256 e <code class="inline">links[]</code> extraídos
+                  estaticamente.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Consultar</h3>
+                <p>
+                  Agente ou você usam <code class="inline">c2 grep</code>,
+                  <code class="inline">c2 related</code> e <code class="inline">c2 read</code>
+                  — ou o MCP, direto do seu cliente de IA.
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          <h3 style="margin-top: var(--space-6xl)">O que entra no metadado</h3>
+          <div class="grid grid-3" style="margin-top: var(--space-l)">
+            <article class="card">
+              <h3>Semântica</h3>
+              <p>O que é, por que existe, objetivo, resumo e fronteira de responsabilidade.</p>
+            </article>
+            <article class="card">
+              <h3>Grafo</h3>
+              <p>Imports, <span class="mono">mod</span>, <span class="mono">use</span>,
+                <span class="mono">require</span> — arestas sem chamar o modelo.</p>
+            </article>
+            <article class="card">
+              <h3>Identidade</h3>
+              <p>Hash e tamanho detectam mudança real; rename por hash reaproveita o metadado.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- NÚMEROS -->
+      <section class="section" id="numeros">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Números medidos</span>
+            <h2>O que acontece em 501 arquivos</h2>
+            <p>
+              Corpus sintético, Windows, RTX 4060 Ti 8 GB, Gemma 4 E2B Q4_K_M, runtime
+              oficial embarcado. Tudo com evidência no repositório.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Resultado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Primeira indexação</td>
+                  <td><strong class="num">36,7 min</strong> · 501 chamadas · ~4,4 s/arquivo</td>
+                </tr>
+                <tr>
+                  <td>Segunda passada</td>
+                  <td><strong class="num">0,4 s</strong> · <strong>0 chamadas</strong> · 501 hashes do cache</td>
+                </tr>
+                <tr>
+                  <td>Busca <span class="mono">c2 grep</span></td>
+                  <td><strong class="num">p50 60 ms</strong> · p95 82 ms</td>
+                </tr>
+                <tr>
+                  <td>Consulta semântica</td>
+                  <td><strong class="num">86 ms</strong> acha o que o grep lexical não encontra</td>
+                </tr>
+                <tr>
+                  <td><span class="mono">c2 related</span></td>
+                  <td><strong class="num">49 ms</strong></td>
+                </tr>
+                <tr>
+                  <td>Pacote Windows</td>
+                  <td><strong class="num">117 MB</strong> (app + CLI + runtime llama.cpp)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hero-note">
+            Metodologia e dados brutos:
+            <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/bench-500.json" rel="noreferrer">
+              docs/bench-500.json
+            </a>
+            ·
+            <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/mvp-gate.md" rel="noreferrer">
+              gate do MVP
+            </a>
+          </p>
+
+          <h3 style="margin-top: var(--space-6xl)">E quando o vocabulário não casa?</h3>
+          <div class="table-wrap" style="margin-top: var(--space-l)">
+            <table>
+              <thead>
+                <tr>
+                  <th>Consulta: "onde impede valores acima do permitido"</th>
+                  <th>Com C2</th>
+                  <th>grep lexical</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Achou?</td>
+                  <td><span class="badge ok">sim</span> primeiro resultado correto</td>
+                  <td>0 resultados</td>
+                </tr>
+                <tr>
+                  <td>Contexto lido</td>
+                  <td><strong class="num">1,3 KB</strong></td>
+                  <td>precisaria varrer <strong class="num">995 KB</strong></td>
+                </tr>
+                <tr>
+                  <td>Tempo</td>
+                  <td><strong class="num">86 ms</strong></td>
+                  <td>150 ms (sem resposta)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- QUANDO NÃO VALE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Honestidade</span>
+            <h2>Quando o C2 <em>não</em> vale a pena</h2>
+          </div>
+          <div class="callout warning">
+            <h3>Projeto pequeno? Leia os arquivos direto.</h3>
+            <p>
+              Em 8 arquivos (6,5 KB) medimos: o C2 gastou ~16,3 KB de contexto contra
+              ~8,5 KB da leitura direta. O metadado e a indexação custam mais do que ler tudo.
+            </p>
+            <ul>
+              <li><strong>≤ 20 arquivos</strong> — leitura direta ganha.</li>
+              <li><strong>100–500 arquivos</strong> — o C2 compensa.</li>
+              <li><strong>milhares</strong> — o C2 compensa muito.</li>
+            </ul>
+            <p style="margin-top: var(--space-s)">
+              Também não vale para uma tarefa pontual num arquivo que você já sabe qual é.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSTALAR -->
+      <section class="section" id="instalar">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Começar</span>
+            <h2>Instalar e indexar em dois minutos</h2>
+            <p>
+              O pacote leva o app, a CLI e o runtime oficial do llama.cpp. Só o modelo
+              <span class="mono">.gguf</span> fica com você — e nunca é copiado.
+            </p>
+          </div>
+
+          <pre class="code"><span class="c"># instalar (escolhe a pasta no seletor do Windows)</span>
+pwsh -File instalar.ps1
+
+<span class="c"># ou direto em uma pasta</span>
+pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
+
+<span class="c"># primeiro projeto</span>
+cd meu-projeto
+c2 init
+c2 config set model.path "H:\modelos\gemma-4-E2B-Q4_K_M.gguf"
+c2 reindex
+c2 grep "onde valida permissão de usuário"</pre>
+
+          <div class="grid grid-3" style="margin-top: var(--space-2xl)">
+            <article class="card">
+              <h3>Instalador</h3>
+              <p>Escolhe pasta, cria atalhos e põe o CLI no PATH do usuário. Desinstalar remove só a entrada do C2.</p>
+            </article>
+            <article class="card">
+              <h3>Janela</h3>
+              <p>Projetos, Engine ao vivo, Busca com score e MCP. O modelo é validado antes de ir para a GPU.</p>
+            </article>
+            <article class="card">
+              <h3>Sem LM Studio</h3>
+              <p>Runtime embarcado (Vulkan + CPU). Sem CUDA obrigatório, sem serviços externos.</p>
+            </article>
+          </div>
+          <p class="hero-note">
+            Requisitos, opções do instalador e solução de problemas: <a href="ajuda.html">página de ajuda</a>.
+          </p>
+        </div>
+      </section>
+
+      <!-- PRIVACIDADE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Privacidade</span>
+            <h2>Seu código não sai da máquina</h2>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <h3>Local por padrão</h3>
+              <p>Modelo e índice rodam no seu computador. Sem conta, sem telemetria.</p>
+            </article>
+            <article class="card">
+              <h3>Segredos barrados</h3>
+              <p>Chaves, tokens, JWTs e senhas são detectados antes do modelo; política <span class="mono">skip</span> ou <span class="mono">mask</span>.</p>
+            </article>
+            <article class="card">
+              <h3>Sem banco</h3>
+              <p>O índice são arquivos <span class="mono">.c2.json</span> ao lado do código — versionáveis, inspecionáveis e removíveis.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- JANELA -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">A janela</span>
+            <h2>Feita para desenvolvedor, não para dashboard</h2>
+            <p>Densa, escura e sem enfeite: estado, log ao vivo e busca com evidência.</p>
+          </div>
+          <div class="terminal" style="padding: 0">
+            <img
+              src="assets/img/janela-mcp.png"
+              alt="Janela do C2 na tela MCP mostrando servidor pronto, protocolo e ferramentas expostas"
+              style="display: block; width: 100%; height: auto"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- TESTEMUNHOS -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Testemunhos</span>
+            <h2>O que as IAs dizem</h2>
+            <p>Prints de feedback real de modelos, com atribuição. Esta seção será preenchida.</p>
+          </div>
+          <div class="testimonials">
+            <article class="testimonial">
+              <blockquote>
+                “Nossa, realmente esse sistema de comentário me ajudou a ser muito mais efetivo.”
+              </blockquote>
+              <cite>— modelo de IA · tarefa de refatoração · data</cite>
+            </article>
+            <div class="placeholder">Aguardando print do próximo testemunho</div>
+            <div class="placeholder">Aguardando print do próximo testemunho</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">FAQ</span>
+            <h2>Dúvidas rápidas</h2>
+          </div>
+          <div class="faq">
+            <details open>
+              <summary>Precisa de GPU?</summary>
+              <div class="answer">
+                Não. CPU funciona (mais lento). Com GPU Vulkan a indexação acelera para
+                ~4 s/arquivo em modelo de 4 B.
+              </div>
+            </details>
+            <details>
+              <summary>Precisa de internet?</summary>
+              <div class="answer">
+                Só para baixar o pacote e o modelo. Índice, busca e runtime são locais.
+              </div>
+            </details>
+            <details>
+              <summary>Meu código vai para algum servidor?</summary>
+              <div class="answer">Não. Modelo e índice ficam na máquina.</div>
+            </details>
+            <details>
+              <summary>Funciona em monorepo?</summary>
+              <div class="answer">
+                Sim: respeita <span class="mono">.gitignore</span> e
+                <span class="mono">.c2ignore</span>, tem filtros por extensão e pasta.
+              </div>
+            </details>
+            <details>
+              <summary>Quanto custa indexar?</summary>
+              <div class="answer">
+                ~4 s/arquivo na primeira vez (GPU 8 GB). Depois é incremental: arquivo
+                inalterado não chama o modelo.
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer wrap">
+      <span>C2 — contexto semântico de projeto · Windows 10/11</span>
+      <span>
+        <a href="ajuda.html">Ajuda</a> ·
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a> ·
+        licença a definir (MIT OR Apache-2.0)
+      </span>
+    </footer>
+  </body>
+</html>

@@ -94,6 +94,8 @@ sem conhecimento prévio:
 | Acerto na rubrica (0–10) | 10 | 10 |
 | Contexto consumido | ~16,3 KB | **~8,5 KB** |
 
+**Segundo projeto (repositório do C2, 202 arquivos):** A/B cego deu 10/10 nas duas condições; C2 usou ~168 KB contra ~157 KB da leitura direta. Acerto empatado. Detalhe: [docs/bench-ab/resultado-cego-projeto-grande.md](../bench-ab/resultado-cego-projeto-grande.md).
+
 **Leitura honesta:** em projeto pequeno o C2 **não compensa** — metadado + índice
 custam mais que ler tudo. Ele se paga a partir de projetos médios, quando o
 agente precisaria abrir 10–20% do repositório.
