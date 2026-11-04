@@ -38,8 +38,12 @@ export function Button(props: ButtonProps): HTMLButtonElement {
   }
 
   if (props.iconName) {
+    const tamanho = size === "md" || size === "lg" ? 16 : 14;
     const span = document.createElement("span");
-    span.innerHTML = icon(props.iconName, size === "md" || size === "lg" ? 16 : 14);
+    span.className = styles.icon;
+    span.style.width = `${tamanho}px`;
+    span.style.height = `${tamanho}px`;
+    span.innerHTML = icon(props.iconName, tamanho);
     if (props.busy) span.classList.add(styles.spinning);
     button.appendChild(span);
   }

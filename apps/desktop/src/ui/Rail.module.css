@@ -80,3 +80,7 @@
 .item:focus-visible .label {
   opacity: 1;
 }
+
+.item > svg {
+  display: block;
+}

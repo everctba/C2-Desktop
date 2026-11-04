@@ -9,6 +9,7 @@
   font-family: inherit;
   font-size: var(--text-xs);
   font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
@@ -107,6 +108,19 @@
 .iconOnly.md {
   width: 34px;
   padding: 0;
+}
+
+/* Caixa do icone: centraliza o SVG sem baseline de texto */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.icon > svg {
+  display: block;
 }
 
 .spinning {

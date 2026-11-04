@@ -26,5 +26,5 @@ const PATHS: Record<IconName, string> = {
 
 export function icon(name: IconName, size = 16): string {
   const path = PATHS[name];
-  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="${path}" fill="currentColor"/></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true" focusable="false" style="display:block"><path d="${path}" fill="currentColor"/></svg>`;
 }
