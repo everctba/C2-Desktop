@@ -19,7 +19,7 @@ Status: ✅ atendido · ⚠️ atendido parcialmente · ❌ não atendido · ⏸
 | 2 | Executar `c2 init` dentro de um projeto | ✅ | cria `.c2/config.json`, detecta linguagens, idempotente (teste de integração) | — |
 | 3 | O desktop reconhecer o workspace | ✅ | `C2.exe` abre com projeto (`c2 open --root <dir>` via `initial_root`, ou escolha de pasta) | — |
 | 4 | Configurar um modelo local | ✅ | `c2 config set model.path|binary|port` + validação por `--version` | — |
-| 5 | Pressionar PLAY | ✅ | botão **Iniciar** na janela sobe engine (thread + eventos) e runtime; **Parar** encerra os dois; **Reindexar** faz passada única | — |
+| 5 | Pressionar PLAY | ✅ | botão **Iniciar** na janela sobe engine (thread + eventos) e runtime; **Parar** encerra os dois; **Reindexar** faz passada única — janela validada pelo usuário no portátil | — |
 | 6 | Runtime iniciar e indexar os arquivos | ✅ | `c2 reindex` em projeto real: 37/37 arquivos, 0 erros | — |
 | 7 | Alterações atualizarem os metadados | ✅ | hash diferente → reindexa só o arquivo mudado (teste + execução real) | — |
 | 8 | Arquivos inalterados não chamarem o LLM | ✅ | 2ª passada: 0 chamadas (teste de integração e execução real) | — |
