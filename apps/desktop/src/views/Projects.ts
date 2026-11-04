@@ -8,6 +8,7 @@ import styles from "./views.module.css";
 export interface ProjectsContext {
   root: string;
   status: StatusReport | null;
+  error: string | null;
   onPickProject: () => void;
 }
 
@@ -37,6 +38,14 @@ export async function renderProjects(ctx: ProjectsContext): Promise<HTMLElement>
       ? "Projeto ainda não inicializado. Clique em Inicializar para criar .c2/config.json."
       : "Nenhum projeto aberto.";
     empty.appendChild(text);
+
+    if (ctx.error) {
+      const detail = document.createElement("p");
+      detail.className = "pageHint";
+      detail.style.color = "var(--danger)";
+      detail.textContent = ctx.error;
+      empty.appendChild(detail);
+    }
     const actions = document.createElement("div");
     actions.className = styles.actions;
     actions.appendChild(

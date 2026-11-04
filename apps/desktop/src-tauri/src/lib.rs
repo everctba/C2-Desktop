@@ -27,19 +27,22 @@ struct Engine {
 fn open_workspace(root: &str) -> Result<Workspace, String> {
     let path = c2_core::workspace::canonical_path(Path::new(root)).map_err(|err| err.to_string())?;
     let workspace = Workspace::at(path);
-    if !workspace.is_initialized() {
-        return Err(format!(
-            "workspace C2 nao inicializado em {} (use Inicializar)",
-            workspace.root().display()
-        ));
+    // O usuario pode escolher uma subpasta: sobe ate a raiz inicializada.
+    if let Ok(Some(found)) = Workspace::find(workspace.root()) {
+        return Ok(found);
     }
     Ok(workspace)
 }
 
 #[tauri::command]
-fn workspace_status(root: String) -> Result<StatusReport, String> {
+fn workspace_status(root: String) -> Result<Option<StatusReport>, String> {
     let workspace = open_workspace(&root)?;
-    status::build(&workspace).map_err(|err| err.to_string())
+    if !workspace.is_initialized() {
+        return Ok(None);
+    }
+    status::build(&workspace)
+        .map(Some)
+        .map_err(|err| err.to_string())
 }
 
 #[derive(Serialize)]

@@ -45,7 +45,7 @@ export function onEngineEvent(
 }
 
 export const api = {
-  status: (root: string) => invoke<StatusReport>("workspace_status", { root }),
+  status: (root: string) => invoke<StatusReport | null>("workspace_status", { root }),
   init: (root: string) => invoke<InitResult>("workspace_init", { root }),
   reindex: (root: string, full = false, limit?: number) =>
     invoke<IndexReport>("workspace_reindex", { root, full, limit }),

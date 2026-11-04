@@ -16,6 +16,7 @@ interface AppState {
   running: boolean;
   busy: boolean;
   logs: string[];
+  error: string | null;
 }
 
 const state: AppState = {
@@ -25,6 +26,7 @@ const state: AppState = {
   running: false,
   busy: false,
   logs: [],
+  error: null,
 };
 
 function log(message: string): void {
@@ -41,8 +43,10 @@ async function loadStatus(): Promise<void> {
   try {
     state.status = await api.status(state.root);
     state.running = await api.engineRunning();
-  } catch {
+    state.error = null;
+  } catch (error) {
     state.status = null;
+    state.error = String(error);
   }
 }
 
@@ -159,6 +163,7 @@ function render(): void {
         view = await renderProjects({
           root: state.root,
           status: state.status,
+          error: state.error,
           onPickProject: () => void pickProject(),
         });
     }
