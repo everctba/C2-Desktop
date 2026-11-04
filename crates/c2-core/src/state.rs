@@ -8,6 +8,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{IoContext, Result};
 
+/// Uma operacao registrada no historico do workspace.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationRecord {
+    /// Segundos desde a epoch.
+    pub ts: i64,
+    /// `index`, `reindex`, `cleaner`, `migrate`, `start`, `stop`...
+    pub kind: String,
+    pub summary: String,
+}
+
 /// Contadores acumulados do engine.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -18,11 +28,21 @@ pub struct EngineState {
     pub unchanged: u64,
     pub removed: u64,
     pub errors: u64,
+    /// Arquivos pulados por conter segredo.
+    pub blocked: u64,
+    /// Arquivos indexados com conteudo mascarado.
+    pub masked: u64,
+    /// Metadados antigos que ganharam links sem chamar o modelo.
+    pub relinked: u64,
+    /// Bytes de conteudo enviados ao modelo.
+    pub bytes_sent: u64,
     pub llm_calls: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub latency_ms: u64,
     pub last_error: Option<String>,
+    /// Ultimas operacoes (mais recentes primeiro, teto de 20).
+    pub history: Vec<OperationRecord>,
 }
 
 impl EngineState {
@@ -54,13 +74,17 @@ impl EngineState {
         Ok(())
     }
 
-    /// Soma os contadores de um ciclo do indexador.
+    /// Soma os contadores de um ciclo do indexador e registra no historico.
     pub fn merge_report(&mut self, report: &crate::indexer::IndexReport) {
         self.last_scan = now_secs();
         self.indexed += report.indexed as u64;
         self.unchanged += report.unchanged as u64;
         self.removed += report.removed as u64;
         self.errors += report.errors as u64;
+        self.blocked += report.blocked as u64;
+        self.masked += report.masked as u64;
+        self.relinked += report.relinked as u64;
+        self.bytes_sent += report.bytes_sent;
         self.llm_calls += report.calls as u64;
         self.prompt_tokens += report.prompt_tokens;
         self.completion_tokens += report.completion_tokens;
@@ -68,6 +92,26 @@ impl EngineState {
         if let Some(err) = report.last_error.clone() {
             self.last_error = Some(err);
         }
+        self.push_history(
+            "index",
+            format!(
+                "{} indexados, {} inalterados, {} removidos, {} erros",
+                report.indexed, report.unchanged, report.removed, report.errors
+            ),
+        );
+    }
+
+    /// Registra uma operacao no historico (teto de 20, mais recente primeiro).
+    pub fn push_history(&mut self, kind: &str, summary: impl Into<String>) {
+        self.history.insert(
+            0,
+            OperationRecord {
+                ts: now_secs(),
+                kind: kind.to_string(),
+                summary: summary.into(),
+            },
+        );
+        self.history.truncate(20);
     }
 }
 
@@ -108,6 +152,17 @@ mod tests {
         state.save(&path).unwrap();
         assert_eq!(EngineState::load(&path).unwrap(), state);
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn historico_limita_a_20_operacoes() {
+        let mut state = EngineState::default();
+        for indice in 0..30 {
+            state.push_history("index", format!("op {indice}"));
+        }
+        assert_eq!(state.history.len(), 20);
+        assert_eq!(state.history[0].summary, "op 29");
+        assert_eq!(state.history[0].kind, "index");
     }
 
     #[test]

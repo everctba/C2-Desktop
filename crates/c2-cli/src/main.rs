@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use c2_core::indexer::{self, IndexOptions, IndexReport};
+use c2_core::log::Logger;
 use c2_core::runtime;
 use c2_core::schema::MetaFile;
 use c2_core::search::{self, SearchOptions};
@@ -52,6 +53,13 @@ enum Command {
 
     /// Abre a janela do C2 Desktop neste projeto
     Open,
+
+    /// Mostra as ultimas linhas do log do workspace
+    Logs {
+        /// Quantas linhas mostrar
+        #[arg(long, default_value_t = 20)]
+        lines: usize,
+    },
 
     /// Mostra o estado do workspace
     Status,
@@ -157,6 +165,7 @@ fn run(cli: Cli) -> Result<()> {
             Ok(())
         }
         Command::Open => cmd_open(cli.root.as_deref()),
+        Command::Logs { lines } => cmd_logs(cli.root.as_deref(), lines, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
@@ -342,6 +351,13 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                     "pid": engine_pid,
                 },
                 "runtime": runtime_json(&workspace, &config),
+                "initialized": true,
+                "pending": discovery.files.len().saturating_sub(metadata.len()),
+                "log": {
+                    "path": workspace.logs_dir().join("c2.log"),
+                    "size_bytes": std::fs::metadata(workspace.logs_dir().join("c2.log")).map(|m| m.len()).unwrap_or(0),
+                    "level": config.log.level,
+                },
                 "files": discovery.files.len(),
                 "metadata": metadata.len(),
                 "skipped": discovery.skipped,
@@ -384,6 +400,28 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         None => println!("Engine:      parado"),
     }
     print_runtime_status(&workspace, &config);
+    println!(
+        "Pendentes:   {} (arquivos sem metadado)",
+        discovery.files.len().saturating_sub(metadata.len())
+    );
+    let log_path = workspace.logs_dir().join("c2.log");
+    println!(
+        "Log:         {} ({} KiB, nivel {})",
+        log_path.display(),
+        std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0) / 1024,
+        config.log.level
+    );
+    if !state.history.is_empty() {
+        println!("Operacoes:");
+        for operacao in state.history.iter().take(3) {
+            println!(
+                "  {} {:<10} {}",
+                format_timestamp(operacao.ts),
+                operacao.kind,
+                operacao.summary
+            );
+        }
+    }
     println!(
         "Historico:   {} indexados, {} chamadas, {} tokens, {} erros (ultima varredura: {})",
         state.indexed,
@@ -469,6 +507,8 @@ fn cmd_config_list(root: Option<&Path>, json_output: bool) -> Result<()> {
                 "engine.poll_interval_secs",
                 config.get("engine.poll_interval_secs"),
             ),
+            ("log.level", config.get("log.level")),
+            ("log.keep", config.get("log.keep")),
         ] {
             let shown = value
                 .filter(|v| v != "null")
@@ -495,6 +535,17 @@ fn cmd_cleaner(root: Option<&Path>, dry_run: bool, json_output: bool) -> Result<
         );
         return Ok(());
     }
+
+    let logger = Logger::for_workspace(&workspace, &workspace.load_config()?);
+    logger.info(
+        "cli",
+        format!(
+            "cleaner: {} encontrados, {} removidos (dry_run={})",
+            report.found.len(),
+            report.removed.len(),
+            report.dry_run
+        ),
+    );
 
     if report.dry_run {
         println!(
@@ -524,6 +575,12 @@ fn cmd_reindex(
     let workspace = require_workspace(root)?;
     let config = workspace.load_config()?;
     let client = LlmClient::from_config(&config);
+
+    let logger = Logger::for_workspace(&workspace, &config);
+    logger.info(
+        "cli",
+        format!("reindex iniciado (full={full}, limit={limit:?}, dry_run={dry_run})"),
+    );
 
     let options = IndexOptions {
         full,
@@ -566,6 +623,17 @@ fn cmd_reindex(
         let mut state = EngineState::load(&workspace.state_path())?;
         state.merge_report(&report);
         state.save(&workspace.state_path())?;
+    }
+
+    logger.info(
+        "cli",
+        format!(
+            "reindex concluido: {} indexados, {} inalterados, {} erros, {} chamadas",
+            report.indexed, report.unchanged, report.errors, report.calls
+        ),
+    );
+    if let Some(erro) = &report.last_error {
+        logger.warn("cli", format!("ultimo erro do reindex: {erro}"));
     }
 
     // Comando de uma vez: se o runtime foi subido aqui, nao deixa VRAM ocupada.
@@ -613,6 +681,18 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
         let mut state = EngineState::load(&workspace.state_path())?;
         state.merge_report(&report);
         state.save(&workspace.state_path())?;
+
+        let logger = Logger::for_workspace(&workspace, &config);
+        logger.info(
+            "engine",
+            format!(
+                "ciclo: {} indexados, {} inalterados, {} erros, {} chamadas",
+                report.indexed, report.unchanged, report.errors, report.calls
+            ),
+        );
+        if let Some(erro) = &report.last_error {
+            logger.warn("engine", format!("erro no ciclo: {erro}"));
+        }
 
         print_report(&report, false, json_output)?;
 
@@ -988,4 +1068,29 @@ fn print_runtime_status(workspace: &Workspace, config: &c2_core::Config) {
     if let Some(version) = &status.version {
         println!("Versao:      {version}");
     }
+}
+
+fn cmd_logs(root: Option<&Path>, lines: usize, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    let logger = Logger::for_workspace(&workspace, &config);
+    let linhas = logger.tail(lines);
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&linhas)?);
+        return Ok(());
+    }
+    if linhas.is_empty() {
+        println!(
+            "log vazio em {} (nivel {}, rotacao {} KiB)",
+            logger.path().display(),
+            config.log.level,
+            config.log.max_file_bytes / 1024
+        );
+        return Ok(());
+    }
+    for linha in linhas {
+        println!("{linha}");
+    }
+    Ok(())
 }

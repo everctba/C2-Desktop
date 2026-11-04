@@ -97,6 +97,8 @@ async fn workspace_reindex(
         let config = workspace.load_config().map_err(|err| err.to_string())?;
         require_model(&config)?;
         let client = LlmClient::from_config(&config);
+        let logger = c2_core::log::Logger::for_workspace(&workspace, &config);
+        logger.info("desktop", "reindex iniciado");
         runtime::ensure(&workspace, &config).map_err(|err| err.to_string())?;
 
         let options = IndexOptions {
@@ -113,6 +115,17 @@ async fn workspace_reindex(
         state
             .save(&workspace.state_path())
             .map_err(|err| err.to_string())?;
+
+        logger.info(
+            "desktop",
+            format!(
+                "reindex concluido: {} indexados, {} erros, {} chamadas",
+                report.indexed, report.errors, report.calls
+            ),
+        );
+        if let Some(erro) = &report.last_error {
+            logger.warn("desktop", format!("ultimo erro: {erro}"));
+        }
 
         let _ = runtime::stop(&workspace);
         Ok(report)
@@ -135,15 +148,18 @@ fn engine_start(
     let config = workspace.load_config().map_err(|err| err.to_string())?;
     require_model(&config)?;
     let client = LlmClient::from_config(&config);
+    let logger = c2_core::log::Logger::for_workspace(&workspace, &config);
     let running = Arc::clone(&engine.running);
     running.store(true, Ordering::SeqCst);
 
     let handle = std::thread::spawn(move || {
         if let Err(err) = runtime::ensure(&workspace, &config) {
+            logger.error("engine", format!("falha ao subir o runtime: {err}"));
             let _ = app.emit("engine://error", err.to_string());
             running.store(false, Ordering::SeqCst);
             return;
         }
+        logger.info("engine", "engine iniciado");
 
         let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
         while running.load(Ordering::SeqCst) {
@@ -164,9 +180,20 @@ fn engine_start(
                     let mut state = EngineState::load(&workspace.state_path()).unwrap_or_default();
                     state.merge_report(&report);
                     let _ = state.save(&workspace.state_path());
+                    logger.info(
+                        "engine",
+                        format!(
+                            "ciclo: {} indexados, {} inalterados, {} erros, {} chamadas",
+                            report.indexed, report.unchanged, report.errors, report.calls
+                        ),
+                    );
+                    if let Some(erro) = &report.last_error {
+                        logger.warn("engine", format!("erro no ciclo: {erro}"));
+                    }
                     let _ = app.emit("engine://cycle", report);
                 }
                 Err(err) => {
+                    logger.error("engine", format!("falha no ciclo: {err}"));
                     let _ = app.emit("engine://error", err.to_string());
                 }
             }
@@ -178,6 +205,7 @@ fn engine_start(
             std::thread::sleep(interval);
         }
 
+        logger.info("engine", "engine encerrado");
         let _ = runtime::stop(&workspace);
         let _ = app.emit("engine://stopped", ());
     });

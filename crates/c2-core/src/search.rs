@@ -281,8 +281,26 @@ fn semantic_tokens(meta: &MetaFile) -> BTreeMap<&'static str, Vec<String>> {
 
 /// Simbolos do arquivo, extraidos por heuristica de linha (sem parser).
 const SYMBOL_KEYWORDS: &[&str] = &[
-    "fn", "def", "function", "class", "struct", "enum", "trait", "impl", "interface", "type",
-    "const", "static", "pub", "async", "let", "var", "module", "defmodule", "func", "sub",
+    "fn",
+    "def",
+    "function",
+    "class",
+    "struct",
+    "enum",
+    "trait",
+    "impl",
+    "interface",
+    "type",
+    "const",
+    "static",
+    "pub",
+    "async",
+    "let",
+    "var",
+    "module",
+    "defmodule",
+    "func",
+    "sub",
 ];
 pub fn extract_symbols(content: &str) -> Vec<String> {
     let mut symbols = Vec::new();

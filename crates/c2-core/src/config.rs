@@ -205,6 +205,28 @@ impl Default for SearchConfig {
     }
 }
 
+/// Parametros de log em arquivo (`c2-e10t1`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LogConfig {
+    /// Nivel minimo: error, warn, info ou debug.
+    pub level: String,
+    /// Tamanho maximo antes de rotacionar.
+    pub max_file_bytes: u64,
+    /// Quantos arquivos rotacionados manter.
+    pub keep: usize,
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            level: "info".to_string(),
+            max_file_bytes: 1024 * 1024,
+            keep: 5,
+        }
+    }
+}
+
 /// Configuracao completa do workspace.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -214,6 +236,7 @@ pub struct Config {
     pub index: IndexConfig,
     pub engine: EngineConfig,
     pub search: SearchConfig,
+    pub log: LogConfig,
 }
 
 impl Default for Config {
@@ -224,6 +247,7 @@ impl Default for Config {
             index: IndexConfig::default(),
             engine: EngineConfig::default(),
             search: SearchConfig::default(),
+            log: LogConfig::default(),
         }
     }
 }
@@ -262,6 +286,18 @@ impl Config {
         }
         if self.engine.poll_interval_secs == 0 {
             return invalid("engine.poll_interval_secs deve ser > 0".to_string());
+        }
+        if self.log.keep == 0 {
+            return invalid("log.keep deve ser >= 1".to_string());
+        }
+        if self.log.max_file_bytes < 1024 {
+            return invalid("log.max_file_bytes deve ser >= 1024".to_string());
+        }
+        if !matches!(
+            self.log.level.to_ascii_lowercase().as_str(),
+            "error" | "warn" | "warning" | "info" | "debug"
+        ) {
+            return invalid("log.level deve ser error, warn, info ou debug".to_string());
         }
         Ok(())
     }
