@@ -4,6 +4,7 @@
 #   pwsh -File instalar.ps1
 #   pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
 #   pwsh -File instalar.ps1 -NoShortcut
+#   pwsh -File instalar.ps1 -NoGui        # sem dialogo: usa prompt de texto
 #
 # O que faz:
 #   1. escolhe a pasta de instalacao (padrao %LOCALAPPDATA%\C2);
@@ -13,7 +14,9 @@
 
 param(
     [string]$Dest = '',
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    # Nao abre o seletor grafico de pasta (usa prompt de texto)
+    [switch]$NoGui
 )
 
 $ErrorActionPreference = 'Continue'
@@ -26,8 +29,31 @@ if (-not (Test-Path (Join-Path $source 'runtime\llama-server.exe'))) {
     Write-Warning 'runtime\llama-server.exe nao encontrado no pacote: o C2 vai exigir model.binary ou llama-server no PATH'
 }
 
+$padrao = Join-Path $env:LOCALAPPDATA 'C2'
+
+if (-not $Dest -and -not $NoGui) {
+    # Seletor grafico de pasta (escolhe qualquer disco/pasta)
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        $dialogo = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dialogo.Description = 'Escolha a pasta onde o C2 sera instalado'
+        $dialogo.UseDescriptionForTitle = $true
+        $dialogo.ShowNewFolderButton = $true
+        $dialogo.SelectedPath = $padrao
+        if ($dialogo.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $Dest = $dialogo.SelectedPath
+        } else {
+            Write-Host 'instalacao cancelada'
+            exit 0
+        }
+    } catch {
+        Write-Warning "nao foi possivel abrir o seletor grafico ($($_.Exception.Message)); usando prompt de texto"
+        $entrada = Read-Host "Pasta de instalacao [$padrao]"
+        if ([string]::IsNullOrWhiteSpace($entrada)) { $Dest = $padrao } else { $Dest = $entrada }
+    }
+}
+
 if (-not $Dest) {
-    $padrao = Join-Path $env:LOCALAPPDATA 'C2'
     $entrada = Read-Host "Pasta de instalacao [$padrao]"
     if ([string]::IsNullOrWhiteSpace($entrada)) { $Dest = $padrao } else { $Dest = $entrada }
 }

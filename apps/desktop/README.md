@@ -69,6 +69,17 @@ apps/desktop/
     └── tauri.conf.json
 ```
 
+## Instalar em outra pasta
+
+O instalador abre o **seletor gráfico de pasta** do Windows (padrão
+`%LOCALAPPDATA%\C2`). Também aceita caminho direto, sem interface:
+
+```powershell
+pwsh -File instalar.ps1                       # abre o seletor de pasta
+pwsh -File instalar.ps1 -Dest "D:\Apps\C2"   # instala direto
+pwsh -File instalar.ps1 -NoGui                # prompt de texto
+```
+
 ## Configurações
 
 A rota **Config** (engrenagem no rail) edita o `.c2/config.json` do projeto:
