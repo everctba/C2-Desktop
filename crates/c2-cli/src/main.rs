@@ -935,6 +935,8 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
                 "errors": report.errors,
                 "deferred": report.deferred,
                 "relinked": report.relinked,
+                "renamed": report.renamed,
+                "hash_cache_hits": report.hash_cache_hits,
                 "blocked": report.blocked,
                 "masked": report.masked,
                 "bytes_sent": report.bytes_sent,
@@ -949,14 +951,21 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
     }
 
     println!(
-        "{} indexados, {} inalterados, {} removidos, {} religados, {} erros, {} adiados",
+        "{} indexados, {} inalterados, {} removidos, {} religados, {} renomeados, {} erros, {} adiados",
         report.indexed,
         report.unchanged,
         report.removed,
         report.relinked,
+        report.renamed,
         report.errors,
         report.deferred
     );
+    if report.hash_cache_hits > 0 {
+        println!(
+            "cache: {} hash(es) reaproveitados por (tamanho, mtime)",
+            report.hash_cache_hits
+        );
+    }
     if report.blocked > 0 || report.masked > 0 {
         println!(
             "seguranca: {} bloqueados por segredo, {} com conteudo mascarado",

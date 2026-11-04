@@ -34,6 +34,8 @@ pub struct EngineState {
     pub masked: u64,
     /// Metadados antigos que ganharam links sem chamar o modelo.
     pub relinked: u64,
+    /// Arquivos renomeados que reaproveitaram o metadado existente.
+    pub renamed: u64,
     /// Bytes de conteudo enviados ao modelo.
     pub bytes_sent: u64,
     pub llm_calls: u64,
@@ -84,6 +86,7 @@ impl EngineState {
         self.blocked += report.blocked as u64;
         self.masked += report.masked as u64;
         self.relinked += report.relinked as u64;
+        self.renamed += report.renamed as u64;
         self.bytes_sent += report.bytes_sent;
         self.llm_calls += report.calls as u64;
         self.prompt_tokens += report.prompt_tokens;

@@ -78,6 +78,11 @@ impl Workspace {
         self.c2_dir().join(CONFIG_FILE)
     }
 
+    /// `.c2/hash-cache.json`
+    pub fn hash_cache_path(&self) -> PathBuf {
+        self.c2_dir().join("hash-cache.json")
+    }
+
     pub fn state_path(&self) -> PathBuf {
         self.c2_dir().join(STATE_FILE)
     }

@@ -30,6 +30,7 @@ pub enum Decision {
     New,
     Changed,
     Unchanged,
+    Renamed,
     Removed,
 }
 
@@ -39,6 +40,7 @@ impl Decision {
             Decision::New => "novo",
             Decision::Changed => "alterado",
             Decision::Unchanged => "inalterado",
+            Decision::Renamed => "renomeado",
             Decision::Removed => "removido",
         }
     }
@@ -56,6 +58,17 @@ pub struct PlanItem {
     pub hash: Option<String>,
     /// Metadado ja existente, quando houver.
     pub existing: Option<MetaFile>,
+    /// O hash veio do cache (tamanho e mtime batem; nao recalculado).
+    pub hash_from_cache: bool,
+    /// Origem de uma renomeacao detectada por hash.
+    pub renamed_from: Option<RenamedFrom>,
+}
+
+/// Metadado antigo de um arquivo renomeado.
+#[derive(Debug, Clone)]
+pub struct RenamedFrom {
+    pub meta_path: PathBuf,
+    pub old_rel: String,
 }
 
 /// Opcoes de um ciclo.
@@ -87,6 +100,10 @@ pub struct IndexReport {
     pub deferred: usize,
     /// Metadados antigos que receberam links sem chamar o modelo.
     pub relinked: usize,
+    /// Arquivos renomeados reaproveitando metadado (sem chamar o modelo).
+    pub renamed: usize,
+    /// Hashes reaproveitados do cache (tamanho+mtime iguais).
+    pub hash_cache_hits: usize,
     /// Arquivos pulados por conter segredo (politica `skip`).
     pub blocked: usize,
     /// Arquivos indexados com conteudo mascarado (politica `mask`).
@@ -108,12 +125,14 @@ impl IndexReport {
             + self.errors
             + self.deferred
             + self.relinked
+            + self.renamed
             + self.blocked
             + self.masked
     }
 }
 
-/// Monta o plano: descobre arquivos, compara com os metadados e lista orfaos.
+/// Monta o plano: descobre arquivos, compara com os metadados, detecta
+/// renomeacoes por hash e lista orfaos.
 pub fn plan(
     workspace: &Workspace,
     config: &Config,
@@ -122,6 +141,7 @@ pub fn plan(
 ) -> Result<Vec<PlanItem>> {
     let root = workspace.root();
     let discovery = discover::discover(root, config)?;
+    let cache = crate::hash::HashCache::load(&workspace.hash_cache_path());
     let mut items = Vec::new();
 
     for entry in discovery.files {
@@ -138,14 +158,14 @@ pub fn plan(
             None
         };
 
-        let (decision, current_hash) = match &existing {
-            None => (Decision::New, Some(hash::sha256_file(&entry.path)?)),
+        let (hash_atual, hash_from_cache) = fingerprint(&entry, &cache, full)?;
+        let decision = match &existing {
+            None => Decision::New,
             Some(meta) => {
-                let current = hash::sha256_file(&entry.path)?;
-                if !full && meta.hash == current {
-                    (Decision::Unchanged, None)
+                if !full && meta.hash == hash_atual {
+                    Decision::Unchanged
                 } else {
-                    (Decision::Changed, Some(current))
+                    Decision::Changed
                 }
             }
         };
@@ -157,15 +177,18 @@ pub fn plan(
             decision,
             size: entry.size,
             mtime: entry.mtime,
-            hash: current_hash,
+            hash: Some(hash_atual),
             existing,
+            hash_from_cache,
+            renamed_from: None,
         });
     }
 
     // Orfaos: metadado cujo arquivo-fonte nao existe mais.
-    let mut seen: BTreeSet<PathBuf> = items.iter().map(|i| i.meta_path.clone()).collect();
+    let mut vistos: BTreeSet<PathBuf> = items.iter().map(|item| item.meta_path.clone()).collect();
+    let mut orfaos: Vec<PlanItem> = Vec::new();
     for meta_path in crate::cleaner::metadata_files(root)? {
-        if !seen.insert(meta_path.clone()) {
+        if !vistos.insert(meta_path.clone()) {
             continue;
         }
         let source = source_path_for(&meta_path);
@@ -178,7 +201,7 @@ pub fn plan(
                 continue;
             }
         }
-        items.push(PlanItem {
+        orfaos.push(PlanItem {
             rel,
             path: source,
             meta_path,
@@ -187,11 +210,55 @@ pub fn plan(
             mtime: 0,
             hash: None,
             existing: None,
+            hash_from_cache: false,
+            renamed_from: None,
         });
     }
 
+    // Renomeacao: arquivo novo cujo hash casa com o de um orfao (mesmo conteudo).
+    for item in items
+        .iter_mut()
+        .filter(|item| item.decision == Decision::New)
+    {
+        let Some(hash_novo) = item.hash.clone() else {
+            continue;
+        };
+        let Some(posicao) = orfaos.iter().position(|orfao| {
+            MetaFile::read(&orfao.meta_path)
+                .map(|meta| meta.hash == hash_novo)
+                .unwrap_or(false)
+        }) else {
+            continue;
+        };
+
+        let orfao = orfaos.remove(posicao);
+        let existente = MetaFile::read(&orfao.meta_path).ok();
+        item.decision = Decision::Renamed;
+        item.existing = existente;
+        item.renamed_from = Some(RenamedFrom {
+            meta_path: orfao.meta_path,
+            old_rel: orfao.rel,
+        });
+    }
+
+    items.extend(orfaos);
     items.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(items)
+}
+
+/// Hash do arquivo: reaproveita o cache quando (tamanho, mtime) batem e
+/// `full` nao foi pedido; caso contrario le e calcula SHA-256.
+fn fingerprint(
+    entry: &discover::FileEntry,
+    cache: &crate::hash::HashCache,
+    full: bool,
+) -> Result<(String, bool)> {
+    if !full {
+        if let Some(hash) = cache.get(&entry.rel, entry.size, entry.mtime) {
+            return Ok((hash, true));
+        }
+    }
+    Ok((hash::sha256_file(&entry.path)?, false))
 }
 
 /// Executa um ciclo de indexacao.
@@ -209,7 +276,11 @@ pub fn run<P: SemanticProvider>(
         options.only_path.as_deref(),
     )?;
     let total = items.len();
-    let mut report = IndexReport::default();
+    let hits_de_cache = items.iter().filter(|item| item.hash_from_cache).count();
+    let mut report = IndexReport {
+        hash_cache_hits: hits_de_cache,
+        ..IndexReport::default()
+    };
     let mut processed = 0usize;
 
     for (position, item) in items.iter().enumerate() {
@@ -261,6 +332,36 @@ pub fn run<P: SemanticProvider>(
                     }
                 }
             }
+            Decision::Renamed => {
+                processed += 1;
+                if options.dry_run {
+                    report.renamed += 1;
+                    continue;
+                }
+                let (Some(origem), Some(meta)) = (&item.renamed_from, &item.existing) else {
+                    continue;
+                };
+                let hash = item.hash.clone().unwrap_or_else(|| meta.hash.clone());
+                let atualizado = MetaFile::new(
+                    item.rel.clone(),
+                    hash,
+                    item.size,
+                    item.mtime,
+                    meta.semantic.clone(),
+                    meta.links.clone(),
+                );
+                match atualizado.write_atomic(&item.meta_path) {
+                    Ok(()) => {
+                        let _ = fs::remove_file(&origem.meta_path);
+                        match relink_references(workspace, &origem.old_rel, &item.rel) {
+                            Ok(quantidade) => report.relinked += quantidade,
+                            Err(err) => record_error(&mut report, err),
+                        }
+                        report.renamed += 1;
+                    }
+                    Err(err) => record_error(&mut report, err),
+                }
+            }
             Decision::New | Decision::Changed => {
                 processed += 1;
                 if options.dry_run {
@@ -281,6 +382,24 @@ pub fn run<P: SemanticProvider>(
                 }
             }
         }
+    }
+
+    // Persiste o cache apenas com os arquivos atuais (orfaos saem).
+    if !options.dry_run {
+        let mut atual = crate::hash::HashCache::default();
+        for item in &items {
+            if item.decision == Decision::Removed {
+                continue;
+            }
+            let hash = item
+                .hash
+                .clone()
+                .or_else(|| item.existing.as_ref().map(|meta| meta.hash.clone()));
+            if let Some(hash) = hash {
+                atual.insert(&item.rel, item.size, item.mtime, hash);
+            }
+        }
+        atual.save(&workspace.hash_cache_path())?;
     }
 
     Ok(report)
@@ -406,6 +525,28 @@ fn mtime_secs(metadata: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
+/// Atualiza, em todos os metadados, links que apontavam para o caminho antigo.
+fn relink_references(workspace: &Workspace, old_rel: &str, new_rel: &str) -> Result<usize> {
+    let mut alterados = 0;
+    for caminho in crate::cleaner::metadata_files(workspace.root())? {
+        let Ok(mut meta) = MetaFile::read(&caminho) else {
+            continue;
+        };
+        let mut mudou = false;
+        for link in &mut meta.links {
+            if link.to == old_rel {
+                link.to = new_rel.to_string();
+                mudou = true;
+            }
+        }
+        if mudou {
+            meta.write_atomic(&caminho)?;
+            alterados += 1;
+        }
+    }
+    Ok(alterados)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,6 +641,115 @@ mod tests {
 
     fn options() -> IndexOptions {
         IndexOptions::default()
+    }
+
+    fn opcoes_full() -> IndexOptions {
+        IndexOptions {
+            full: true,
+            ..IndexOptions::default()
+        }
+    }
+
+    #[test]
+    fn cache_de_hash_evita_recalculo_na_segunda_passada() {
+        let (base, workspace) = setup("cache-hit");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert!(workspace.hash_cache_path().is_file(), "cache deve existir");
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.unchanged, 2);
+        assert_eq!(report.hash_cache_hits, 2, "os dois hashes vem do cache");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn cache_e_invalidado_quando_o_arquivo_muda() {
+        let (base, workspace) = setup("cache-miss");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        // tamanho e mtime diferentes: cache nao pode ser usado para este arquivo
+        fs::write(base.join("src/a.rs"), "fn a() { let x = 1; }\n").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(report.indexed, 1, "so o arquivo alterado e reindexado");
+        assert_eq!(report.hash_cache_hits, 1, "o outro vem do cache");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn full_ignora_o_cache_de_hash() {
+        let (base, workspace) = setup("cache-full");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        let report = run(&workspace, &config, &provider, &opcoes_full(), |_| {}).unwrap();
+        assert_eq!(
+            report.hash_cache_hits, 0,
+            "--full recalcula todos os hashes"
+        );
+        assert_eq!(
+            provider.calls(),
+            4,
+            "full reindexa os 2 de novo (2 antes + 2 agora)"
+        );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn renomear_arquivo_reaproveita_metadado_sem_llm() {
+        let (base, workspace) = setup("rename");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert_eq!(provider.calls(), 2);
+
+        fs::rename(base.join("src/a.rs"), base.join("src/c.rs")).unwrap();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        assert_eq!(report.renamed, 1);
+        assert_eq!(report.removed, 0);
+        assert_eq!(report.indexed, 0);
+        assert_eq!(provider.calls(), 2, "rename nao pode chamar o modelo");
+
+        assert!(base.join("src/c.rs.c2.json").is_file());
+        assert!(!base.join("src/a.rs.c2.json").exists());
+        let meta = MetaFile::read(&base.join("src/c.rs.c2.json")).unwrap();
+        assert_eq!(meta.file, "src/c.rs");
+        assert_eq!(meta.semantic.what, "o que");
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn renomear_atualiza_links_de_outros_metadados() {
+        let (base, workspace) = setup("rename-links");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        // b.rs passa a apontar para a.rs
+        let caminho_b = base.join("src/b.rs.c2.json");
+        let mut meta_b = MetaFile::read(&caminho_b).unwrap();
+        meta_b.links = vec![crate::schema::Link {
+            to: "src/a.rs".to_string(),
+            kind: "uses".to_string(),
+        }];
+        meta_b.write_atomic(&caminho_b).unwrap();
+
+        fs::rename(base.join("src/a.rs"), base.join("src/c.rs")).unwrap();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        assert_eq!(report.renamed, 1);
+        assert!(report.relinked >= 1, "link antigo deve ser reescrito");
+        let meta_b = MetaFile::read(&caminho_b).unwrap();
+        assert_eq!(meta_b.links[0].to, "src/c.rs");
+        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
@@ -777,6 +1027,37 @@ mod tests {
         assert_eq!(report.indexed, 1);
         assert_eq!(provider.calls(), 1);
 
+        fs::remove_dir_all(&base).ok();
+    }
+    /// Mede o efeito do cache de hash: primeira passada x segunda (tudo igual).
+    /// Rode com: cargo test -p c2-core --lib bench_cache -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn bench_cache_de_hash() {
+        let (base, workspace) = setup("bench-cache");
+        let mut config = workspace.load_config().unwrap();
+        config.index.max_total_bytes_per_run = 0;
+        for indice in 0..300 {
+            fs::write(
+                base.join(format!("src/f{indice:03}.rs")),
+                format!("pub fn f{indice}() -> u32 {{ {indice} }}\n"),
+            )
+            .unwrap();
+        }
+        let provider = MockProvider::ok();
+
+        let inicio = std::time::Instant::now();
+        let primeiro = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        let primeira = inicio.elapsed();
+
+        let inicio = std::time::Instant::now();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        let segunda = inicio.elapsed();
+
+        println!(
+            "300 arquivos: 1a passada {primeira:?} ({} indexados, {} chamadas), 2a passada {segunda:?} ({} hashes do cache, {} inalterados)",
+            primeiro.indexed, primeiro.calls, report.hash_cache_hits, report.unchanged
+        );
         fs::remove_dir_all(&base).ok();
     }
 }
