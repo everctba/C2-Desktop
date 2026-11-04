@@ -2,7 +2,7 @@ import "./styles/global.css";
 import { api, hasTauri, onEngineEvent } from "./api";
 import { Rail, type Route } from "./ui/Rail";
 import { Toolbar } from "./ui/Toolbar";
-import type { StatusReport } from "./types";
+import type { RecentProject, StatusReport } from "./types";
 import { renderEngine } from "./views/Engine";
 import { modelInstructions, renderProjects } from "./views/Projects";
 import { createDialog, dialogField, openDialog } from "./ui/Dialog";
@@ -15,6 +15,49 @@ import { renderSettings } from "./views/Settings";
 import type { View } from "./views/view";
 
 const app = document.getElementById("app")!;
+
+const RECENT_KEY = "c2.recent";
+const MAX_RECENT = 12;
+
+/** Projetos abertos recentemente, mais recente primeiro. */
+function loadRecents(): RecentProject[] {
+  try {
+    const bruto = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as RecentProject[];
+    return bruto
+      .filter((item) => typeof item?.path === "string" && item.path.length > 0)
+      .sort((a, b) => (b.opened_at ?? 0) - (a.opened_at ?? 0))
+      .slice(0, MAX_RECENT);
+  } catch {
+    return [];
+  }
+}
+
+function saveRecents(lista: RecentProject[]): void {
+  localStorage.setItem(RECENT_KEY, JSON.stringify(lista.slice(0, MAX_RECENT)));
+}
+
+function rememberProject(path: string): void {
+  if (!path) return;
+  const normalizar = (valor: string) => valor.replace(/\\/g, "/").toLowerCase();
+  const lista = loadRecents().filter((item) => normalizar(item.path) !== normalizar(path));
+  lista.unshift({ path, opened_at: Date.now() });
+  saveRecents(lista);
+}
+
+function removeRecent(path: string): void {
+  const normalizar = (valor: string) => valor.replace(/\\/g, "/").toLowerCase();
+  saveRecents(loadRecents().filter((item) => normalizar(item.path) !== normalizar(path)));
+  render();
+}
+
+async function openRecent(path: string): Promise<void> {
+  state.root = path.replace(/\\/g, "/");
+  localStorage.setItem("c2.root", state.root);
+  rememberProject(state.root);
+  await loadStatus();
+  state.route = state.status?.initialized ? "engine" : "projects";
+  render();
+}
 
 interface AppState {
   root: string;
@@ -62,6 +105,7 @@ async function pickProject(): Promise<void> {
   if (!path) return;
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
+  rememberProject(state.root);
   await loadStatus();
   // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
   state.route = state.status?.initialized ? "engine" : "projects";
@@ -428,6 +472,9 @@ function render(): void {
               state.route = "engine";
               render();
             })(),
+          recents: loadRecents(),
+          onOpenRecent: (caminho) => void openRecent(caminho),
+          onRemoveRecent: (caminho) => removeRecent(caminho),
         });
     }
     disposeView = view.dispose ?? null;
@@ -455,6 +502,7 @@ async function boot(): Promise<void> {
   if (fromArgs) {
     state.root = fromArgs.replace(/\\/g, "/");
     localStorage.setItem("c2.root", state.root);
+    rememberProject(state.root);
   }
   await loadStatus();
   if (fromArgs && state.status?.initialized) {

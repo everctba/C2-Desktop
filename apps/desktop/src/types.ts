@@ -90,6 +90,11 @@ export interface RuntimePlan {
   loaded: boolean;
 }
 
+export interface RecentProject {
+  path: string;
+  opened_at: number;
+}
+
 export interface StatusReport {
   root: string;
   initialized: boolean;

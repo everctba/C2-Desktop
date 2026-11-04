@@ -3,7 +3,7 @@ import { Button } from "../ui/Button";
 import { Card, cardBody, cardFooter } from "../ui/Card";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
-import type { ModelInspection, StatusReport } from "../types";
+import type { ModelInspection, RecentProject, StatusReport } from "../types";
 import type { View } from "./view";
 
 /** Modelo recomendado para o C2 (validado nesta máquina). */
@@ -23,6 +23,10 @@ export interface ProjectsContext {
   onChanged: () => void;
   /// Chamado depois de criar o .c2/config.json (a janela vai para a Engine).
   onInitialized: () => void;
+  /// Projetos abertos recentemente (mais recente primeiro).
+  recents: RecentProject[];
+  onOpenRecent: (path: string) => void;
+  onRemoveRecent: (path: string) => void;
 }
 
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
@@ -133,6 +137,10 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
     }),
   );
   page.appendChild(actions);
+
+  if (ctx.recents.length > 0) {
+    page.appendChild(recentCard(ctx));
+  }
 
   if (!hasTauri) {
     const note = document.createElement("p");
@@ -389,4 +397,51 @@ export function modelInstructions(): HTMLElement {
 
   box.appendChild(acoes);
   return box;
+}
+
+/** Lista de projetos recentes: clique abre, X remove do historico. */
+function recentCard(ctx: ProjectsContext): HTMLElement {
+  const card = Card({ title: "Projetos recentes", accent: 6 });
+  const body = cardBody(card);
+
+  const atual = (caminho: string) =>
+    caminho.replace(/\\/g, "/").toLowerCase() === ctx.root.replace(/\\/g, "/").toLowerCase();
+
+  for (const item of ctx.recents) {
+    const row = document.createElement("div");
+    row.className = styles.recentRow;
+    row.title = item.path;
+    row.addEventListener("click", () => ctx.onOpenRecent(item.path));
+
+    const info = document.createElement("div");
+    info.className = styles.recentInfo;
+    const nome = document.createElement("span");
+    nome.className = styles.recentName;
+    nome.textContent = item.path.split("/").filter(Boolean).pop() ?? item.path;
+    const caminho = document.createElement("span");
+    caminho.className = styles.recentPath;
+    caminho.textContent = item.path;
+    info.append(nome, caminho);
+    row.appendChild(info);
+
+    if (atual(item.path)) {
+      row.appendChild(Pill("atual", "accent", "xs"));
+    }
+
+    const remover = Button({
+      iconOnly: true,
+      iconName: "close",
+      variant: "ghost",
+      size: "xs",
+      onClick: () => ctx.onRemoveRecent(item.path),
+    });
+    remover.setAttribute("aria-label", `Remover ${item.path} dos recentes`);
+    remover.title = "Remover dos recentes";
+    remover.addEventListener("click", (evento) => evento.stopPropagation());
+    row.appendChild(remover);
+
+    body.appendChild(row);
+  }
+
+  return card;
 }
