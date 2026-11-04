@@ -1,7 +1,8 @@
 # Benchmark do C2: corpus sintetico, indexacao real e medicao da busca.
 #
 # Uso:
-#   pwsh -File scripts/bench.ps1                  # 500 arquivos
+#   pwsh -File scripts/bench.ps1                  # 100 arquivos (padrao)
+#   pwsh -File scripts/bench.ps1 -Files 500       # corpus grande (opcional)
 #   pwsh -File scripts/bench.ps1 -Files 100
 #
 # Mede: tempo do primeiro indice, chamadas ao modelo, tempo da segunda passada
@@ -10,15 +11,24 @@
 # Requisitos: runtime do llama-server configurado (model.binary) ou no PATH.
 
 param(
-    [int]$Files = 500,
-    [string]$Out = ''
+    [int]$Files = 100,
+    [string]$Out = '',
+    # CLI a usar; por padrao prefere o pacote portatil (que tem o runtime embarcado)
+    [string]$C2 = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$c2 = Join-Path $root 'target\release\c2.exe'
-if (-not (Test-Path $c2)) { $c2 = Join-Path $root 'target\debug\c2.exe' }
-if (-not (Test-Path $c2)) { throw 'compile o C2 primeiro: cargo build --release' }
+$c2 = $C2
+if (-not $c2) {
+    $portable = Join-Path $root 'dist\desktop\cli\c2.exe'
+    $release = Join-Path $root 'target\release\c2.exe'
+    $debug = Join-Path $root 'target\debug\c2.exe'
+    if (Test-Path $portable) { $c2 = $portable }
+    elseif (Test-Path $release) { $c2 = $release }
+    elseif (Test-Path $debug) { $c2 = $debug }
+}
+if (-not $c2 -or -not (Test-Path $c2)) { throw 'compile o C2 (ou gere dist/desktop) antes do benchmark' }
 
 $work = Join-Path $env:TEMP "c2-bench-$Files"
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }

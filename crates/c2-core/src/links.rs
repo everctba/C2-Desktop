@@ -17,7 +17,7 @@ pub fn extract(root: &Path, rel: &str, content: &str, max_links: usize) -> Vec<L
     let mut raw: Vec<(String, &'static str)> = Vec::new();
 
     match extension.as_str() {
-        "rs" => extract_rust(rel, content, &mut raw),
+        "rs" => extract_rust(root, rel, content, &mut raw),
         "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "vue" | "svelte" => {
             extract_js(rel, content, &mut raw)
         }
@@ -60,9 +60,9 @@ fn dir_of(rel: &str) -> String {
     }
 }
 
-fn extract_rust(rel: &str, content: &str, raw: &mut Vec<(String, &'static str)>) {
+fn extract_rust(root: &Path, rel: &str, content: &str, raw: &mut Vec<(String, &'static str)>) {
     let dir = dir_of(rel);
-    let crate_root = crate_root_of(&dir);
+    let crate_root = crate_root_of(root, &dir);
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -109,16 +109,18 @@ fn extract_rust(rel: &str, content: &str, raw: &mut Vec<(String, &'static str)>)
     }
 }
 
-fn crate_root_of(dir: &str) -> String {
+fn crate_root_of(root: &Path, dir: &str) -> String {
     let mut current = dir.to_string();
     loop {
-        if !current.is_empty() {
-            let has_root = ["lib.rs", "main.rs"]
-                .iter()
-                .any(|name| std::path::Path::new(&format!("{current}/{name}")).is_file());
-            if has_root {
-                return current;
-            }
+        let base = root.join(current.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let has_root = ["lib.rs", "main.rs"]
+            .iter()
+            .any(|name| base.join(name).is_file());
+        if has_root {
+            return current;
+        }
+        if current.is_empty() {
+            return String::new();
         }
         let parent = dir_of(&current);
         if parent == current {
@@ -324,6 +326,27 @@ mod tests {
         let path = base.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, "").unwrap();
+    }
+
+    #[test]
+    fn use_crate_com_modulo_aninhado_resolve_contra_o_workspace() {
+        let base = workspace("aninhado");
+        touch(&base, "src/lib.rs");
+        touch(&base, "src/mod00/arquivo_001.rs");
+        touch(&base, "src/mod00/arquivo_002.rs");
+
+        let links = extract(
+            &base,
+            "src/mod00/arquivo_001.rs",
+            "use crate::mod00::arquivo_002;\n",
+            DEFAULT_MAX_LINKS,
+        );
+        let targets: Vec<&str> = links.iter().map(|link| link.to.as_str()).collect();
+        assert!(
+            targets.contains(&"src/mod00/arquivo_002.rs"),
+            "crate::mod00::arquivo_002 deveria resolver; veio {targets:?}"
+        );
+        fs::remove_dir_all(&base).ok();
     }
 
     #[test]
