@@ -257,7 +257,9 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   avisoProvedor.textContent =
     "Local é o padrão: o modelo roda na sua máquina e nada sai dela. " +
     "Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor " +
-    "configurado e os tokens são cobrados na sua conta — só ative se for aceitável.";
+    "configurado e os tokens são cobrados na sua conta — só ative se for aceitável. " +
+    "No modo API/BYO, os indicadores locais (runtime, VRAM, .gguf) não se aplicam: " +
+    "quem gerencia o servidor é o provedor ou software externo.";
   provedorBody.appendChild(avisoProvedor);
 
   const gradeProvedor = document.createElement("div");

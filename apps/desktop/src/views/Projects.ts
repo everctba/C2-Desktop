@@ -131,6 +131,24 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
 
   page.appendChild(grid);
 
+  // Provedor externo (nuvem ou BYO): indicadores locais nao refletem o servidor.
+  if (status.model.provider === "openai_compat") {
+    const externo = document.createElement("div");
+    externo.style.cssText =
+      "margin-top: var(--space-m); padding: var(--space-m); " +
+      "border: 1px solid var(--border-muted); border-radius: var(--radius); " +
+      "font-size: var(--text-s); line-height: 1.45; color: var(--text-muted);";
+    const local = /127\.0\.0\.1|localhost|\[::1\]/.test(status.model.base_url ?? "");
+    externo.innerHTML =
+      "Você está usando um <strong>provedor externo</strong> (" +
+      (local ? "servidor local de terceiro, como LM Studio/Ollama/vLLM" : "nuvem") +
+      "). Alguns indicadores desta tela — status do runtime do C2, VRAM e o " +
+      "<span class=\"mono\">.gguf</span> — <strong>não</strong> refletem o servidor " +
+      "que está rodando: ele é gerenciado por outro software. Use " +
+      "<strong>Config → Provedor de IA → Testar conexão</strong> para validar.";
+    page.appendChild(externo);
+  }
+
   const actions = document.createElement("div");
   actions.className = styles.actions;
 

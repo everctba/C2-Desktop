@@ -427,6 +427,7 @@ c2 migrate --yes</pre>
               <li>O <span class="mono">model.path</span>, VRAM e <span class="mono">ctx_size</span> são responsabilidade do servidor (use contexto ≥ 8k).</li>
               <li>Endpoints em <span class="mono">127.0.0.1</span>/<span class="mono">localhost</span> dispensam API key.</li>
               <li>Se o provedor falhar, o C2 mostra um popup e <strong>não</strong> troca para o local sozinho.</li>
+              <li>No modo externo, indicadores locais (runtime do C2, VRAM, <span class="mono">.gguf</span>) não refletem o servidor real — valide com <strong>Testar conexão</strong>.</li>
             </ul>
           </section>
 
