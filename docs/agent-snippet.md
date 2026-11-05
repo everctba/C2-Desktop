@@ -8,7 +8,7 @@ Cole este bloco no arquivo de regras do seu agente (CLAUDE.md, `.cursor/rules/`,
 
 ## Contexto antes de código
 
-Este projeto é indexado pelo **C2**. Ao lado de cada arquivo existe um
+Este projeto tem comentários semânticos do **C2**. Ao lado de cada arquivo existe um
 `<arquivo>.c2.json` com metadados semânticos gerados por modelo local. Ele
 responde "o que é, por que existe, qual o objetivo, qual a responsabilidade,
 quais arquivos se relacionam" — em ~300 tokens, contra milhares do código.
@@ -35,7 +35,7 @@ decidir *se* vale ler o código.
 - **Não leia todos os `.c2.json`.** Use só os dos arquivos que o `grep` trouxe.
 - `links[].type` diz a relação: `imports`, `includes`, `mod`, `require`, `extends`.
 - Cite sempre `caminho/arquivo:linha` ao referenciar código.
-- Sem `.c2.json` = projeto não indexado: avise e use leitura normal.
+- Sem `.c2.json` = projeto sem comentários do C2: avise e use leitura normal.
 - **C2 ≠ bd.** C2 é contexto de código; `bd` é tarefa/projeto. Não misture.
 
 ## Fallback (CLI do C2 ainda não instalada)

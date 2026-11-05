@@ -11,7 +11,7 @@
 
 ## 1. O que você precisa saber
 
-Este projeto é indexado pelo **C2**. Ao lado de cada arquivo de código existe um
+Este projeto é **comentado pelo C2**. Ao lado de cada arquivo de código existe um
 `<arquivo>.c2.json` — um **comentário semântico** gerado por IA local, com:
 
 | Campo | Responde |
@@ -75,11 +75,11 @@ o projeto.
 
 - **Não invente comportamento.** Sem evidência no código, diga "não encontrei".
 - **Não edite `.c2.json` manualmente.** O C2 reescreve; sua edição é perdida.
-- **Metadado ausente** = projeto não indexado (ou arquivo novo). Avise e use
+- **Metadado ausente** = projeto sem comentários do C2 (ou arquivo novo). Avise e use
   leitura normal; não tente "adivinhar" o conteúdo.
 - **Metadado velho** (arquivo mudou e o `.c2.json` não): rode
   `c2 reindex --path <arquivo>` e continue.
-- **Segredos** não são indexados por padrão (`skip`); arquivos com nome sensível
+- **Segredos** não recebem comentário por padrão (`skip`); arquivos com nome sensível
   nem entram na descoberta. Não peça para indexá-los.
 - **C2 ≠ bd.** C2 é contexto de código; `bd` é rastreamento de tarefas. Não
   misture os dois.
@@ -154,4 +154,4 @@ c2 mcp            # servidor MCP por STDIO
 - [ ] Se o metadado divergiu, avisei e reindexei.
 - [ ] Não li mais arquivos do que o necessário (e sei justificar os que li).
 - [ ] Não alterei nenhum `.c2.json` à mão.
-- [ ] Se o projeto não estava indexado, avisei o usuário.
+- [ ] Se o projeto não tinha comentários do C2, avisei o usuário.

@@ -297,7 +297,7 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
         println!("(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)");
     } else {
         println!();
-        println!("Para o seu agente usar o indice, cole o bloco abaixo no");
+        println!("Para o seu agente usar os comentarios do C2, cole o bloco abaixo no");
         println!("AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):");
         println!();
         for linha in AGENT_SNIPPET.lines() {
@@ -311,14 +311,14 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
     Ok(())
 }
 
-/// Bloco de regras que ensina um agente a consultar o indice antes do codigo.
+/// Bloco de regras que ensina um agente a consultar os comentarios antes do codigo.
 const AGENT_SNIPPET: &str = "## Contexto antes de codigo (C2)
 
-Este projeto e indexado pelo C2: ao lado de cada arquivo existe um
+Este projeto tem comentarios semanticos do C2: ao lado de cada arquivo existe um
 `<arquivo>.c2.json` com what/why/goal/summary/responsibility e links[].
 
 Ordem de investigacao:
-1. `c2 status` - o indice esta atualizado?
+1. `c2 status` - os comentarios estao atualizados?
 2. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
 3. Leia o `.c2.json` do candidato ANTES do arquivo de codigo.
 4. `c2 related <arquivo>` - vizinhos do grafo.
