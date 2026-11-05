@@ -185,6 +185,16 @@ export interface MetaLink {
   type: string;
 }
 
+export interface AgentNote {
+  by: string;
+  model: string | null;
+  task: string | null;
+  at: string;
+  hash: string | null;
+  kind: string;
+  text: string;
+}
+
 export interface MetaFile {
   schema_version: number;
   file: string;
@@ -199,6 +209,7 @@ export interface MetaFile {
     responsibility: string;
   };
   links: MetaLink[];
+  agent_notes?: AgentNote[];
 }
 
 export interface RelatedResult {

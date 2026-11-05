@@ -341,6 +341,21 @@ async function abrirMetadado(root: string, file: string): Promise<void> {
       container.appendChild(pills);
     }
 
+    const notas = meta.agent_notes ?? [];
+    if (notas.length > 0) {
+      const tituloNotas = document.createElement("strong");
+      tituloNotas.textContent = "Anotações de agentes (hipóteses)";
+      tituloNotas.style.marginTop = "var(--space-s)";
+      container.appendChild(tituloNotas);
+      for (const nota of notas) {
+        const obsoleta =
+          nota.hash && nota.hash !== meta.hash ? " · revisar: o arquivo mudou" : "";
+        const cabecalho =
+          `${nota.kind} · ${nota.by}${nota.model ? ` (${nota.model})` : ""}` + obsoleta;
+        container.appendChild(dialogField(cabecalho, nota.text));
+      }
+    }
+
     const related: RelatedResult = await api.related(root, file);
     const pre = document.createElement("pre");
     pre.className = styles.pre;

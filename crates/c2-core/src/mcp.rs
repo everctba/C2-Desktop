@@ -71,13 +71,28 @@ pub fn tools() -> Value {
                 "type": "object",
                 "properties": { "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 200 } }
             }
+        },
+        {
+            "name": "c2_annotate",
+            "description": "Anexa uma anotacao de agente (teleology/invariant/gotcha) ao .c2.json do arquivo. Escrita restrita a agent_notes: nao altera codigo, semantic nem links. Use somente para descobertas nao obvias pelo codigo.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "file": { "type": "string", "description": "Caminho relativo ao workspace" },
+                    "text": { "type": "string", "description": "Descoberta nao obvia (max 2000 caracteres)" },
+                    "kind": { "type": "string", "enum": ["teleology", "invariant", "gotcha", "note"], "default": "note" },
+                    "task": { "type": "string", "description": "Tarefa/contexto em que a anotacao nasceu (opcional)" },
+                    "model": { "type": "string", "description": "Modelo do agente (opcional)" }
+                },
+                "required": ["file", "text"]
+            }
         }
     ])
 }
 
 /// Nomes das ferramentas (para painel/testes).
 pub fn tool_names() -> Vec<&'static str> {
-    vec!["c2_grep", "c2_read", "c2_related", "c2_map"]
+    vec!["c2_grep", "c2_read", "c2_related", "c2_map", "c2_annotate"]
 }
 
 /// Processa uma linha JSON-RPC. Devolve `None` para notificacoes (sem `id`).
@@ -298,6 +313,27 @@ fn chamar_ferramenta(
             ));
             Ok(saida)
         }
+        "c2_annotate" => {
+            let arquivo = argumentos
+                .get("file")
+                .and_then(Value::as_str)
+                .ok_or_else(|| texto_erro("c2_annotate exige 'file'"))?;
+            let texto_nota = argumentos
+                .get("text")
+                .and_then(Value::as_str)
+                .ok_or_else(|| texto_erro("c2_annotate exige 'text'"))?;
+            let kind = argumentos.get("kind").and_then(Value::as_str);
+            let task = argumentos.get("task").and_then(Value::as_str);
+            let model = argumentos.get("model").and_then(Value::as_str);
+            let nota =
+                crate::notes::append(workspace, arquivo, texto_nota, kind, task, None, model)?;
+            Ok(serde_json::to_string_pretty(&json!({
+                "ok": true,
+                "file": arquivo,
+                "note": nota
+            }))
+            .unwrap_or_default())
+        }
         outro => Err(texto_erro(format!(
             "ferramenta desconhecida: {outro} (disponiveis: {})",
             tool_names().join(", ")
@@ -374,6 +410,23 @@ mod tests {
         for esperado in tool_names() {
             assert!(nomes.contains(&esperado), "faltou {esperado}: {nomes:?}");
         }
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn tools_call_anotacao_de_agente() {
+        let (base, ws, config) = workspace("annotate");
+        let resposta = handle(
+            &ws,
+            &config,
+            r#"{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"c2_annotate","arguments":{"file":"src/a.rs","text":"invariante: a() nao pode retornar negativo","kind":"invariant"}}}"#,
+        )
+        .unwrap();
+        assert!(resposta.contains("invariant"), "{resposta}");
+        let meta = MetaFile::read(&base.join("src/a.rs.c2.json")).unwrap();
+        assert_eq!(meta.agent_notes.len(), 1);
+        assert_eq!(meta.agent_notes[0].kind, "invariant");
+        assert!(meta.agent_notes[0].text.contains("negativo"));
         fs::remove_dir_all(&base).ok();
     }
 

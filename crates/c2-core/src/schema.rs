@@ -11,7 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::error::{C2Error, IoContext, Result};
@@ -88,6 +88,40 @@ impl Link {
     }
 }
 
+/// Anotacao adicionada por um agente (IA principal) ao metadado.
+///
+/// Deliberadamente separada de `semantic`: a anotacao e uma hipotese do agente,
+/// nao a descricao gerada pelo modelo local, e nunca sobrescreve a semantica.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentNote {
+    /// Quem escreveu (ex.: "agent", "claude-code").
+    #[serde(default = "default_note_by")]
+    pub by: String,
+    /// Modelo do agente, quando informado.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Tarefa/contexto em que a anotacao nasceu.
+    #[serde(default)]
+    pub task: Option<String>,
+    /// Momento em UTC (ISO-8601).
+    pub at: String,
+    /// Hash do arquivo quando a nota foi escrita (deteccao de nota obsoleta).
+    #[serde(default)]
+    pub hash: Option<String>,
+    /// teleology | invariant | gotcha | note
+    #[serde(default = "default_note_kind")]
+    pub kind: String,
+    pub text: String,
+}
+
+fn default_note_by() -> String {
+    "agent".to_string()
+}
+
+fn default_note_kind() -> String {
+    "note".to_string()
+}
+
 /// Metadado de um arquivo do projeto.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MetaFile {
@@ -102,6 +136,9 @@ pub struct MetaFile {
     pub mtime: i64,
     pub semantic: Semantic,
     pub links: Vec<Link>,
+    /// Anotacoes de agentes (IA principal); preservadas no reindex.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_notes: Vec<AgentNote>,
 }
 
 /// Remove o BOM UTF-8, se presente (alguns editores do Windows gravam).
@@ -126,6 +163,7 @@ impl MetaFile {
             mtime,
             semantic,
             links,
+            agent_notes: Vec::new(),
         }
     }
 
@@ -136,6 +174,28 @@ impl MetaFile {
                 "metadado de `{}` sem semantica (what/why/goal/summary/responsibility vazios)",
                 self.file
             )));
+        }
+        if self.agent_notes.len() > crate::notes::MAX_NOTES {
+            return Err(C2Error::InvalidConfig(format!(
+                "metadado de `{}` excede {} anotacoes",
+                self.file,
+                crate::notes::MAX_NOTES
+            )));
+        }
+        for nota in &self.agent_notes {
+            if nota.text.trim().is_empty() {
+                return Err(C2Error::InvalidConfig(format!(
+                    "metadado de `{}` tem anotacao vazia",
+                    self.file
+                )));
+            }
+            if nota.text.chars().count() > crate::notes::MAX_TEXT_CHARS {
+                return Err(C2Error::InvalidConfig(format!(
+                    "anotacao de `{}` excede {} caracteres",
+                    self.file,
+                    crate::notes::MAX_TEXT_CHARS
+                )));
+            }
         }
         if self.hash.is_empty() {
             return Err(C2Error::InvalidConfig(format!(
@@ -236,6 +296,45 @@ impl MetaFile {
         });
         links.dedup();
 
+        let mut agent_notes = Vec::new();
+        if let Some(items) = value.get("agent_notes").and_then(Value::as_array) {
+            for item in items.iter().take(50) {
+                let text = item
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
+                if text.is_empty() {
+                    continue;
+                }
+                agent_notes.push(AgentNote {
+                    by: item
+                        .get("by")
+                        .and_then(Value::as_str)
+                        .unwrap_or("agent")
+                        .to_string(),
+                    model: item
+                        .get("model")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    task: item.get("task").and_then(Value::as_str).map(str::to_string),
+                    at: item
+                        .get("at")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_string(),
+                    hash: item.get("hash").and_then(Value::as_str).map(str::to_string),
+                    kind: item
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .unwrap_or("note")
+                        .to_string(),
+                    text,
+                });
+            }
+        }
+
         MetaFile {
             schema_version: value
                 .get("schema_version")
@@ -255,6 +354,7 @@ impl MetaFile {
             mtime: value.get("mtime").and_then(Value::as_i64).unwrap_or(0),
             semantic,
             links,
+            agent_notes,
         }
     }
 

@@ -158,3 +158,16 @@ c2 mcp            # servidor MCP por STDIO
 - [ ] Não li mais arquivos do que o necessário (e sei justificar os que li).
 - [ ] Não alterei nenhum `.c2.json` à mão.
 - [ ] Se o projeto não tinha comentários do C2, avisei o usuário.
+
+## 7. Anotações de agente (`c2_annotate`)
+
+Quando descobrir algo **não óbvio pelo código** — invariante sutil, motivo real
+da existência do arquivo, armadilha de manutenção — registre com a tool MCP
+`c2_annotate` (`file`, `text`, `kind` = `teleology` | `invariant` | `gotcha` |
+`note`; opcionalmente `task`/`model`). Regras:
+
+- curto: até 2.000 caracteres; máximo 10 anotações por arquivo;
+- **não** anote o óbvio nem repita a semântica já gerada;
+- a anotação é uma hipótese do agente, datada e com o hash do arquivo; se o
+  arquivo mudar, ela aparece como "revisar";
+- ela nunca altera `semantic`, `links` ou o código.

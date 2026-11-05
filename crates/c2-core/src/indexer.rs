@@ -354,7 +354,7 @@ pub fn run<P: SemanticProvider>(
                         if meta.links.is_empty() {
                             let extracted = extract_links(workspace, config, item)?;
                             if !extracted.is_empty() {
-                                let updated = MetaFile::new(
+                                let mut updated = MetaFile::new(
                                     meta.file.clone(),
                                     meta.hash.clone(),
                                     meta.size,
@@ -362,6 +362,7 @@ pub fn run<P: SemanticProvider>(
                                     meta.semantic.clone(),
                                     extracted,
                                 );
+                                updated.agent_notes = meta.agent_notes.clone();
                                 updated.write_atomic(&item.meta_path)?;
                                 report.relinked += 1;
                             }
@@ -389,7 +390,7 @@ pub fn run<P: SemanticProvider>(
                     continue;
                 };
                 let hash = item.hash.clone().unwrap_or_else(|| meta.hash.clone());
-                let atualizado = MetaFile::new(
+                let mut atualizado = MetaFile::new(
                     item.rel.clone(),
                     hash,
                     item.size,
@@ -397,6 +398,7 @@ pub fn run<P: SemanticProvider>(
                     meta.semantic.clone(),
                     meta.links.clone(),
                 );
+                atualizado.agent_notes = meta.agent_notes.clone();
                 match atualizado.write_atomic(&item.meta_path) {
                     Ok(()) => {
                         let _ = fs::remove_file(&origem.meta_path);
@@ -532,7 +534,7 @@ fn index_one<P: SemanticProvider>(
         &config.index.link_fallback,
     );
 
-    let meta = MetaFile::new(
+    let mut meta = MetaFile::new(
         item.rel.clone(),
         hash_after,
         metadata.len(),
@@ -540,6 +542,10 @@ fn index_one<P: SemanticProvider>(
         generated.semantic,
         extracted,
     );
+    // Anotacoes de agentes sobrevivem ao reindex; o hash antigo marca obsoletas.
+    if let Some(existente) = &item.existing {
+        meta.agent_notes = existente.agent_notes.clone();
+    }
     meta.write_atomic(&item.meta_path)?;
     report.indexed += 1;
     Ok(())
@@ -1207,5 +1213,40 @@ mod tests {
             primeiro.indexed, primeiro.calls, report.hash_cache_hits, report.unchanged
         );
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn reindex_preserva_anotacoes_de_agente() {
+        let (base, workspace) = setup("notes");
+        let config = workspace.load_config().unwrap();
+        let provider = MockProvider::ok();
+        run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+
+        let nota = crate::notes::append(
+            &workspace,
+            "src/a.rs",
+            "invariante: nunca negativo",
+            Some("invariant"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let hash_antigo = nota.hash.clone().unwrap();
+
+        // muda o arquivo: proximo ciclo regenera a semantica, mas mantem a nota
+        std::fs::write(base.join("src/a.rs"), "fn a() { 2; }\n").unwrap();
+        run(&workspace, &config, &provider, &opcoes_full(), |_| {}).unwrap();
+
+        let meta = MetaFile::read(&base.join("src/a.rs.c2.json")).unwrap();
+        assert_eq!(meta.agent_notes.len(), 1);
+        assert_eq!(meta.agent_notes[0].text, "invariante: nunca negativo");
+        // hash mudou: a nota antiga fica marcada como stale no metadado
+        assert_ne!(meta.hash, hash_antigo);
+        assert_eq!(
+            meta.agent_notes[0].hash.as_deref(),
+            Some(hash_antigo.as_str())
+        );
+        std::fs::remove_dir_all(&base).ok();
     }
 }

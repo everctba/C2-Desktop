@@ -534,6 +534,7 @@ mod tests {
 
         let mut nuvem = client("https://api.exemplo.com/v1/chat/completions");
         nuvem.cache_prompt = false;
+        nuvem.local_endpoint = false;
         let body = nuvem.build_body("instrucoes", "<arquivo/>", 100);
         assert!(body.get("cache_prompt").is_none());
     }
@@ -545,7 +546,10 @@ mod tests {
         cliente.local_endpoint = false;
         cliente.bearer = Some("sk-teste-segredo-123".to_string());
         let dump = format!("{cliente:?}");
-        assert!(!dump.contains("sk-teste-segredo-123"), "chave vazou: {dump}");
+        assert!(
+            !dump.contains("sk-teste-segredo-123"),
+            "chave vazou: {dump}"
+        );
         assert!(dump.contains("<redacted>"), "esperava redacao: {dump}");
     }
 

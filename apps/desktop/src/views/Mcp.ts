@@ -168,7 +168,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
     const nota = document.createElement("p");
     nota.className = "pageHint";
     nota.textContent =
-      "Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor expõe apenas leitura; nada é enviado para fora da máquina.";
+      "Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor é somente leitura, exceto `c2_annotate` (anotações no .c2.json do arquivo). Nada é enviado para fora da máquina.";
     conectarCorpo.appendChild(nota);
   };
 

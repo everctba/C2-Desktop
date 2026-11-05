@@ -29,7 +29,11 @@ decidir *se* vale ler o código.
 
 ## Regras
 
-- **Metadado é hipótese; código é evidência.** Toda afirmação sobre
+- **Ao descobrir algo NÃO óbvio pelo código (invariante, gotcha, motivo real
+de existência), registre com a tool MCP `c2_annotate` (file, text, kind) —
+curto, max 2000 caracteres. Não anote o óbvio.
+
+Metadado é hipótese; código é evidência.** Toda afirmação sobre
   comportamento deve vir do código. Se o metadado divergir, diga isso e rode
   `c2 reindex --path <arquivo>` — nunca invente nem edite `.c2.json` à mão.
 - **Não leia o projeto inteiro.** Comece com `--limit 5`; 1 a 3 arquivos

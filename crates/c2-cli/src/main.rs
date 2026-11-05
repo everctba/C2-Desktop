@@ -148,6 +148,46 @@ enum Command {
         /// Caminho relativo ao workspace
         file: PathBuf,
     },
+    /// Anotacoes de agentes no metadado (c2-zup)
+    Note {
+        #[command(subcommand)]
+        acao: NoteAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum NoteAction {
+    /// Anexa uma anotacao ao .c2.json de um arquivo
+    Add {
+        /// Caminho relativo ao workspace
+        file: PathBuf,
+        /// Texto da anotacao (max 2000 caracteres)
+        texto: String,
+        /// teleology | invariant | gotcha | note
+        #[arg(long, default_value = "note")]
+        kind: String,
+        /// Tarefa/contexto (opcional)
+        #[arg(long)]
+        task: Option<String>,
+        /// Autor (padrao: agent)
+        #[arg(long)]
+        by: Option<String>,
+        /// Modelo do agente (opcional)
+        #[arg(long)]
+        model: Option<String>,
+    },
+    /// Lista as anotacoes
+    List {
+        /// Caminho relativo ao workspace (opcional)
+        file: Option<PathBuf>,
+    },
+    /// Remove uma anotacao (indice 1-based)
+    Remove {
+        /// Caminho relativo ao workspace
+        file: PathBuf,
+        /// Indice da anotacao (1-based)
+        index: usize,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -216,6 +256,7 @@ fn run(cli: Cli) -> Result<()> {
         ),
         Command::Read { file, lines } => cmd_read(cli.root.as_deref(), file, lines, cli.json),
         Command::Related { file } => cmd_related(cli.root.as_deref(), file, cli.json),
+        Command::Note { acao } => cmd_note(cli.root.as_deref(), acao, cli.json),
     }
 }
 
@@ -312,6 +353,9 @@ Ordem de investigacao:
 3. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
 4. `c2 related <arquivo>` - vizinhos do grafo.
 5. `c2 read <arquivo> --lines A:B` - so o trecho necessario.
+6. Ao descobrir algo NAO OBVIO pelo codigo (invariante, gotcha, motivo real de
+   existencia), registre com a tool MCP `c2_annotate` (file, text, kind).
+   Seja curto (max 2000 chars) e nao anote o obvio.
 
 Metadado e hipotese; codigo e evidencia. Se divergir, `c2 reindex --path <arquivo>`.
 Nao leia o projeto inteiro: comece com --limit 5.";
@@ -871,6 +915,74 @@ fn cmd_grep(
             }
         }
         println!();
+    }
+    Ok(())
+}
+
+fn cmd_note(root: Option<&Path>, acao: NoteAction, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    match acao {
+        NoteAction::Add {
+            file,
+            texto,
+            kind,
+            task,
+            by,
+            model,
+        } => {
+            let rel = file.to_string_lossy().replace('\\', "/");
+            let nota = c2_core::notes::append(
+                &workspace,
+                &rel,
+                &texto,
+                Some(&kind),
+                task.as_deref(),
+                by.as_deref(),
+                model.as_deref(),
+            )?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&nota)?);
+            } else {
+                println!("anotacao adicionada em {rel} ({}) — {}", nota.kind, nota.at);
+            }
+        }
+        NoteAction::List { file } => {
+            let filtro = file
+                .as_ref()
+                .map(|caminho| caminho.to_string_lossy().replace('\\', "/"));
+            let notas = c2_core::notes::list(&workspace, filtro.as_deref())?;
+            if json_output {
+                let valor: Vec<serde_json::Value> = notas
+                    .iter()
+                    .map(|(rel, lista)| serde_json::json!({ "file": rel, "notes": lista }))
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&valor)?);
+            } else if notas.is_empty() {
+                println!("nenhuma anotacao de agente");
+            } else {
+                for (rel, lista) in notas {
+                    println!("{rel}");
+                    for (indice, nota) in lista.iter().enumerate() {
+                        println!(
+                            "  {}. [{}] {} — {}",
+                            indice + 1,
+                            nota.kind,
+                            nota.at,
+                            nota.text
+                        );
+                    }
+                }
+            }
+        }
+        NoteAction::Remove { file, index } => {
+            let rel = file.to_string_lossy().replace('\\', "/");
+            let nota = c2_core::notes::remove(&workspace, &rel, index)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&nota)?);
+            } else {
+                println!("anotacao {index} removida de {rel}");
+            }
+        }
     }
     Ok(())
 }

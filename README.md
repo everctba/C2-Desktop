@@ -28,6 +28,8 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Resposta em milissegundos.** `c2 grep` p50 **60 ms**, `c2 related` **49 ms**;
   a consulta semântica resolve em **86 ms** o que a busca lexical não encontra.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
+- **Anotações de agentes.** A IA principal pode salvar descobertas não óbvias
+  no próprio `.c2.json` via MCP (`c2_annotate`), preservadas no reindex.
 - **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional.
 - **Sem GPU?** Rode na CPU (mais lento) ou use um provedor OpenAI-compatible com a
   sua API key (Config → Provedor de IA). No modo nuvem o conteúdo dos arquivos é
@@ -101,6 +103,7 @@ c2 --root . mcp     # STDIO: initialize, tools/list, tools/call
 ```
 
 Ferramentas somente leitura: `c2_grep`, `c2_read`, `c2_related`, `c2_map`.
+A única escrita é `c2_annotate` (anotações em `agent_notes` do `.c2.json`).
 Configuração pronta na aba **MCP** da janela.
 
 ## Privacidade
