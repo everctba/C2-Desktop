@@ -79,10 +79,10 @@ export function openWelcome(handlers: WelcomeHandlers): void {
     }
 
     if (atual === 1) {
-      corpo.appendChild(titulo("Abra a pasta do projeto"));
+      corpo.appendChild(titulo("Escolha a pasta do projeto"));
       corpo.appendChild(
         texto(
-          "O C2 grava os metadados ao lado de cada arquivo (<arquivo>.c2.json) e o índice em .c2/. " +
+          "O C2 grava os metadados ao lado de cada arquivo (<arquivo>.c2.json). " +
             "Escolha a pasta que você quer indexar.",
         ),
       );
@@ -140,7 +140,7 @@ export function openWelcome(handlers: WelcomeHandlers): void {
       const raiz = handlers.root();
       if (!raiz) {
         corpo.appendChild(
-          texto("Abra a pasta do projeto antes de selecionar o modelo."),
+          texto("Escolha a pasta do projeto antes de selecionar o modelo."),
         );
       } else {
         if (modeloEscolhido) {
