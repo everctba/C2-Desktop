@@ -20,7 +20,8 @@ site/
 
 ## Logo (arte em Braille)
 
-A arte-fonte fica em `assets/ascii/logo.txt` (Braille Unicode, ~72 colunas).
+A arte-fonte fica em `assets/ascii/logo.txt` (Braille Unicode, ~72 colunas,
+sem legenda). A legenda "Comments 2.0 for AI" é **texto HTML** ao lado do SVG.
 Para não depender de fonte instalada, ela é convertida em SVG vetorial:
 
 ```powershell

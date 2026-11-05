@@ -753,17 +753,33 @@ code.inline {
 }
 
 /* ---------- logo em Braille (SVG vetorial) ---------- */
-.ascii-logo {
+.hero-logo {
   grid-column: 1 / -1;
   justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-xs);
+  margin-bottom: calc(-1 * var(--space-2xl));
+}
+
+.ascii-logo {
   width: min(440px, 78vw);
   height: auto;
-  margin-bottom: calc(-1 * var(--space-3xl));
+}
+
+.ascii-caption {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  color: var(--text-subtle);
 }
 
 @media (max-width: 900px) {
+  .hero-logo {
+    margin-bottom: 0;
+  }
+
   .ascii-logo {
     width: min(320px, 80vw);
-    margin-bottom: 0;
   }
 }
