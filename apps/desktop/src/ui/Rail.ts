@@ -1,4 +1,5 @@
 import { icon, type IconName } from "../icons/index";
+import { t } from "../i18n";
 import styles from "./Rail.module.css";
 
 export type Route = "projects" | "engine" | "search" | "mcp" | "settings" | "about";
@@ -49,7 +50,7 @@ function criarItem(item: Item, props: RailProps): HTMLButtonElement {
 
   const label = document.createElement("span");
   label.className = styles.label;
-  label.textContent = item.label;
+  label.textContent = t(item.label);
   button.appendChild(label);
 
   button.addEventListener("click", () => props.onNavigate(item.route));

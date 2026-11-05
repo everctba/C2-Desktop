@@ -15,6 +15,7 @@ import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
 import { initNews } from "./news";
+import { initLang, t } from "./i18n";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
 
@@ -130,9 +131,9 @@ async function chooseModelForWelcome(): Promise<string | null> {
     return escolhido;
   } catch (error) {
     await openDialog({
-      title: "Modelo inválido",
-      body: dialogField("Erro", String(error), true),
-      confirmLabel: "Entendi",
+      title: t("Modelo inválido"),
+      body: dialogField(t("Erro"), String(error), true),
+      confirmLabel: t("Entendi"),
       cancelLabel: "",
     });
     return null;
@@ -165,7 +166,7 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
   return new Promise((resolve) => {
     let decidido = false;
     const handle = createDialog({
-      title: "Como você quer rodar a IA?",
+      title: t("Como você quer rodar a IA?"),
       onClose: () => {
         if (!decidido) {
           decidido = true;
@@ -260,9 +261,9 @@ async function avisarFalhaProvedor(mensagem: string): Promise<void> {
     "em Config → Provedor de IA.";
   corpo.appendChild(aviso);
   await openDialog({
-    title: "Provedor de IA falhou",
+    title: t("Provedor de IA falhou"),
     body: corpo,
-    confirmLabel: "Entendi",
+    confirmLabel: t("Entendi"),
     cancelLabel: "",
   });
 }
@@ -279,16 +280,16 @@ async function runReindex(full: boolean): Promise<void> {
       const estimativa = await api.costEstimate(state.root, full);
       if (estimativa.estimated_cost_usd > 0) {
         const seguir = await openDialog({
-          title: "Custo estimado",
+          title: t("Custo estimado"),
           body: dialogField(
-            "Estimativa",
+            t("Estimativa"),
             `~US$ ${estimativa.estimated_cost_usd.toFixed(4)} para ${estimativa.pending} arquivo(s).` +
               (estimativa.cap_usd > 0
                 ? ` Teto por execução: US$ ${estimativa.cap_usd.toFixed(2)}.`
                 : " Sem teto configurado.") +
               "\n\nValores aproximados; confira os preços do provedor.",
           ),
-          confirmLabel: "Indexar",
+          confirmLabel: t("Indexar"),
           cancelLabel: "Cancelar",
         });
         if (!seguir) {
@@ -364,9 +365,9 @@ async function ensureModel(): Promise<boolean> {
   body.appendChild(modelInstructions());
 
   const escolher = await openDialog({
-    title: "Selecione um modelo para iniciar",
+    title: t("Selecione um modelo para iniciar"),
     body,
-    confirmLabel: "Selecionar .gguf…",
+    confirmLabel: t("Selecionar .gguf…"),
   });
   if (!escolher) return false;
 
@@ -381,9 +382,9 @@ async function ensureModel(): Promise<boolean> {
     return true;
   } catch (error) {
     await openDialog({
-      title: "Modelo inválido",
-      body: dialogField("Erro", String(error), true),
-      confirmLabel: "Entendi",
+      title: t("Modelo inválido"),
+      body: dialogField(t("Erro"), String(error), true),
+      confirmLabel: t("Entendi"),
       cancelLabel: "",
     });
     return false;
@@ -404,9 +405,9 @@ async function ensureModelLoaded(): Promise<boolean> {
     plano = await api.runtimePlan(state.root);
   } catch (error) {
     await openDialog({
-      title: "Não foi possível planejar a carga",
-      body: dialogField("Erro", String(error), true),
-      confirmLabel: "Entendi",
+      title: t("Não foi possível planejar a carga"),
+      body: dialogField(t("Erro"), String(error), true),
+      confirmLabel: t("Entendi"),
       cancelLabel: "",
     });
     return false;
@@ -415,7 +416,7 @@ async function ensureModelLoaded(): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
     let settled = false;
     const handle = createDialog({
-      title: "Carregar modelo na GPU",
+      title: t("Carregar modelo na GPU"),
       onClose: () => {
         if (!settled) {
           settled = true;
@@ -509,19 +510,19 @@ async function ensureModelLoaded(): Promise<boolean> {
       const ctx = Number.parseInt(ctxField.input.value, 10);
       const camadas = Number.parseInt(layersField.input.value, 10);
       if (!Number.isFinite(ctx) || ctx < 512) {
-        erro.textContent = "Contexto inválido (mínimo 512 tokens).";
+        erro.textContent = t("Contexto inválido (mínimo 512 tokens).");
         erro.style.display = "block";
         return;
       }
       if (!Number.isFinite(camadas) || camadas < 0) {
-        erro.textContent = "Camadas na GPU inválidas.";
+        erro.textContent = t("Camadas na GPU inválidas.");
         erro.style.display = "block";
         return;
       }
 
       btnCancelar.disabled = true;
       btnCarregar.disabled = true;
-      btnCarregar.textContent = "Carregando…";
+      btnCarregar.textContent = t("Carregando…");
       erro.style.display = "none";
       barra.replaceChildren(loadingBar());
 
@@ -535,7 +536,7 @@ async function ensureModelLoaded(): Promise<boolean> {
         erro.style.display = "block";
         btnCancelar.disabled = false;
         btnCarregar.disabled = false;
-        btnCarregar.textContent = "Carregar na GPU";
+        btnCarregar.textContent = t("Carregar na GPU");
         barra.replaceChildren(memoryBar(plano.estimate));
       }
     };
@@ -714,6 +715,7 @@ function subscribeEvents(): void {
 }
 
 async function boot(): Promise<void> {
+  await initLang();
   // `c2 open --root <dir>` vence o ultimo projeto salvo na janela.
   const fromArgs = await api.initialRoot();
   if (fromArgs) {
@@ -730,6 +732,7 @@ async function boot(): Promise<void> {
   }
   if (state.status) log("workspace carregado");
   subscribeEvents();
+  window.addEventListener("c2:lang", () => render());
   render();
 
   // Primeira execucao sem modelo: abre o assistente de primeiros passos.

@@ -890,6 +890,30 @@ fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
 }
 
 #[tauri::command]
+fn language_load(app: tauri::AppHandle) -> Option<String> {
+    let caminho = app
+        .path()
+        .app_data_dir()
+        .ok()?
+        .join("language.json");
+    let texto = std::fs::read_to_string(caminho).ok()?;
+    let valor: serde_json::Value = serde_json::from_str(&texto).ok()?;
+    valor.get("lang").and_then(|v| v.as_str()).map(str::to_string)
+}
+
+#[tauri::command]
+fn language_save(app: tauri::AppHandle, lang: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|erro| erro.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|erro| erro.to_string())?;
+    let json = serde_json::json!({ "lang": lang });
+    std::fs::write(
+        dir.join("language.json"),
+        serde_json::to_string_pretty(&json).map_err(|erro| erro.to_string())?,
+    )
+    .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
 fn news_fetch(url: String) -> Result<String, String> {
     c2_core::news::fetch(&url).map_err(|erro| erro.to_string())
 }
@@ -978,6 +1002,8 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            language_load,
+            language_save,
             news_fetch,
             news_url,
             news_state_load,

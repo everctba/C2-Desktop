@@ -5,6 +5,8 @@ import { Card, cardBody } from "../ui/Card";
 import { dialogField, openDialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
+import { flagBR, flagUS } from "../ui/Flags";
+import { idiomaAtual, setLang, t } from "../i18n";
 import { Select } from "../ui/Select";
 import { Toggle } from "../ui/Toggle";
 import type { View } from "./view";
@@ -116,20 +118,21 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   header.className = styles.header;
   const title = document.createElement("h1");
   title.className = "pageTitle";
-  title.textContent = "Configurações";
+  title.textContent = t("Configurações");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent =
-    "Grava direto em .c2/config.json. Mudanças de contexto/camadas valem no próximo carregamento do modelo.";
+  hint.textContent = t(
+    "Grava direto em .c2/config.json. Mudanças de contexto/camadas valem no próximo carregamento do modelo.",
+  );
   header.append(title, hint);
   page.appendChild(header);
 
   if (!ctx.root) {
     const vazio = document.createElement("div");
     vazio.className = "empty";
-    vazio.textContent = "abra um projeto para configurar o workspace";
+    vazio.textContent = t("abra um projeto para configurar o workspace");
     vazio.appendChild(
-      Button({ label: "Abrir projeto", variant: "primary", onClick: ctx.onPickProject }),
+      Button({ label: t("Abrir projeto"), variant: "primary", onClick: ctx.onPickProject }),
     );
     page.appendChild(vazio);
     return { element: page };
@@ -157,7 +160,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     iniciais.set(spec.key, inicial);
 
     if (spec.kind === "toggle") {
-      const toggle = Toggle({ label: spec.label, checked: inicial === "true" });
+      const toggle = Toggle({ label: t(spec.label), checked: inicial === "true" });
       controles.set(spec.key, {
         kind: spec.kind,
         get: () => (toggle.control.getAttribute("aria-checked") === "true" ? "true" : "false"),
@@ -168,7 +171,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
 
     if (spec.kind === "select") {
       const select = Select({
-        label: spec.label,
+        label: t(spec.label),
         value: inicial,
         options: spec.options ?? [],
       });
@@ -178,12 +181,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     }
 
     const input = Input({
-      label: spec.label,
+      label: t(spec.label),
       value: inicial,
       size: "sm",
       mono: spec.kind !== "text",
       readOnly: spec.readOnly,
-      hint: spec.hint,
+      hint: spec.hint ? t(spec.hint) : undefined,
     });
     controles.set(spec.key, { kind: spec.kind, get: () => input.input.value });
     container.appendChild(input.root);
@@ -193,7 +196,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       linha.className = styles.actions;
       linha.appendChild(
         Button({
-          label: "Selecionar .gguf…",
+          label: t("Selecionar .gguf…"),
           size: "xs",
           variant: "secondary",
           onClick: async () => {
@@ -203,12 +206,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
               await api.modelInspect(escolhido);
               await api.modelSet(ctx.root, escolhido);
               input.input.value = escolhido;
-              status.textContent = "modelo atualizado";
+              status.textContent = t("modelo atualizado");
             } catch (error) {
               await openDialog({
-                title: "Modelo inválido",
+                title: t("Modelo inválido"),
                 body: dialogField("Erro", String(error), true),
-                confirmLabel: "Entendi",
+                confirmLabel: t("Entendi"),
                 cancelLabel: "",
               });
             }
@@ -220,7 +223,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   };
 
   const montarCard = (titulo: string, accent: number, fields: FieldSpec[]) => {
-    const card = Card({ title: titulo, accent });
+    const card = Card({ title: t(titulo), accent });
     const body = cardBody(card);
     const grid = document.createElement("div");
     grid.style.display = "grid";
@@ -232,18 +235,64 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     return card;
   };
 
+  // ---- Idioma da interface (PT-BR x EN) ----
+  const idiomaCard = Card({ title: t("Idioma"), accent: 2 });
+  const idiomaBody = cardBody(idiomaCard);
+  const explicaIdioma = document.createElement("p");
+  explicaIdioma.className = "pageHint";
+  explicaIdioma.style.maxWidth = "none";
+  explicaIdioma.textContent = t(
+    "Escolha o idioma da interface. A CLI e as ferramentas MCP continuam em inglês.",
+  );
+  idiomaBody.appendChild(explicaIdioma);
+
+  const gradeIdioma = document.createElement("div");
+  gradeIdioma.style.display = "flex";
+  gradeIdioma.style.gap = "var(--space-s)";
+  gradeIdioma.style.marginTop = "var(--space-m)";
+
+  const opcaoIdioma = (lang: "en" | "pt-BR", rotulo: string, bandeira: string) => {
+    const ativo = idiomaAtual() === lang;
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.style.cssText =
+      "display: flex; align-items: center; gap: var(--space-s); padding: var(--space-s) var(--space-m); " +
+      "border-radius: var(--radius); cursor: pointer; background: var(--bg-surface); " +
+      `border: 1px solid ${ativo ? "var(--accent-1)" : "var(--border-muted)"}; color: var(--text);`;
+    botao.innerHTML = bandeira;
+    const textoBotao = document.createElement("span");
+    textoBotao.textContent = rotulo;
+    botao.appendChild(textoBotao);
+    if (ativo) botao.appendChild(Pill(t("ativo"), "success", "xs"));
+    botao.addEventListener("click", () => {
+      if (ativo) return;
+      setLang(lang);
+      status.textContent = t("idioma atualizado");
+      ctx.onSaved();
+    });
+    return botao;
+  };
+
+  gradeIdioma.append(
+    opcaoIdioma("en", "English", flagUS(22)),
+    opcaoIdioma("pt-BR", "Português (Brasil)", flagBR(22)),
+  );
+  idiomaBody.appendChild(gradeIdioma);
+  page.appendChild(idiomaCard);
+
   // ---- Modo de uso (IA local x API Key) + simples/avancado ----
   const avancado = localStorage.getItem("c2.config.avancado") === "1";
   const provedorAtual = String(lerConfig(config, "model.provider") ?? "local");
 
-  const modoCard = Card({ title: "Modo de uso", accent: 1 });
+  const modoCard = Card({ title: t("Modo de uso"), accent: 1 });
   const modoBody = cardBody(modoCard);
   const explicaModo = document.createElement("p");
   explicaModo.className = "pageHint";
   explicaModo.style.maxWidth = "none";
-  explicaModo.textContent =
+  explicaModo.textContent = t(
     "Escolha onde a IA roda. O restante da tela se adapta ao modo; " +
-    "o que não se aplica fica oculto (abra 'avançado' para ver tudo).";
+      "o que não se aplica fica oculto (abra 'avançado' para ver tudo).",
+  );
   modoBody.appendChild(explicaModo);
 
   const gradeModo = document.createElement("div");
@@ -265,15 +314,15 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       "border-radius: var(--radius); cursor: pointer; background: var(--bg-surface); " +
       `border: 1px solid ${ativo ? "var(--accent-1)" : "var(--border-muted)"};`;
     const tituloEl = document.createElement("strong");
-    tituloEl.textContent = titulo;
+    tituloEl.textContent = t(titulo);
     tituloEl.style.color = "var(--text-bright)";
     const descEl = document.createElement("span");
-    descEl.textContent = descricao;
+    descEl.textContent = t(descricao);
     descEl.style.fontSize = "var(--text-s)";
     descEl.style.color = "var(--text-muted)";
     descEl.style.lineHeight = "1.4";
     box.append(tituloEl, descEl);
-    box.appendChild(Pill(ativo ? "ativo" : "escolher", ativo ? "success" : "neutral", "xs"));
+    box.appendChild(Pill(t(ativo ? "ativo" : "escolher"), ativo ? "success" : "neutral", "xs"));
     box.addEventListener("click", async () => {
       if (ativo) return;
       try {
@@ -307,7 +356,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   linhaAvancado.style.marginTop = "var(--space-m)";
   linhaAvancado.appendChild(
     Toggle({
-      label: "avançado",
+      label: t("avançado"),
       checked: avancado,
       onChange: (marcado: boolean) => {
         localStorage.setItem("c2.config.avancado", marcado ? "1" : "0");
@@ -340,18 +389,19 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     "LM Studio (local)": { base: "http://127.0.0.1:1234/v1", modelo: "local-model", precoIn: 0, precoOut: 0 },
   };
 
-  const provedorCard = Card({ title: "Provedor de IA", accent: 3 });
+  const provedorCard = Card({ title: t("Provedor de IA"), accent: 3 });
   const provedorBody = cardBody(provedorCard);
 
   const avisoProvedor = document.createElement("p");
   avisoProvedor.className = "pageHint";
   avisoProvedor.style.maxWidth = "none";
-  avisoProvedor.textContent =
+  avisoProvedor.textContent = t(
     "Local é o padrão: o modelo roda na sua máquina e nada sai dela. " +
-    "Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor " +
-    "configurado e os tokens são cobrados na sua conta — só ative se for aceitável. " +
-    "No modo API/BYO, os indicadores locais (runtime, VRAM, .gguf) não se aplicam: " +
-    "quem gerencia o servidor é o provedor ou software externo.";
+      "Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor " +
+      "configurado e os tokens são cobrados na sua conta — só ative se for aceitável. " +
+      "No modo API/BYO, os indicadores locais (runtime, VRAM, .gguf) não se aplicam: " +
+      "quem gerencia o servidor é o provedor ou software externo.",
+  );
   provedorBody.appendChild(avisoProvedor);
 
   const gradeProvedor = document.createElement("div");
@@ -361,7 +411,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   gradeProvedor.style.marginTop = "var(--space-m)";
 
   const seletorProvedor = Select({
-    label: "provedor",
+    label: t("provedor"),
     value: String(lerConfig(config, "model.provider") ?? "local"),
     options: ["local", "openai_compat"],
   });
@@ -369,50 +419,50 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   gradeProvedor.appendChild(seletorProvedor.root);
 
   const preset = Select({
-    label: "preset",
+    label: t("preset"),
     value: "personalizado",
     options: ["personalizado", ...Object.keys(PROVEDORES)],
   });
   gradeProvedor.appendChild(preset.root);
 
   const campoBase = Input({
-    label: "base URL (nuvem)",
+    label: t("base URL (nuvem)"),
     value: String(lerConfig(config, "model.base_url") ?? ""),
     mono: true,
-    hint: "ex.: https://api.openai.com/v1",
+    hint: t("ex.: https://api.openai.com/v1"),
   });
   controles.set("model.base_url", { kind: "text", get: () => campoBase.input.value });
   gradeProvedor.appendChild(campoBase.root);
 
   const campoModelo = Input({
-    label: "modelo",
+    label: t("modelo"),
     value: String(lerConfig(config, "model.name") ?? ""),
     mono: true,
-    hint: "nome enviado no campo model",
+    hint: t("nome enviado no campo model"),
   });
   controles.set("model.name", { kind: "text", get: () => campoModelo.input.value });
   gradeProvedor.appendChild(campoModelo.root);
 
   const campoPrecoIn = Input({
-    label: "preço entrada / 1M tokens",
+    label: t("preço entrada / 1M tokens"),
     value: String(lerConfig(config, "model.cost_input_per_mtok") ?? 0),
-    hint: "modo nuvem; 0 = não calcular",
+    hint: t("modo nuvem; 0 = não calcular"),
   });
   controles.set("model.cost_input_per_mtok", { kind: "text", get: () => campoPrecoIn.input.value });
   gradeProvedor.appendChild(campoPrecoIn.root);
 
   const campoPrecoOut = Input({
-    label: "preço saída / 1M tokens",
+    label: t("preço saída / 1M tokens"),
     value: String(lerConfig(config, "model.cost_output_per_mtok") ?? 0),
-    hint: "modo nuvem; 0 = não calcular",
+    hint: t("modo nuvem; 0 = não calcular"),
   });
   controles.set("model.cost_output_per_mtok", { kind: "text", get: () => campoPrecoOut.input.value });
   gradeProvedor.appendChild(campoPrecoOut.root);
 
   const campoCap = Input({
-    label: "teto por execução (US$)",
+    label: t("teto por execução (US$)"),
     value: String(lerConfig(config, "model.max_cost_usd_per_run") ?? 0),
-    hint: "0 = sem teto; interrompe o ciclo ao atingir",
+    hint: t("0 = sem teto; interrompe o ciclo ao atingir"),
   });
   controles.set("model.max_cost_usd_per_run", { kind: "text", get: () => campoCap.input.value });
   gradeProvedor.appendChild(campoCap.root);
@@ -435,10 +485,10 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   linha.style.marginTop = "var(--space-m)";
 
   const campoChave = Input({
-    label: "API key (cofre do sistema)",
-    placeholder: "cole a chave do provedor",
+    label: t("API key (cofre do sistema)"),
+    placeholder: t("cole a chave do provedor"),
     mono: true,
-    hint: "nunca é gravada no .c2/config.json",
+    hint: t("nunca é gravada no .c2/config.json"),
   });
   campoChave.input.type = "password";
   provedorBody.appendChild(campoChave.root);
@@ -453,14 +503,14 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
 
   linha.appendChild(
     Button({
-      label: "Salvar chave",
+      label: t("Salvar chave"),
       size: "xs",
       variant: "secondary",
       onClick: async () => {
         try {
           await api.apiKeySet(campoChave.input.value);
           campoChave.input.value = "";
-          status.textContent = "API key salva no cofre do sistema";
+          status.textContent = t("API key salva no cofre do sistema");
         } catch (erro) {
           status.textContent = `nao foi possivel salvar a chave: ${erro}`;
         }
@@ -469,7 +519,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   );
   linha.appendChild(
     Button({
-      label: "Esquecer chave",
+      label: t("Esquecer chave"),
       size: "xs",
       variant: "ghost",
       onClick: async () => {
@@ -481,11 +531,11 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   );
   linha.appendChild(
     Button({
-      label: "Testar conexão",
+      label: t("Testar conexão"),
       size: "xs",
       variant: "primary",
       onClick: async () => {
-        status.textContent = "testando provedor…";
+        status.textContent = t("testando provedor…");
         const resultado = await api.providerTest(ctx.root);
         status.textContent = resultado.ok
           ? `provedor ok (${resultado.provider} · ${resultado.model}) em ${resultado.latency_ms} ms`
@@ -502,20 +552,21 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   const promptInicial = String(lerConfig(config, "index.prompt") ?? "");
   iniciais.set("index.prompt", promptInicial);
 
-  const promptCard = Card({ title: "Prompt de indexação", accent: 6 });
+  const promptCard = Card({ title: t("Prompt de indexação"), accent: 6 });
   const promptBody = cardBody(promptCard);
 
   const fluxo = document.createElement("p");
   fluxo.className = styles.promptFluxo;
-  fluxo.textContent = "prompt = instruções + conteúdo do arquivo 1 → resposta";
+  fluxo.textContent = t("prompt = instruções + conteúdo do arquivo 1 → resposta");
   promptBody.appendChild(fluxo);
 
   const explicacao = document.createElement("p");
   explicacao.className = "pageHint";
   explicacao.style.maxWidth = "none";
-  explicacao.textContent =
+  explicacao.textContent = t(
     "Estas instruções são enviadas ao modelo junto com o conteúdo de cada arquivo. " +
-    "A linha que trata o arquivo como DADO (e não instrução) é fixa e não pode ser removida.";
+      "A linha que trata o arquivo como DADO (e não instrução) é fixa e não pode ser removida.",
+  );
   promptBody.appendChild(explicacao);
 
   const area = document.createElement("textarea");
@@ -536,12 +587,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   if (padrao) {
     promptAcoes.appendChild(
       Button({
-        label: "Restaurar padrão",
+        label: t("Restaurar padrão"),
         size: "xs",
         variant: "secondary",
         onClick: () => {
           area.value = padrao;
-          status.textContent = "prompt restaurado (salve para aplicar)";
+          status.textContent = t("prompt restaurado (salve para aplicar)");
         },
       }),
     );
@@ -552,7 +603,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   page.appendChild(promptCard);
 
   // ---- Modelo local no modo simples (o card Runtime completo fica em avançado) ----
-  const modeloSimples = Card({ title: "Modelo local", accent: 4 });
+  const modeloSimples = Card({ title: t("Modelo local"), accent: 4 });
   const modeloSimplesBody = cardBody(modeloSimples);
   const modeloNome = document.createElement("div");
   modeloNome.className = styles.fieldValue;
@@ -562,7 +613,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   modeloCaminho.className = styles.field;
   const modeloCaminhoLabel = document.createElement("span");
   modeloCaminhoLabel.className = styles.fieldLabel;
-  modeloCaminhoLabel.textContent = "GGUF";
+  modeloCaminhoLabel.textContent = t("GGUF");
   const modeloCaminhoValor = document.createElement("span");
   modeloCaminhoValor.className = styles.mono;
   const caminhoInicial = String(lerConfig(config, "model.path") ?? "");
@@ -574,7 +625,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   modeloAcoes.className = styles.actions;
   modeloAcoes.appendChild(
     Button({
-      label: "Selecionar .gguf…",
+      label: t("Selecionar .gguf…"),
       iconName: "projects",
       size: "sm",
       variant: "secondary",
@@ -583,13 +634,13 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
         if (!escolhido) return;
         try {
           await api.modelSet(ctx.root, escolhido);
-          status.textContent = "modelo atualizado";
+          status.textContent = t("modelo atualizado");
           ctx.onSaved();
         } catch (erro) {
           await openDialog({
-            title: "Modelo inválido",
+            title: t("Modelo inválido"),
             body: dialogField("Erro", String(erro), true),
-            confirmLabel: "Entendi",
+            confirmLabel: t("Entendi"),
             cancelLabel: "",
           });
         }
@@ -599,9 +650,10 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   const dicaModelo = document.createElement("p");
   dicaModelo.className = "pageHint";
   dicaModelo.style.maxWidth = "none";
-  dicaModelo.textContent =
+  dicaModelo.textContent = t(
     "O modelo é uma preferência do app: escolha uma vez e ele vale para todos os projetos " +
-    "(novos projetos herdam este caminho).";
+      "(novos projetos herdam este caminho).",
+  );
   modeloSimplesBody.appendChild(dicaModelo);
   modeloSimplesBody.appendChild(modeloAcoes);
   page.appendChild(modeloSimples);
@@ -630,12 +682,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   const rodape = document.createElement("div");
   rodape.className = styles.actions;
   const salvar = Button({
-    label: "Salvar alterações",
+    label: t("Salvar alterações"),
     variant: "primary",
     iconName: "settings",
     onClick: async () => {
       salvar.disabled = true;
-      salvar.textContent = "Salvando…";
+      salvar.textContent = t("Salvando…");
       const erros: string[] = [];
       let alterados = 0;
 
@@ -660,7 +712,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       }
 
       salvar.disabled = false;
-      salvar.textContent = "Salvar alterações";
+      salvar.textContent = t("Salvar alterações");
 
       if (erros.length > 0) {
         status.textContent = "";
@@ -669,7 +721,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
         return;
       }
       if (alterados === 0) {
-        status.textContent = "nada para salvar";
+        status.textContent = t("nada para salvar");
         return;
       }
       status.style.color = "var(--success)";
@@ -680,17 +732,17 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   rodape.append(
     salvar,
     Button({
-      label: "Recarregar",
+      label: t("Recarregar"),
       variant: "ghost",
       onClick: ctx.onSaved,
     }),
     status,
     Pill(
       ctx.status?.model.provider === "openai_compat"
-        ? "runtime externo"
+        ? t("runtime externo")
         : ctx.status?.runtime.healthy
-          ? "runtime no ar"
-          : "runtime parado",
+          ? t("runtime no ar")
+          : t("runtime parado"),
       ctx.status?.runtime.healthy && ctx.status?.model.provider !== "openai_compat"
         ? "success"
         : "neutral",

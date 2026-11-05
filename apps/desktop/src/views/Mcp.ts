@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { t } from "../i18n";
 import type { McpStatus } from "../types";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
@@ -22,7 +23,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
   header.className = styles.header;
   const title = document.createElement("h1");
   title.className = "pageTitle";
-  title.textContent = "MCP";
+  title.textContent = t("MCP");
   const hint = document.createElement("p");
   hint.className = "pageHint";
   hint.textContent =
@@ -32,10 +33,10 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
 
   const estado = document.createElement("div");
   estado.className = styles.actions;
-  const pilha = Pill("testando…", "neutral");
+  const pilha = Pill(t("testando…"), "neutral");
   estado.appendChild(pilha);
   const botao = Button({
-    label: "Testar conexão",
+    label: t("Testar conexão"),
     iconName: "refresh",
     size: "sm",
     variant: "secondary",
@@ -43,15 +44,15 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
   estado.appendChild(botao);
   page.appendChild(estado);
 
-  const servidorCard = Card({ title: "Servidor", accent: 4 });
+  const servidorCard = Card({ title: t("Servidor"), accent: 4 });
   const servidorCorpo = cardBody(servidorCard);
   page.appendChild(servidorCard);
 
-  const ferramentasCard = Card({ title: "Ferramentas expostas", accent: 2 });
+  const ferramentasCard = Card({ title: t("Ferramentas expostas"), accent: 2 });
   const ferramentasCorpo = cardBody(ferramentasCard);
   page.appendChild(ferramentasCard);
 
-  const conectarCard = Card({ title: "Conectar um agente", accent: 6 });
+  const conectarCard = Card({ title: t("Conectar um agente"), accent: 6 });
   const conectarCorpo = cardBody(conectarCard);
   page.appendChild(conectarCard);
 
@@ -89,7 +90,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
     if (status.tools.length === 0) {
       const vazio = document.createElement("div");
       vazio.className = "empty";
-      vazio.textContent = "nenhuma ferramenta retornada pelo servidor";
+      vazio.textContent = t("nenhuma ferramenta retornada pelo servidor");
       ferramentasCorpo.appendChild(vazio);
     }
     for (const ferramenta of status.tools) {
@@ -123,9 +124,9 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
     topo.className = styles.configTopo;
     const rotulo = document.createElement("span");
     rotulo.className = styles.configLabel;
-    rotulo.textContent = "configuração do cliente MCP";
+    rotulo.textContent = t("configuração do cliente MCP");
     const copiar = Button({
-      label: "Copiar MCP",
+      label: t("Copiar MCP"),
       iconName: "copy",
       size: "sm",
       variant: "secondary",
@@ -144,10 +145,10 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
         }
         const rotuloBotao = copiar.lastElementChild as HTMLElement | null;
         copiar.title = "Copiado!";
-        if (rotuloBotao) rotuloBotao.textContent = "Copiado";
+        if (rotuloBotao) rotuloBotao.textContent = t("Copiado");
         setTimeout(() => {
           copiar.title = "Copiar configuração MCP";
-          if (rotuloBotao) rotuloBotao.textContent = "Copiar MCP";
+          if (rotuloBotao) rotuloBotao.textContent = t("Copiar MCP");
         }, 1600);
       },
     });
@@ -173,7 +174,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
   };
 
   const testar = async () => {
-    pilha.replaceWith(Pill("testando…", "neutral"));
+    pilha.replaceWith(Pill(t("testando…"), "neutral"));
     try {
       const status = await api.mcpSmoke(ctx.root);
       desenhar(status);

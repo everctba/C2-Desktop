@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { t } from "../i18n";
 import type { Hit, MetaFile, RelatedResult } from "../types";
 import { Button } from "../ui/Button";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
@@ -29,7 +30,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
   header.className = styles.header;
   const title = document.createElement("h1");
   title.className = "pageTitle";
-  title.textContent = "Busca";
+  title.textContent = t("Busca");
   const hint = document.createElement("p");
   hint.className = "pageHint";
   hint.textContent =
@@ -48,7 +49,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     summary.textContent = "";
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "digite pelo menos 2 caracteres — exemplos:";
+    empty.textContent = t("digite pelo menos 2 caracteres — exemplos:");
     const exemplos = document.createElement("div");
     exemplos.className = styles.actions;
     exemplos.style.justifyContent = "center";
@@ -79,7 +80,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
 
     const inicio = performance.now();
     results.innerHTML = "";
-    summary.textContent = "buscando...";
+    summary.textContent = t("buscando");
     try {
       const hits = await api.grep(ctx.root, termo, 10);
       const ms = Math.round(performance.now() - inicio);
@@ -111,7 +112,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
   /* busca enquanto digita */
   let debounce: number | undefined;
   const field = Input({
-    placeholder: "onde o sistema valida permissão de usuário",
+    placeholder: t("onde o sistema valida permissão de usuário"),
     size: "md",
     onInput: (value) => {
       window.clearTimeout(debounce);
@@ -128,13 +129,13 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
   actions.className = styles.actions;
   actions.append(
     Button({
-      label: "Buscar",
+      label: t("Buscar"),
       iconName: "search",
       variant: "primary",
       onClick: () => void run(field.input.value),
     }),
     Button({
-      label: "Limpar",
+      label: t("Limpar"),
       variant: "ghost",
       onClick: () => {
         field.input.value = "";
@@ -268,7 +269,7 @@ function resultRow(
 
   const btnRelacionados = document.createElement("button");
   btnRelacionados.type = "button";
-  btnRelacionados.textContent = "ver relacionados";
+  btnRelacionados.textContent = t("ver relacionados");
   btnRelacionados.style.cssText =
     "height:22px;padding:0 var(--space-xs);border:0;border-radius:var(--input-radius);" +
     "background:var(--overlay-10);color:var(--text-muted);font-size:var(--text-2xs);" +
@@ -277,7 +278,7 @@ function resultRow(
     evento.stopPropagation();
     if (relacionados.childElementCount > 0) {
       relacionados.replaceChildren();
-      btnRelacionados.textContent = "ver relacionados";
+      btnRelacionados.textContent = t("ver relacionados");
       return;
     }
     try {
@@ -299,7 +300,7 @@ function resultRow(
       texto.textContent = partes.join(" · ");
       caixa.appendChild(texto);
       relacionados.appendChild(caixa);
-      btnRelacionados.textContent = "ocultar relacionados";
+      btnRelacionados.textContent = t("ocultar relacionados");
     } catch (erro) {
       relacionados.replaceChildren();
       const falha = document.createElement("span");
@@ -344,7 +345,7 @@ async function abrirMetadado(root: string, file: string): Promise<void> {
     const notas = meta.agent_notes ?? [];
     if (notas.length > 0) {
       const tituloNotas = document.createElement("strong");
-      tituloNotas.textContent = "Anotações de agentes (hipóteses)";
+      tituloNotas.textContent = t("Anotações de agentes (hipóteses)");
       tituloNotas.style.marginTop = "var(--space-s)";
       container.appendChild(tituloNotas);
       for (const nota of notas) {
@@ -371,9 +372,9 @@ async function abrirMetadado(root: string, file: string): Promise<void> {
   }
 
   await openDialog({
-    title: "Metadado",
+    title: t("Metadado"),
     body: container,
-    confirmLabel: "Fechar",
+    confirmLabel: t("Fechar"),
     cancelLabel: "",
   });
 }

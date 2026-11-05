@@ -1,4 +1,5 @@
 import { Button } from "./Button";
+import { t } from "../i18n";
 import { Pill } from "./Pill";
 import styles from "./Toolbar.module.css";
 
@@ -35,7 +36,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
   bar.appendChild(project);
 
   bar.appendChild(
-    Pill(props.running ? "engine rodando" : "engine parado", props.running ? "success" : "neutral", "xs"),
+    Pill(t(props.running ? "engine rodando" : "engine parado"), props.running ? "success" : "neutral", "xs"),
   );
 
   const spacer = document.createElement("div");
@@ -44,7 +45,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
 
   bar.appendChild(
     Button({
-      label: props.running ? "Parar" : "Iniciar",
+      label: t(props.running ? "Parar" : "Iniciar"),
       iconName: props.running ? "stop" : "play",
       variant: props.running ? "secondary" : "primary",
       busy: props.busy,
@@ -55,7 +56,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
 
   bar.appendChild(
     Button({
-      label: "Reindexar",
+      label: t("Reindexar"),
       iconName: "refresh",
       variant: "ghost",
       disabled: !props.projectPath || props.busy,
@@ -65,7 +66,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
 
   bar.appendChild(
     Button({
-      label: "Abrir projeto",
+      label: t("Abrir projeto"),
       variant: "ghost",
       iconName: "projects",
       onClick: props.onPickProject,

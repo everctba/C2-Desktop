@@ -1,4 +1,5 @@
 import { api, hasTauri, openExternal } from "../api";
+import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { Card, cardBody, cardFooter } from "../ui/Card";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
@@ -41,11 +42,12 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   header.className = styles.header;
   const title = document.createElement("h1");
   title.className = "pageTitle";
-  title.textContent = "Projetos";
+  title.textContent = t("Projetos");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent =
-    "Abra a pasta de um projeto para o C2 indexar: o índice fica em .c2/ e os metadados ao lado de cada arquivo.";
+  hint.textContent = t(
+    "Abra a pasta de um projeto para o C2 indexar: o índice fica em .c2/ e os metadados ao lado de cada arquivo.",
+  );
   // uma linha só: sem limite de 70ch neste hint
   hint.style.maxWidth = "none";
   header.append(title, hint);
@@ -57,8 +59,8 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
     const text = document.createElement("p");
     text.className = "pageHint";
     text.textContent = ctx.root
-      ? "Projeto ainda não inicializado. Clique em Inicializar para criar .c2/config.json."
-      : "Nenhum projeto aberto.";
+      ? t("Projeto ainda não inicializado. Clique em Inicializar para criar .c2/config.json.")
+      : t("Nenhum projeto aberto.");
     empty.appendChild(text);
 
     if (ctx.error) {
@@ -72,7 +74,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
     actions.className = styles.actions;
     actions.appendChild(
       Button({
-        label: "Abrir projeto",
+        label: t("Abrir projeto"),
         iconName: "projects",
         variant: "primary",
         onClick: ctx.onPickProject,
@@ -81,7 +83,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
     if (ctx.root) {
       actions.appendChild(
         Button({
-          label: "Inicializar",
+          label: t("Inicializar"),
           variant: "secondary",
           onClick: async () => {
             try {
@@ -104,7 +106,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   grid.className = styles.grid;
 
   grid.appendChild(
-    projectCard("Projeto", status.root, [
+    projectCard(t("Projeto"), status.root, [
       ["Arquivos descobertos", String(status.files)],
       ["Metadados", String(status.metadata)],
       ["Sensíveis pulados", String(status.skipped.sensitive)],
@@ -116,9 +118,9 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   if (status.model.provider === "openai_compat") {
     grid.appendChild(
       projectCard("Runtime", "gerenciado externamente", [
-        ["Servidor", "provedor / LM Studio / Ollama / vLLM"],
-        ["Endpoint", status.model.base_url ?? "nao configurado"],
-        ["Runtime local do C2", "nao se aplica neste modo"],
+        [t("Servidor"), t("provedor / LM Studio / Ollama / vLLM")],
+        [t("Endpoint"), status.model.base_url ?? t("nao configurado")],
+        [t("Runtime local do C2"), t("nao se aplica neste modo")],
       ]),
     );
   } else {
@@ -132,7 +134,7 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   }
 
   grid.appendChild(
-    projectCard("Segurança", `política ${status.index.secret_policy}`, [
+    projectCard(t("Segurança"), `${t("política")} ${status.index.secret_policy}`, [
       ["Máx. por arquivo", `${Math.round(status.index.max_file_bytes / 1024)} KiB`],
       ["Extensões", String(status.index.extensions)],
       ["Teto por ciclo", `${Math.round(status.index.max_total_bytes_per_run / 1024 / 1024)} MiB`],
@@ -164,14 +166,14 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
 
   actions.appendChild(
     Button({
-      label: "Trocar projeto",
+      label: t("Trocar projeto"),
       iconName: "projects",
       onClick: ctx.onPickProject,
     }),
   );
   actions.appendChild(
     Button({
-      label: "Primeiros passos",
+      label: t("Primeiros passos"),
       variant: "ghost",
       onClick: ctx.onOnboarding,
     }),
@@ -185,8 +187,9 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   if (!hasTauri) {
     const note = document.createElement("p");
     note.className = "pageHint";
-    note.textContent =
-      "Modo preview no navegador: dados falsos. Rode `pnpm tauri dev` para usar o Core real.";
+    note.textContent = t(
+      "Modo preview no navegador: dados falsos. Rode `pnpm tauri dev` para usar o Core real.",
+    );
     page.appendChild(note);
   }
 
@@ -194,13 +197,13 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
 }
 
 function projectCard(title: string, headline: string, fields: Array<[string, string]>): HTMLElement {
-  const card = Card({ title, accent: 3 });
+  const card = Card({ title: t(title), accent: 3 });
   const body = cardBody(card);
 
   const value = document.createElement("div");
   value.className = styles.fieldValue;
-  value.textContent = headline;
-  value.title = headline;
+  value.textContent = t(headline);
+  value.title = t(headline);
   body.appendChild(value);
 
   for (const [label, fieldValue] of fields) {
@@ -208,10 +211,10 @@ function projectCard(title: string, headline: string, fields: Array<[string, str
     field.className = styles.field;
     const fieldLabel = document.createElement("span");
     fieldLabel.className = styles.fieldLabel;
-    fieldLabel.textContent = label;
+    fieldLabel.textContent = t(label);
     const text = document.createElement("span");
     text.className = styles.fieldValue;
-    text.textContent = fieldValue;
+    text.textContent = t(fieldValue);
     text.title = fieldValue;
     field.append(fieldLabel, text);
     body.appendChild(field);
@@ -224,7 +227,7 @@ function projectCard(title: string, headline: string, fields: Array<[string, str
 
 /** No modo nuvem/BYO o card mostra o provedor, nao GGUF/VRAM. */
 function modelCardExterno(ctx: ProjectsContext, status: StatusReport): HTMLElement {
-  const card = Card({ title: "Provedor", accent: 4 });
+  const card = Card({ title: t("Provedor"), accent: 4 });
   const body = cardBody(card);
 
   const nome = document.createElement("div");
@@ -254,21 +257,21 @@ function modelCardExterno(ctx: ProjectsContext, status: StatusReport): HTMLEleme
   footer.appendChild(Pill("nuvem", "neutral", "xs"));
   footer.appendChild(
     Button({
-      label: "Testar conexão",
+      label: t("Testar conexão"),
       size: "xs",
       variant: "secondary",
       onClick: async () => {
         const resultado = await api.providerTest(ctx.root);
         await openDialog({
-          title: "Teste do provedor",
+          title: t("Teste do provedor"),
           body: dialogField(
-            resultado.ok ? "conexão ok" : "falhou",
+            resultado.ok ? t("conexão ok") : t("falhou"),
             resultado.ok
               ? `${resultado.provider} · ${resultado.model} em ${resultado.latency_ms} ms`
               : (resultado.error ?? "erro desconhecido"),
             true,
           ),
-          confirmLabel: "Fechar",
+          confirmLabel: t("Fechar"),
           cancelLabel: "",
         });
       },
@@ -282,7 +285,7 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
   if (status.model.provider === "openai_compat") {
     return modelCardExterno(ctx, status);
   }
-  const card = Card({ title: "Modelo", accent: 4 });
+  const card = Card({ title: t("Modelo local"), accent: 4 });
   const body = cardBody(card);
 
   const name = document.createElement("div");
@@ -299,7 +302,7 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
   cfg.className = styles.field;
   const cfgLabel = document.createElement("span");
   cfgLabel.className = styles.fieldLabel;
-  cfgLabel.textContent = "GGUF";
+  cfgLabel.textContent = t("GGUF");
   const cfgPath = document.createElement("span");
   cfgPath.className = styles.mono;
   cfgPath.textContent = status.model.path ?? "não configurado";
@@ -311,7 +314,7 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
   endpoint.className = styles.field;
   const endpointLabel = document.createElement("span");
   endpointLabel.className = styles.fieldLabel;
-  endpointLabel.textContent = "Endpoint";
+  endpointLabel.textContent = t("Endpoint");
   const endpointValue = document.createElement("span");
   endpointValue.className = styles.fieldValue;
   endpointValue.textContent = `${status.model.host}:${status.model.port}`;
@@ -324,14 +327,14 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
   );
   footer.appendChild(
     Button({
-      label: "Selecionar .gguf…",
+      label: t("Selecionar .gguf…"),
       iconName: "projects",
       size: "sm",
       onClick: () => void pickModelFlow(ctx),
     }),
   );
   const raciocinio = Toggle({
-    label: "raciocínio",
+    label: t("raciocínio"),
     checked: !status.model.disable_thinking,
     tone: "brand",
     onChange: async (ligado) => {
@@ -340,9 +343,9 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
         ctx.onChanged();
       } catch (erro) {
         await openDialog({
-          title: "Não foi possível alterar o raciocínio",
+          title: t("Não foi possível alterar o raciocínio"),
           body: dialogField("Erro", String(erro), true),
-          confirmLabel: "Entendi",
+          confirmLabel: t("Entendi"),
           cancelLabel: "",
         });
       }
@@ -369,18 +372,18 @@ async function pickModelFlow(ctx: ProjectsContext): Promise<void> {
     inspection = await api.modelInspect(path);
   } catch (error) {
     await openDialog({
-      title: "Modelo inválido",
+      title: t("Modelo inválido"),
       body: dialogField("Erro", String(error), true),
-      confirmLabel: "Entendi",
+      confirmLabel: t("Entendi"),
       cancelLabel: "",
     });
     return;
   }
 
   const confirm = await openDialog({
-    title: "Usar este modelo?",
+    title: t("Usar este modelo?"),
     body: inspectionBody(inspection),
-    confirmLabel: "Usar modelo",
+    confirmLabel: t("Usar modelo"),
   });
   if (!confirm) return;
 
@@ -389,9 +392,9 @@ async function pickModelFlow(ctx: ProjectsContext): Promise<void> {
     ctx.onChanged();
   } catch (error) {
     await openDialog({
-      title: "Falha ao salvar",
+      title: t("Falha ao salvar"),
       body: dialogField("Erro", String(error), true),
-      confirmLabel: "Entendi",
+      confirmLabel: t("Entendi"),
       cancelLabel: "",
     });
   }
@@ -429,10 +432,10 @@ function inspectionBody(inspection: ModelInspection): HTMLElement {
   }
 
   const fits: Record<string, { label: string; tone: "success" | "warning" | "danger" | "neutral" }> = {
-    fits: { label: "cabe na VRAM", tone: "success" },
-    tight: { label: "no limite da VRAM", tone: "warning" },
-    too_big: { label: "não cabe na VRAM livre", tone: "danger" },
-    unknown: { label: "sem GPU detectada", tone: "neutral" },
+    fits: { label: t("cabe na VRAM"), tone: "success" },
+    tight: { label: t("no limite da VRAM"), tone: "warning" },
+    too_big: { label: t("não cabe na VRAM livre"), tone: "danger" },
+    unknown: { label: t("sem GPU detectada"), tone: "neutral" },
   };
   const verdict = fits[inspection.fit] ?? fits.unknown;
   pills.appendChild(Pill(verdict.label, verdict.tone, "xs"));
@@ -486,7 +489,7 @@ function modelInstructionsBody(): HTMLElement {
   recomendado.className = styles.field;
   const label = document.createElement("span");
   label.className = styles.fieldLabel;
-  label.textContent = "recomendado · gemma 4 E2B";
+  label.textContent = t("recomendado · gemma 4 E2B");
   const valor = document.createElement("span");
   valor.className = styles.mono;
   valor.textContent = MODELO_RECOMENDADO.repo;
@@ -512,7 +515,7 @@ function modelInstructionsBody(): HTMLElement {
 
   acoes.appendChild(
     Button({
-      label: "Copiar link",
+      label: t("Copiar link"),
       size: "xs",
       variant: "secondary",
       onClick: async () => {
@@ -539,12 +542,12 @@ export function modelInstructions(): HTMLElement {
   const botao = document.createElement("button");
   botao.type = "button";
   botao.className = styles.linkButton;
-  botao.textContent = "Como baixar um modelo";
+  botao.textContent = t("Como baixar um modelo");
   botao.addEventListener("click", () => {
     void openDialog({
-      title: "Como baixar um modelo",
+      title: t("Como baixar um modelo"),
       body: modelInstructionsBody(),
-      confirmLabel: "Fechar",
+      confirmLabel: t("Fechar"),
       cancelLabel: "",
     });
   });
@@ -553,7 +556,7 @@ export function modelInstructions(): HTMLElement {
 
 /** Lista de projetos recentes: clique abre, X remove do historico. */
 function recentCard(ctx: ProjectsContext): HTMLElement {
-  const card = Card({ title: "Projetos recentes", accent: 6 });
+  const card = Card({ title: t("Projetos recentes"), accent: 6 });
   const body = cardBody(card);
 
   const atual = (caminho: string) =>
@@ -577,7 +580,7 @@ function recentCard(ctx: ProjectsContext): HTMLElement {
     row.appendChild(info);
 
     if (atual(item.path)) {
-      row.appendChild(Pill("atual", "accent", "xs"));
+      row.appendChild(Pill(t("atual"), "accent", "xs"));
     }
 
     const remover = Button({

@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { t } from "../i18n";
 import { Button } from "../ui/Button";
 import { createDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
@@ -73,7 +74,7 @@ export function openWelcome(
     dialog.footer.innerHTML = "";
 
     if (modo === "nuvem" && atual === 0) {
-      corpo.appendChild(titulo("Conecte seu provedor (API Key)"));
+      corpo.appendChild(titulo(t("Conecte seu provedor (API Key)")));
       corpo.appendChild(
         texto(
           "O C2 fala o padrao OpenAI-compatible: OpenAI, Groq, DeepSeek, OpenRouter " +
@@ -85,7 +86,7 @@ export function openWelcome(
       acoesNuvem.className = styles.actions;
       acoesNuvem.appendChild(
         Button({
-          label: "Abrir Configuracoes",
+          label: t("Abrir Configuracoes"),
           iconName: "settings",
           size: "xs",
           variant: "primary",
@@ -94,7 +95,7 @@ export function openWelcome(
       );
       acoesNuvem.appendChild(
         Button({
-          label: "Testar conexao",
+          label: t("Testar conexao"),
           size: "xs",
           variant: "secondary",
           onClick: async () => {
@@ -126,7 +127,7 @@ export function openWelcome(
     }
 
     if (modo === "local" && atual === 0) {
-      corpo.appendChild(titulo("Baixe um modelo local (GGUF)"));
+      corpo.appendChild(titulo(t("Baixe um modelo local (GGUF)")));
       corpo.appendChild(
         texto(
           "O C2 roda o modelo na sua máquina — nada sai do seu computador. " +
@@ -167,7 +168,7 @@ export function openWelcome(
           acoes.className = styles.actions;
           acoes.appendChild(
             Button({
-              label: "Configurar nuvem",
+              label: t("Configurar nuvem"),
               size: "xs",
               variant: "primary",
               onClick: () => handlers.openSettings(),
@@ -189,7 +190,7 @@ export function openWelcome(
     }
 
     if (atual === 1) {
-      corpo.appendChild(titulo("Escolha a pasta do projeto"));
+      corpo.appendChild(titulo(t("Escolha a pasta do projeto")));
       corpo.appendChild(
         texto(
           "O C2 grava os metadados ao lado de cada arquivo (<arquivo>.c2.json). " +
@@ -211,7 +212,7 @@ export function openWelcome(
         corpo.appendChild(
           botaoConteudo(
             Button({
-              label: "Trocar pasta",
+              label: t("Trocar pasta"),
               size: "xs",
               variant: "secondary",
               onClick: async () => {
@@ -225,7 +226,7 @@ export function openWelcome(
         corpo.appendChild(
           botaoConteudo(
             Button({
-              label: "Abrir projeto…",
+              label: t("Abrir projeto…"),
               iconName: "projects",
               variant: "primary",
               onClick: async () => {
@@ -239,7 +240,7 @@ export function openWelcome(
     }
 
     if (atual === 2) {
-      corpo.appendChild(titulo("Selecione o arquivo .gguf"));
+      corpo.appendChild(titulo(t("Selecione o arquivo .gguf")));
       corpo.appendChild(
         texto(
           "Escolha o modelo que você baixou. O C2 lê apenas o cabeçalho para validar " +
@@ -250,7 +251,7 @@ export function openWelcome(
       const raiz = handlers.root();
       if (!raiz) {
         corpo.appendChild(
-          texto("Escolha a pasta do projeto antes de selecionar o modelo."),
+          texto(t("Escolha a pasta do projeto antes de selecionar o modelo.")),
         );
       } else {
         if (modeloEscolhido) {
@@ -286,7 +287,7 @@ export function openWelcome(
 
     /* rodape */
     const voltar = Button({
-      label: "Voltar",
+      label: t("Voltar"),
       variant: "ghost",
       onClick: () => {
         if (atual > 0) {
@@ -298,7 +299,7 @@ export function openWelcome(
     voltar.disabled = atual === 0;
 
     const pular = Button({
-      label: "Pular",
+      label: t("Pular"),
       variant: "ghost",
       onClick: () => {
         dialog.close();
@@ -307,7 +308,7 @@ export function openWelcome(
     });
 
     const avancar = Button({
-      label: atual === TOTAL - 1 ? "Ir para a Engine" : "Avançar",
+      label: atual === TOTAL - 1 ? t("Ir para a Engine") : t("Avançar"),
       variant: "primary",
       onClick: () => {
         if (atual === TOTAL - 1) {

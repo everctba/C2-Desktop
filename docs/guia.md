@@ -69,7 +69,9 @@ arquivo. O pacote não embarca o llama.cpp: aponte `model.binary` (ou use um
 O instalador portátil abre um **box de idioma** antes de escolher a pasta:
 **English (padrão)** ou **Português (Brasil)**. A escolha fica em
 `%APPDATA%/dev.c2.desktop/language.json` e será usada pela interface do app.
-Para automação: `pwsh -File instalar.ps1 -Lang en|pt-BR`.
+Para automação: `pwsh -File instalar.ps1 -Lang en|pt-BR`. Dentro do app, troque a
+qualquer momento em **Config → Idioma** (English/Português, com bandeiras); a
+escolha é gravada no mesmo `language.json`.
 
 Os **comandos da CLI e as tools do MCP permanecem em inglês**
 (`c2 reindex`, `c2_annotate`, etc.) — é a API pública do produto.

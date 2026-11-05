@@ -2,6 +2,7 @@ import avatarUrl from "../assets/avatar.webp";
 import paypalQrUrl from "../assets/paypal-qr.png";
 import pixQrUrl from "../assets/pix-qr.png";
 import { api, openExternal } from "../api";
+import { t } from "../i18n";
 import styles from "./About.module.css";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
@@ -103,15 +104,15 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   header.className = styles.header;
   const titulo = document.createElement("h1");
   titulo.className = "pageTitle";
-  titulo.textContent = "Sobre";
+  titulo.textContent = t("Sobre");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent = "Quem faz o C2, versão do programa e como apoiar o projeto.";
+  hint.textContent = t("Quem faz o C2, versão do programa e como apoiar o projeto.");
   header.append(titulo, hint);
   page.appendChild(header);
 
   // ----- perfil -----
-  const perfilCard = Card({ title: "Quem faz", accent: 1 });
+  const perfilCard = Card({ title: t("Quem faz"), accent: 1 });
   const perfilBody = cardBody(perfilCard);
   const perfil = document.createElement("div");
   perfil.className = styles.perfil;
@@ -128,7 +129,7 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   nome.className = styles.nome;
   nome.textContent = PERFIL.nome;
   const bio = document.createElement("p");
-  bio.textContent = PERFIL.bio;
+  bio.textContent = t(PERFIL.bio);
   const pills = document.createElement("div");
   pills.className = styles.pills;
   const versao = await api.appVersion().catch(() => "0.1.0");
@@ -145,14 +146,14 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   acoes.className = styles.acoes;
   acoes.append(
     Button({
-      label: "GitHub",
+      label: t("GitHub"),
       iconName: "projects",
       size: "xs",
       variant: "secondary",
       onClick: () => void openExternal(PERFIL.github),
     }),
     Button({
-      label: "Repositório do C2",
+      label: t("Repositório do C2"),
       size: "xs",
       variant: "secondary",
       onClick: () => void openExternal(PERFIL.repo),
@@ -165,11 +166,12 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   const apoio = document.createElement("section");
   apoio.className = styles.apoio;
   const apoioTitulo = document.createElement("h2");
-  apoioTitulo.textContent = "Apoie o projeto";
+  apoioTitulo.textContent = t("Apoie o projeto");
   const apoioTexto = document.createElement("p");
-  apoioTexto.textContent =
+  apoioTexto.textContent = t(
     "O C2 é gratuito e continua gratuito: nenhuma funcionalidade fica atrás de doação. " +
-    "Se ele te economizou tempo, qualquer valor ajuda a manter o desenvolvimento. Doação opcional.";
+      "Se ele te economizou tempo, qualquer valor ajuda a manter o desenvolvimento. Doação opcional.",
+  );
   apoio.append(apoioTitulo, apoioTexto);
 
   const grade = document.createElement("div");
@@ -196,13 +198,13 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   page.appendChild(apoio);
 
   // ----- programa -----
-  const programa = Card({ title: "Programa", accent: 3 });
+  const programa = Card({ title: t("Programa"), accent: 3 });
   const programaBody = cardBody(programa);
   for (const [rotulo, valor] of [
-    ["Versão", versao],
-    ["Tecnologia", "Rust (c2-core + CLI) · llama.cpp · Tauri"],
-    ["Site", "https://everctba.github.io/C2-Desktop/"],
-    ["Licença", "software gratuito e open source"],
+    [t("Versão"), versao],
+    [t("Tecnologia"), "Rust (c2-core + CLI) · llama.cpp · Tauri"],
+    [t("Site"), "https://everctba.github.io/C2-Desktop/"],
+    [t("Licença"), t("software gratuito e open source")],
   ] as Array<[string, string]>) {
     const linha = document.createElement("div");
     linha.className = styles.linha;

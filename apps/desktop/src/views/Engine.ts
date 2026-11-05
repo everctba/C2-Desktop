@@ -1,4 +1,5 @@
 import { api, onEngineEvent } from "../api";
+import { t } from "../i18n";
 import type { FileEntry, IndexReport, MetaFile, RelatedResult, StatusReport } from "../types";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
@@ -32,7 +33,7 @@ interface ProgressEvent {
  */
 function runtimePillFor(status: StatusReport): HTMLElement {
   if (status.model.provider === "openai_compat") {
-    return Pill("runtime externo", "neutral");
+    return Pill(t("runtime externo"), "neutral");
   }
   return Pill(
     status.runtime.healthy ? "runtime saudável" : "runtime parado",
@@ -48,7 +49,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   header.className = styles.header;
   const title = document.createElement("h1");
   title.className = "pageTitle";
-  title.textContent = "Engine";
+  title.textContent = t("Engine");
   const hint = document.createElement("p");
   hint.className = "pageHint";
   hint.textContent =
@@ -79,10 +80,10 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   activity.className = styles.detail;
   const activityTitle = document.createElement("span");
   activityTitle.className = styles.fieldLabel;
-  activityTitle.textContent = "atividade";
+  activityTitle.textContent = t("atividade");
   const activityValue = document.createElement("span");
   activityValue.className = styles.fieldValue;
-  activityValue.textContent = "ocioso";
+  activityValue.textContent = t("ocioso");
   activity.append(activityTitle, activityValue);
   page.appendChild(activity);
 
@@ -98,13 +99,13 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       onClick: ctx.running ? ctx.onStop : ctx.onPlay,
     }),
     Button({
-      label: "Reindexar (10)",
+      label: t("Reindexar (10)"),
       iconName: "refresh",
       disabled: ctx.busy,
       onClick: () => ctx.onReindex(false),
     }),
     Button({
-      label: "Reindexar tudo",
+      label: t("Reindexar tudo"),
       disabled: ctx.busy,
       onClick: () => ctx.onReindex(true),
     }),
@@ -112,7 +113,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   page.appendChild(actions);
 
   /* log ao vivo */
-  const logCard = Card({ title: "Log", accent: 7 });
+  const logCard = Card({ title: t("Log"), accent: 7 });
   const logBody = cardBody(logCard);
   const logList = document.createElement("div");
   logList.className = styles.log;
@@ -120,7 +121,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   page.appendChild(logCard);
 
   /* arquivos indexados */
-  const listCard = Card({ title: "Arquivos indexados", accent: 2 });
+  const listCard = Card({ title: t("Arquivos indexados"), accent: 2 });
   const body = cardBody(listCard);
   const list = document.createElement("div");
   list.className = "list";
@@ -201,7 +202,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   if (entries.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "nenhum metadado ainda — rode REINDEXAR";
+    empty.textContent = t("nenhum metadado ainda — rode REINDEXAR");
     list.appendChild(empty);
   } else {
     for (const entry of entries) {
@@ -231,7 +232,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         `ciclo: ${report.indexed} indexados, ${report.unchanged} inalterados, ` +
           `${report.errors} erros, ${report.calls} chamadas`,
       );
-      setActivity("aguardando próximo ciclo");
+      setActivity(t("aguardando próximo ciclo"));
       void refreshStatus();
     }),
     onEngineEvent("engine://error", (payload) => {
@@ -240,7 +241,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     }),
     onEngineEvent("engine://stopped", () => {
       appendLog("engine encerrado");
-      setActivity("parado");
+      setActivity(t("parado"));
       void refreshStatus();
     }),
   ];
@@ -318,7 +319,7 @@ async function showDetail(container: HTMLElement, root: string, file: string): P
     if (meta.links.length > 0) {
       const linksRow = document.createElement("div");
       linksRow.className = styles.evidence;
-      linksRow.appendChild(Pill("links", "neutral", "xs"));
+      linksRow.appendChild(Pill(t("links"), "neutral", "xs"));
       for (const link of meta.links) {
         linksRow.appendChild(Pill(`${link.type}: ${link.to}`, "accent", "xs"));
       }

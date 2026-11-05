@@ -74,7 +74,8 @@ pwsh -File instalar.ps1 -Lang pt-BR            # instala em português (sem diá
 
 O instalador mostra um **box de idioma** com **English (padrão)** e **Português (Brasil)**
 e grava a escolha em `%APPDATA%\dev.c2.desktop\language.json`. A interface do app
-usa essa preferência; **comandos da CLI e tools do MCP continuam em inglês**.
+usa essa preferência e permite trocar a qualquer momento em **Config → Idioma**
+(bandeiras 🇺🇸/🇧🇷); **comandos da CLI e tools do MCP continuam em inglês**.
 
 Depois:
 
