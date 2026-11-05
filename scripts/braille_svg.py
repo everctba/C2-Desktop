@@ -10,13 +10,14 @@ SAIDA = r"site/assets/ascii/logo.svg"
 
 CELULA_L = 10.0  # largura da celula
 CELULA_A = 20.0  # altura da celula (terminal ~1:2)
-RAIO = 2.3
-X = (3.0, 7.0)   # centros das 2 colunas
-Y = (4.5, 9.5, 14.5, 19.5)  # centros das 4 linhas
+RAIO = 1.75      # ponto pequeno com folga, como na referencia
+MARGEM = 10.0
+X = (2.5, 7.5)   # centros das 2 colunas (espacamento 5)
+Y = (2.5, 7.5, 12.5, 17.5)  # centros das 4 linhas (espacamento 5)
 
 linhas = io.open(ENTRADA, encoding="utf-8").read().splitlines()
-largura = max(len(linha) for linha in linhas) * CELULA_L
-altura = len(linhas) * CELULA_A
+largura = max(len(linha) for linha in linhas) * CELULA_L + 2 * MARGEM
+altura = len(linhas) * CELULA_A + 2 * MARGEM
 
 partes = []
 for r, linha in enumerate(linhas):
@@ -28,12 +29,12 @@ for r, linha in enumerate(linhas):
                 if bits & (1 << bit):
                     col = 0 if bit in (0, 1, 2, 6) else 1
                     lin = bit if bit < 3 else (3 if bit >= 6 else bit - 3)
-                    cx = c * CELULA_L + X[col]
-                    cy = r * CELULA_A + Y[lin]
+                    cx = MARGEM + c * CELULA_L + X[col]
+                    cy = MARGEM + r * CELULA_A + Y[lin]
                     partes.append(f'<circle cx="{cx:g}" cy="{cy:g}" r="{RAIO:g}"/>')
         elif ch.strip():
-            cx = c * CELULA_L
-            cy = r * CELULA_A + 15.5
+            cx = MARGEM + c * CELULA_L
+            cy = MARGEM + r * CELULA_A + 15.5
             partes.append(
                 f'<text x="{cx:g}" y="{cy:g}" font-family="Consolas, &apos;Courier New&apos;, monospace" '
                 f'font-size="14" fill="#9bdcff">{ch.replace("&", "&amp;").replace("<", "&lt;")}</text>'
