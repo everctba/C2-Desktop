@@ -421,7 +421,57 @@ c2 migrate --yes</pre>
               </table>
             </div>
 
-            <h3>O que muda no modo BYO endpoint</h3>
+            <h3>Trade-offs: IA local (embarcada) x BYO endpoint</h3>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Aspecto</th><th>IA local (padrão)</th><th>BYO endpoint</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Quem sobe o servidor</td>
+                    <td>O C2 (embarcado)</td>
+                    <td>Você (LM Studio, Ollama, vLLM, llama.cpp)</td>
+                  </tr>
+                  <tr>
+                    <td>Escolha do modelo</td>
+                    <td>Selecionar <span class="mono">.gguf</span> no app</td>
+                    <td>No próprio servidor</td>
+                  </tr>
+                  <tr>
+                    <td>VRAM, contexto e camadas de GPU</td>
+                    <td><span class="mono">model.ctx_size</span> / <span class="mono">gpu_layers</span> no app</td>
+                    <td>Flags do servidor; mantenha contexto ≥ 8k</td>
+                  </tr>
+                  <tr>
+                    <td>Reinício / watchdog</td>
+                    <td>O C2 reinicia sozinho</td>
+                    <td>Responsabilidade sua</td>
+                  </tr>
+                  <tr>
+                    <td>API key</td>
+                    <td>Não usa</td>
+                    <td>Só se o servidor não for local</td>
+                  </tr>
+                  <tr>
+                    <td>Indicadores na UI (runtime, VRAM, .gguf)</td>
+                    <td>Refletem o runtime do C2</td>
+                    <td>Não refletem o servidor externo (o app avisa)</td>
+                  </tr>
+                  <tr>
+                    <td>Se falhar</td>
+                    <td>O C2 tenta reiniciar</td>
+                    <td>Popup de erro; <strong>não</strong> cai para o local sozinho</td>
+                  </tr>
+                  <tr>
+                    <td>Privacidade</td>
+                    <td>Nada sai da máquina</td>
+                    <td>Local: nada sai · remoto: conteúdo vai ao provedor</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <ul>
               <li>O C2 <strong>não</strong> inicia nem reinicia o servidor: ele precisa estar de pé antes de indexar.</li>
               <li>O <span class="mono">model.path</span>, VRAM e <span class="mono">ctx_size</span> são responsabilidade do servidor (use contexto ≥ 8k).</li>
