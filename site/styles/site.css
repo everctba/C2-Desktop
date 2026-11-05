@@ -21,6 +21,7 @@ body {
   background: var(--bg-body);
   color: var(--text-bright);
   font-family: var(--font-sans);
+  font-weight: 600; /* Segoe UI Semibold (experimento) */
   font-size: var(--text-m);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
