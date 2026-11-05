@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>C2 — Comments 2.0 for AI</title>
+    <meta name="description" content="Comments 2.0 for AI, local-first: o C2 comenta seu código automaticamente com IA local — what, why, goal, summary, responsibility — num loop que detecta mudanças. Nuvem é opcional, com a sua API key.">
+    <link rel="stylesheet" href="../styles/site.css">
+    <meta name="theme-color" content="#0b0b0b">
+    <link rel="canonical" href="https://everctba.github.io/C2-Desktop/en/index.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="C2">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="C2 — Comments 2.0 for AI">
+    <meta property="og:description" content="O C2 comenta seu código automaticamente com IA local e mantém o comentário atualizado, para sua IA gastar menos tokens entendendo o projeto.">
+    <meta property="og:url" content="https://everctba.github.io/C2-Desktop/en/index.html">
+    <meta property="og:image" content="https://everctba.github.io/C2-Desktop/assets/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="C2 — Comments 2.0 for AI: logo e exemplo de metadado semântico">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="C2 — Comments 2.0 for AI">
+    <meta name="twitter:description" content="O C2 comenta seu código automaticamente com IA local e mantém o comentário atualizado, para sua IA gastar menos tokens entendendo o projeto.">
+    <meta name="twitter:image" content="https://everctba.github.io/C2-Desktop/assets/img/og-image.png">
+    <link rel="icon" href="../assets/img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="../assets/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+  <link rel="alternate" hreflang="pt-BR" href="https://everctba.github.io/C2-Desktop/index.html">
+<link rel="alternate" hreflang="en" href="https://everctba.github.io/C2-Desktop/en/index.html">
+<link rel="alternate" hreflang="x-default" href="https://everctba.github.io/C2-Desktop/index.html">
+  </head>
+  <body data-pt-href="../index.html">
+    <nav class="nav">
+      <a class="brand" href="index.html">
+        <img class="brand-logo" src="../assets/img/logo-mark.png" alt="C2 — Comments 2.0 for AI">
+      </a>
+      <div class="nav-links">
+        <a href="#como-funciona">How it works</a>
+        <a href="#numeros">Numbers</a>
+        <a href="#instalar">Install</a>
+        <a href="ajuda.html">Help</a>
+        <a href="sobre.html">About</a>
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </div>
+    </nav>
+
+    <main>
+      <!-- HERO -->
+      <div class="wrap">
+        <section class="hero">
+          <figure class="hero-logo">
+            <pre class="ascii-logo" aria-hidden="true">         _____                          __        ___   ___
+        / ___/__  __ _  __ _  ___ ___  / /____   |_  | / _ \
+       / /__/ _ \/  ' \/  ' \/ -_) _ \/ __(_-&lt;  / __/_/ // /
+       \___/\___/_/_/_/_/_/_/\__/_//_/\__/___/ /____(_)___/
+                 //////////////////////////
+                 //C2 Comments 2.0 for AI//
+                 //////////////////////////</pre>
+            <figcaption class="sr-only">C2 — Comments 2.0 for AI</figcaption>
+          </figure>
+          <div>
+            <span class="eyebrow">Comments 2.0 for AI · local-first</span>
+            <h1>Your code commented by local AI.<br>Your AI reads the comment — not the project.</h1>
+            <p class="lead">
+              C2 uses a <strong>local AI</strong> to comment each file with
+              <strong>what, why, goal, summary e responsibility</strong>, num loop que
+              detecta o que mudou e reescreve sozinho. Sua IA paga consome esse resumo
+              atualizado e gasta menos tokens — em vez de reler o projeto inteiro.
+              <br><br>
+              <strong>Local in context, not in the workflow:</strong> o agente que escreve o
+              código (Claude, GPT, Cursor…) pode continuar sendo o melhor modelo da nuvem.
+              Ele só lê o resumo — não o projeto inteiro.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#instalar">Install</a>
+              <a class="btn btn-ghost" href="ajuda.html">How to use</a>
+            </div>
+            <p class="hero-note">
+              Windows 10/11 · local-AI-first · optional cloud with your API key · no embeddings
+            </p>
+          </div>
+
+          <div class="terminal" aria-label="Exemplo de uso da CLI">
+            <div class="terminal-bar">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <span class="terminal-title">c2 — terminal</span>
+            </div>
+            <pre>
+<span class="acc">$</span> c2 status
+Arquivos:    132
+Metadados:   127
+Pendentes:   5
+Runtime:     parado
+
+<span class="acc">$</span> c2 grep "onde valida o limite de estoque" --limit 2
+1. src/mod00/arquivo_001.rs   <span class="ok">10.20</span>
+   Servico2 struct e sua implementação
+2. src/mod01/arquivo_002.rs   <span class="ok">8.40</span>
+   Servico3 struct e sua implementação
+
+<span class="acc">$</span> c2 related src/mod00/arquivo_002.rs
+usa (1):     src/mod00/arquivo_003.rs (imports)
+usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
+          </div>
+        </section>
+      </div>
+
+      <!-- O COMENTÁRIO -->
+      <section class="section" id="comentario">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Comments 2.0</span>
+            <h2>The comment your AI should be reading</h2>
+            <p>
+              Em vez de "// calcula o total", o C2 escreve o significado do arquivo —
+              e mantém isso atualizado sozinho.
+            </p>
+          </div>
+          <div class="grid grid-2" style="align-items: start">
+            <div>
+              <pre class="code">{
+  "file": "src/pricing.rs",
+  "semantic": {
+    "what": "cálculo de desconto por volume",
+    "why": "aplicar faixas sem duplicar regra no checkout",
+    "goal": "subtotal com desconto correto e determinístico",
+    "summary": "faixas de 0/5/10% acima de 200/500 reais",
+    "responsibility": "só desconto por volume; cupom fica em coupons.rs"
+  },
+  "links": [{ "to": "src/lib.rs", "type": "imports" }]
+}</pre>
+            </div>
+            <div>
+              <h3>Why this saves tokens</h3>
+              <p>
+                O comentário diz <strong>o que o arquivo faz, por quê e até onde vai</strong> em
+                poucas linhas. Sua IA entende o projeto sem abrir cada arquivo — e, quando
+                precisa do detalhe, sabe exatamente onde clicar.
+              </p>
+              <ul>
+                <li><strong>what</strong> — o que é.</li>
+                <li><strong>why</strong> — por que existe.</li>
+                <li><strong>goal</strong> — que garantia entrega.</li>
+                <li><strong>summary</strong> — o resumo que substitui a leitura.</li>
+                <li><strong>responsibility</strong> — a fronteira: o que não é dele.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROBLEMA -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">O problema</span>
+            <h2>Toda tarefa começa com "onde fica isso mesmo?"</h2>
+            <p>
+              Um agente de IA chega sem mapa. Ele gasta contexto redesenhando a estrutura
+              do projeto — e ainda pode errar o arquivo.
+            </p>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <span class="k">01 · tokens</span>
+              <h3>Wasted context</h3>
+              <p>Reading files to discover the architecture consumes the window before the task starts.</p>
+            </article>
+            <article class="card">
+              <span class="k">02 · vocabulário</span>
+              <h3>Without C2, just grep</h3>
+              <p>
+                Quem busca "onde impede valores acima do permitido" não encontra
+                <code class="inline">valor &lt;= self.limite</code>.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">03 · infraestrutura</span>
+              <h3>Traditional indexes are heavy</h3>
+              <p>Embeddings e banco vetorial trazem infra, custo e tiraram o dado da sua máquina.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMO FUNCIONA -->
+      <section class="section" id="como-funciona">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">How it works</span>
+            <h2>A loop that comments by itself</h2>
+            <p>IA local escreve; o hash decide quando reescrever; sua IA paga só lê o resultado.</p>
+          </div>
+
+          <ol class="steps">
+            <li>
+              <div>
+                <h3>Local AI comments</h3>
+                <p>
+                  O C2 lê o arquivo e pede a um modelo local
+                  <span class="mono">what / why / goal / summary / responsibility</span>.
+                  Nasce um comentário semântico de verdade.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Loop detects change</h3>
+                <p>
+                  Um hash por arquivo mostra o que mudou. Só o alterado chama o modelo —
+                  o comentário é reescrito e fica atualizado, sem trabalho manual.
+                </p>
+              </div>
+            </li>
+            <li>
+              <div>
+                <h3>Your AI consumes</h3>
+                <p>
+                  O comentário vira contexto barato: sua IA paga entende o projeto sem
+                  reler tudo, usando <code class="inline">c2 grep</code>,
+                  <code class="inline">c2 related</code> e o MCP.
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          <h3 style="margin-top: var(--space-6xl)">What goes into the metadata</h3>
+          <div class="grid grid-3" style="margin-top: var(--space-l)">
+            <article class="card">
+              <h3>Semantics</h3>
+              <p>What it is, why it exists, goal, summary and responsibility boundary.</p>
+            </article>
+            <article class="card">
+              <h3>Graph</h3>
+              <p>Imports, <span class="mono">mod</span>, <span class="mono">use</span>,
+                <span class="mono">require</span> — arestas sem chamar o modelo.</p>
+            </article>
+            <article class="card">
+              <h3>Identity</h3>
+              <p>Hash e tamanho detectam mudança real; rename por hash reaproveita o metadado.</p>
+            </article>
+          </div>
+
+          <h3 style="margin-top: var(--space-6xl)">What that changes in practice</h3>
+          <div class="grid grid-3" style="margin-top: var(--space-l)">
+            <article class="card">
+              <span class="k">por intenção</span>
+              <h3>Ask in your own words</h3>
+              <p>
+                "Onde impede valores acima do limite" acha o código certo mesmo sem o
+                termo exato existir no arquivo.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">mais alcance</span>
+              <h3>Find what grep does not find</h3>
+              <p>
+                No corpus de 507 arquivos: a consulta semântica achou; a busca lexical
+                devolveu 0 resultados.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">mais rápido</span>
+              <h3>Answer in milliseconds</h3>
+              <p>
+                Consulta em <strong>86 ms</strong>, <span class="mono">c2 grep</span>
+                p50 <strong>60 ms</strong> e <span class="mono">c2 related</span>
+                <strong>49 ms</strong> — sem varrer o projeto.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- LEVE POR DESIGN -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Light by design</span>
+            <h2>Each file is a new conversation</h2>
+            <p>
+              O C2 não mantém histórico entre arquivos: cada interpretação é uma requisição
+              isolada, com contexto pequeno e limpo. Sem acúmulo, sem contaminação de um
+              arquivo no outro e sem precisar de uma GPU enorme para segurar o projeto inteiro.
+              É o que torna o C2 viável numa máquina modesta.
+            </p>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <span class="k">context</span>
+              <h3>Only one file at a time</h3>
+              <p>
+                Instruções fixas + o arquivo atual. Nada de conversa acumulada, nada de
+                contexto que cresce a cada arquivo.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">no bias</span>
+              <h3>One file does not contaminate the other</h3>
+              <p>
+                Cada metadado nasce do conteúdo daquele arquivo — sem herdar suposições
+                do anterior. Resultado consistente e repetível.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">hardware</span>
+              <h3>Fits in your 8 GB GPU</h3>
+              <p>
+                Um modelo de 4B como o Gemma 4 já é suficiente na GPU de 8 GB. Rodar na
+                CPU está desativado nesta versão (a experiência seria ruim). Cache de
+                prompt é só uma otimização opcional.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOCAL-FIRST x NUVEM -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Local-AI-first</span>
+            <h2>Local first. Cloud only if you want it.</h2>
+            <p>
+              O padrão é a IA rodar na sua máquina: índice, busca e metadados não saem
+              dela. Mas não escondemos o outro caminho — quem não tem GPU (ou prefere
+              pagar pouco por modelo) pode apontar o C2 para um provedor
+              OpenAI-compatible com a própria API key.
+            </p>
+          </div>
+          <div class="grid grid-2">
+            <article class="card">
+              <span class="k">default · local</span>
+              <h3>Local AI, nothing leaves</h3>
+              <p>
+                Modelo GGUF rodando na sua GPU. Índice e busca funcionam sem internet,
+                sem conta e sem telemetria. Segredos são detectados antes do modelo e
+                arquivos como <span class="mono">.env</span> are not even opened.
+                <br><br>
+                A IA que escreve seu código pode seguir na nuvem — o C2 só entrega
+                contexto pronto.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">optional · cloud</span>
+              <h3>Your API key, your provider</h3>
+              <p>
+                Sem GPU? Aponte para OpenAI, Groq, DeepSeek, OpenRouter… a chave fica no
+                cofre do Windows (nunca no config) e o app avisa que o conteúdo dos
+                arquivos será enviado. Também aceita o seu servidor local
+                (LM Studio, Ollama, vLLM) pelo mesmo seletor.
+              </p>
+            </article>
+          </div>
+          <p class="hero-note">
+            How to configure both modes: <a href="ajuda.html#config">guia de configuração</a>.
+          </p>
+        </div>
+      </section>
+
+      <!-- NÚMEROS -->
+      <section class="section" id="numeros">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Números medidos</span>
+            <h2>O que acontece em 501 arquivos</h2>
+            <p>
+              Corpus sintético, Windows, RTX 4060 Ti 8 GB, Gemma 4 E2B Q4_K_M, runtime
+              oficial embarcado. Tudo com evidência no repositório.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Resultado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Primeira indexação</td>
+                  <td><strong class="num">36,7 min</strong> · 501 chamadas · ~4,4 s/arquivo</td>
+                </tr>
+                <tr>
+                  <td>Segunda passada</td>
+                  <td><strong class="num">0,4 s</strong> · <strong>0 chamadas</strong> · 501 hashes do cache</td>
+                </tr>
+                <tr>
+                  <td>Busca <span class="mono">c2 grep</span></td>
+                  <td><strong class="num">p50 60 ms</strong> · p95 82 ms</td>
+                </tr>
+                <tr>
+                  <td>Consulta semântica</td>
+                  <td><strong class="num">86 ms</strong> acha o que a busca sem C2 não encontra</td>
+                </tr>
+                <tr>
+                  <td><span class="mono">c2 related</span></td>
+                  <td><strong class="num">49 ms</strong></td>
+                </tr>
+                <tr>
+                  <td>Pacote Windows</td>
+                  <td><strong class="num">117 MB</strong> (app + CLI + runtime llama.cpp)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hero-note">
+            Metodologia e dados brutos:
+            <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/bench-500.json" rel="noreferrer">
+              docs/bench-500.json
+            </a>
+            ·
+            <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/mvp-gate.md" rel="noreferrer">
+              gate do MVP
+            </a>
+          </p>
+
+          <h3 style="margin-top: var(--space-6xl)">Pergunte em linguagem natural</h3>
+          <p style="max-width: 70ch; margin-top: var(--space-s); color: var(--text-muted)">
+            O agente (ou você) descreve a intenção; o C2 procura no significado do código,
+            não no nome do arquivo. A mesma pergunta que o grep lexical não respondeu foi
+            resolvida em 86 ms.
+          </p>
+          <div class="table-wrap" style="margin-top: var(--space-l)">
+            <table>
+              <thead>
+                <tr>
+                  <th>Consulta: "onde impede valores acima do permitido"</th>
+                  <th>Com C2</th>
+                  <th>Sem C2</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Achou?</td>
+                  <td><span class="badge ok">sim</span> primeiro resultado correto</td>
+                  <td>0 resultados</td>
+                </tr>
+                <tr>
+                  <td>Contexto lido</td>
+                  <td><strong class="num">1,3 KB</strong></td>
+                  <td>precisaria varrer <strong class="num">995 KB</strong></td>
+                </tr>
+                <tr>
+                  <td>Tempo</td>
+                  <td><strong class="num">86 ms</strong></td>
+                  <td>150 ms (sem resposta)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- QUANDO NÃO VALE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Honestidade</span>
+            <h2>Quando o C2 <em>não</em> vale a pena</h2>
+          </div>
+          <div class="callout warning">
+            <h3>Projeto pequeno? Leia os arquivos direto.</h3>
+            <p>
+              Em 8 arquivos (6,5 KB) medimos: o C2 gastou ~16,3 KB de contexto contra
+              ~8,5 KB da leitura direta. O metadado e a indexação custam mais do que ler tudo.
+            </p>
+            <ul>
+              <li><strong>≤ 20 arquivos</strong> — leitura direta ganha.</li>
+              <li><strong>100–500 arquivos</strong> — o C2 compensa.</li>
+              <li><strong>milhares</strong> — o C2 compensa muito.</li>
+            </ul>
+            <p style="margin-top: var(--space-s)">
+              Também não vale para uma tarefa pontual num arquivo que você já sabe qual é.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FRASE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="callout" style="border-left-color: var(--accent-8); padding: var(--space-6xl)">
+            <h2 style="font-size: clamp(1.5rem, 3.2vw, 2.3rem); line-height: 1.25">
+              Comente seu código de forma automatizada e semântica.<br>
+              Melhore a performance e o contexto da sua IA —<br>
+              e pare de gastar tokens relendo o projeto.
+            </h2>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#instalar">Install C2</a>
+              <a class="btn btn-ghost" href="https://github.com/everctba/C2-Desktop" rel="noreferrer">
+                View on GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSTALAR -->
+      <section class="section" id="instalar">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Começar</span>
+            <h2>Instalar e indexar em dois minutos</h2>
+            <p>
+              O pacote leva o app, a CLI e o runtime oficial do llama.cpp. Só o modelo
+              <span class="mono">.gguf</span> fica com você — e nunca é copiado.
+            </p>
+          </div>
+
+          <pre class="code"><span class="c"># instalar (escolhe a pasta no seletor do Windows)</span>
+pwsh -File instalar.ps1
+
+<span class="c"># ou direto em uma pasta</span>
+pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
+
+<span class="c"># primeiro projeto</span>
+cd meu-projeto
+c2 init
+c2 config set model.path "H:\modelos\gemma-4-E2B-Q4_K_M.gguf"
+c2 reindex
+c2 grep "onde valida permissão de usuário"</pre>
+
+          <div class="grid grid-3" style="margin-top: var(--space-2xl)">
+            <article class="card">
+              <h3>Instalador</h3>
+              <p>Escolhe pasta, cria atalhos e põe o CLI no PATH do usuário. Desinstalar remove só a entrada do C2.</p>
+            </article>
+            <article class="card">
+              <h3>Janela</h3>
+              <p>Projetos, Engine ao vivo, Busca com score e MCP. O modelo é validado antes de ir para a GPU.</p>
+            </article>
+            <article class="card">
+              <h3>Sem LM Studio</h3>
+              <p>Runtime embarcado (Vulkan + CPU). Sem CUDA obrigatório, sem serviços externos.</p>
+            </article>
+          </div>
+          <p class="hero-note">
+            Requisitos, opções do instalador e solução de problemas: <a href="ajuda.html">página de ajuda</a>.
+          </p>
+        </div>
+      </section>
+
+      <!-- PRIVACIDADE -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Privacy</span>
+            <h2>Local-first: context is local by default</h2>
+            <p>
+              Local here means <strong>indexing, search and interpretation</strong>.
+              O agente de código que você usa (Claude, GPT, Cursor…) pode continuar
+              na nuvem: ele recebe só o que decidir ler, e o C2 reduz esse volume.
+            </p>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <h3>Local by default</h3>
+              <p>Model and index run on your computer. No account, no telemetry.</p>
+            </article>
+            <article class="card">
+              <h3>Cloud is opt-in</h3>
+              <p>
+                Se você ativar um provedor, o app avisa que o conteúdo sai da máquina.
+                Nada é enviado sem essa escolha.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Secrets blocked</h3>
+              <p>Chaves, tokens, JWTs e senhas são detectados antes do modelo; política <span class="mono">skip</span> ou <span class="mono">mask</span>.</p>
+            </article>
+            <article class="card">
+              <h3>No database</h3>
+              <p>O índice são arquivos <span class="mono">.c2.json</span> ao lado do código — versionáveis, inspecionáveis e removíveis.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- JANELA -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">The window</span>
+            <h2>Made for developers, not for dashboards</h2>
+            <p>Dense, dark and plain: state, live log and search with evidence.</p>
+          </div>
+          <div class="terminal" style="padding: 0">
+            <img src="../assets/img/janela-mcp.png" alt="Janela do C2 na tela MCP mostrando servidor pronto, protocolo e ferramentas expostas" style="display: block; width: 100%; height: auto">
+          </div>
+        </div>
+      </section>
+
+      <!-- TESTEMUNHOS -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Testemunhos</span>
+            <h2>O que as IAs dizem</h2>
+            <p>Prints de feedback real de modelos, com atribuição. Esta seção será preenchida.</p>
+          </div>
+          <div class="testimonials">
+            <article class="testimonial">
+              <blockquote>
+                “Nossa, realmente esse sistema de comentário me ajudou a ser muito mais efetivo.”
+              </blockquote>
+              <cite>— modelo de IA · tarefa de refatoração · data</cite>
+            </article>
+            <div class="placeholder">Aguardando print do próximo testemunho</div>
+            <div class="placeholder">Aguardando print do próximo testemunho</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">FAQ</span>
+            <h2>Dúvidas rápidas</h2>
+          </div>
+          <div class="faq">
+            <details open>
+              <summary>Do I need a GPU?</summary>
+              <div class="answer">
+                Não é obrigatório. Rodar na CPU está <strong>desativado nesta versão</strong>:
+                o modelo inteiro iria para a RAM (~4 GB no 4B Q4 em contexto 8k) e cada
+                arquivo levaria minutos. Com GPU Vulkan a indexação fica na casa de
+                ~4 s/arquivo em modelo de 4 B. Sem GPU, use o modo nuvem opcional com a
+                sua API key.
+              </div>
+            </details>
+            <details>
+              <summary>No GPU. Can I still use it?</summary>
+              <div class="answer">
+                Sim: use um provedor de nuvem OpenAI-compatible com a sua API key.
+                O C2 detecta a ausência de VRAM no primeiro uso e sugere esse caminho.
+                Rodar na CPU não é oferecido nesta versão.
+              </div>
+            </details>
+            <details>
+              <summary>I already use LM Studio, Ollama or vLLM. Can I reuse it?</summary>
+              <div class="answer">
+                Sim. O C2 fala o padrão OpenAI-compatible: em Config → Provedor de IA
+                aponte para o seu servidor local (no LM Studio, a base costuma ser
+                <span class="mono">http://127.0.0.1:1234/v1</span>; no Ollama,
+                <span class="mono">http://127.0.0.1:11434/v1</span>) e escolha o modelo.
+                Endpoint local dispensa API key. É o mesmo caminho usado na nuvem —
+                o C2 não te prende ao runtime embarcado. Passo a passo e trade-offs:
+                <a href="ajuda.html#provedor">guia de configuração</a>.
+              </div>
+            </details>
+            <details>
+              <summary>Does it need internet?</summary>
+              <div class="answer">
+                Para baixar o pacote/modelo e para usar seu agente de código na nuvem.
+                Índice, busca e o modelo local funcionam sem internet. Se você ativar o
+                provedor de nuvem opcional no C2, ele também precisa de internet.
+              </div>
+            </details>
+            <details>
+              <summary>Does my code go to a server?</summary>
+              <div class="answer">
+                O C2 não envia: modelo e índice ficam na máquina. Mas o agente de IA que
+                você usa para codar (Claude, GPT, Cursor…) pode enviar à nuvem os arquivos
+                que ele ler — o C2 reduz o que ele precisa ler.
+              </div>
+            </details>
+            <details>
+              <summary>Is C2 100% offline?</summary>
+              <div class="answer">
+                Não usamos esse mote. Índice, busca e interpretação rodam localmente; seu
+                agente de código normalmente é na nuvem. Local-first aqui é sobre
+                <strong>context</strong>, não sobre o workflow inteiro.
+              </div>
+            </details>
+            <details>
+              <summary>Does it work in a monorepo?</summary>
+              <div class="answer">
+                Sim: respeita <span class="mono">.gitignore</span> e
+                <span class="mono">.c2ignore</span>, tem filtros por extensão e pasta.
+              </div>
+            </details>
+            <details>
+              <summary>How much does indexing cost?</summary>
+              <div class="answer">
+                ~4 s/arquivo na primeira vez (GPU 8 GB). Depois é incremental: arquivo
+                inalterado não chama o modelo.
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer wrap">
+      <span>C2 — Comments 2.0 for AI · Windows 10/11</span>
+      <span>
+        <a href="ajuda.html">Help</a> ·
+        <a href="sobre.html">Sobre / apoiar</a> ·
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a> ·
+        licença a definir (MIT OR Apache-2.0)
+      </span>
+    </footer>
+    <script src="../i18n.js" defer></script>
+</body>
+</html>

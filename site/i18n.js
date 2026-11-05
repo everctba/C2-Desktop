@@ -10,7 +10,33 @@
   const PADRAO = "pt-BR";
 
   const EN = {
-    // navegação / chrome
+  
+    "O C2 usa uma": "C2 uses a",
+    "para comentar cada arquivo com": "to comment each file with",
+    ", num loop que": ", in a loop that",
+    "detecta o que mudou e reescreve sozinho. Sua IA paga consome esse resumo":
+      "detects what changed and rewrites itself. Your paid AI consumes this summary",
+    "atualizado e gasta menos tokens — em vez de reler o projeto inteiro.":
+      "up to date and spends fewer tokens — instead of re-reading the whole project.",
+    "o agente que escreve o código": "the agent writing the code",
+    "(Claude, GPT, Cursor…) pode continuar sendo o melhor modelo da nuvem.":
+      "(Claude, GPT, Cursor…) can still be the best cloud model.",
+    "Ele só lê o resumo — não o projeto inteiro.":
+      "It only reads the summary — not the whole project.",
+
+    "IA local": "local AI",
+    "modelo local": "local model",
+    "nuvem opcional": "optional cloud",
+    "metadados": "metadata",
+    "índice": "index",
+    "busca": "search",
+    "contexto": "context",
+    "semântico": "semantic",
+    "projeto": "project",
+    "projetos": "projects",
+    "arquivo": "file",
+    "arquivos": "files",
+  // navegação / chrome
     "Como funciona": "How it works",
     "Números": "Numbers",
     Instalar: "Install",
@@ -323,6 +349,7 @@
       { lang: "pt-BR", rotulo: "Português" },
       { lang: "en", rotulo: "English" },
     ];
+    const paginaAtual = document.documentElement.lang === "en" ? "en" : "pt-BR";
     for (const opcao of opcoes) {
       const item = document.createElement("button");
       item.type = "button";
@@ -333,9 +360,18 @@
       item.appendChild(texto);
       item.addEventListener("click", () => {
         localStorage.setItem(CHAVE, opcao.lang);
+        menu.hidden = true;
+        // Se existe pagina estatica na outra lingua, navega (melhor SEO).
+        const alvo =
+          opcao.lang === "en"
+            ? document.body.dataset.enHref
+            : document.body.dataset.ptHref;
+        if (alvo && opcao.lang !== paginaAtual) {
+          location.href = alvo;
+          return;
+        }
         wrap.setAttribute("data-site-lang", opcao.lang);
         botao.innerHTML = bandeira(opcao.lang);
-        menu.hidden = true;
         atualizarAtivos();
         aplicar(opcao.lang);
       });
@@ -363,12 +399,21 @@
   }
 
   function iniciar() {
+    const naPaginaEn = document.documentElement.lang === "en";
     const parametro = new URLSearchParams(location.search).get("lang");
     if (parametro === "en" || parametro === "pt-BR") {
       localStorage.setItem(CHAVE, parametro);
+      if (parametro === "en" && !naPaginaEn && document.body.dataset.enHref) {
+        location.href = document.body.dataset.enHref;
+        return;
+      }
+      if (parametro === "pt-BR" && naPaginaEn && document.body.dataset.ptHref) {
+        location.href = document.body.dataset.ptHref;
+        return;
+      }
     }
-    const salvo = localStorage.getItem(CHAVE);
-    if (salvo === "en") aplicar("en");
+    localStorage.setItem(CHAVE, naPaginaEn ? "en" : "pt-BR");
+    if (!naPaginaEn && localStorage.getItem(CHAVE) === "en") aplicar("en");
     montarSeletor();
   }
 

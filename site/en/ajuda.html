@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ajuda — C2 (Comments 2.0 for AI)</title>
+    <meta name="description" content="Como instalar, usar, configurar e resolver problemas do C2: telas, comandos, configurações, MCP e erros comuns.">
+    <link rel="stylesheet" href="../styles/site.css">
+    <meta name="theme-color" content="#0b0b0b">
+    <link rel="canonical" href="https://everctba.github.io/C2-Desktop/en/ajuda.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="C2">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:title" content="Ajuda — C2 (Comments 2.0 for AI)">
+    <meta property="og:description" content="Requisitos, instalação, primeiro uso, comandos, configuração, MCP e solução de erros do C2.">
+    <meta property="og:url" content="https://everctba.github.io/C2-Desktop/en/ajuda.html">
+    <meta property="og:image" content="https://everctba.github.io/C2-Desktop/assets/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="C2 — guia de uso">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Ajuda — C2 (Comments 2.0 for AI)">
+    <meta name="twitter:description" content="Requisitos, instalação, primeiro uso, comandos, configuração, MCP e solução de erros do C2.">
+    <meta name="twitter:image" content="https://everctba.github.io/C2-Desktop/assets/img/og-image.png">
+    <link rel="icon" href="../assets/img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" href="../assets/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+  <link rel="alternate" hreflang="pt-BR" href="https://everctba.github.io/C2-Desktop/ajuda.html">
+<link rel="alternate" hreflang="en" href="https://everctba.github.io/C2-Desktop/en/ajuda.html">
+<link rel="alternate" hreflang="x-default" href="https://everctba.github.io/C2-Desktop/ajuda.html">
+  </head>
+  <body data-pt-href="../ajuda.html">
+    <nav class="nav">
+      <a class="brand" href="index.html">
+        <img class="brand-logo" src="../assets/img/logo-mark.png" alt="C2 — Comments 2.0 for AI">
+      </a>
+      <div class="nav-links">
+        <a href="index.html">Início</a>
+        <a href="#requisitos">Requirements</a>
+        <a href="#instalacao">Installation</a>
+        <a href="#cli">CLI</a>
+        <a href="#erros">Erros</a>
+        <a href="sobre.html">About</a>
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </div>
+    </nav>
+
+    <main class="wrap">
+      <div class="doc">
+        <aside class="toc" aria-label="Índice da ajuda">
+          <a href="#requisitos">1. Requisitos</a>
+          <a href="#instalacao">2. Instalação</a>
+          <a href="#primeiro-uso">3. Primeiro uso</a>
+          <a href="#telas">4. Tela por tela</a>
+          <a href="#cli">5. CLI (comandos)</a>
+          <a href="#config">6. Configuração</a>
+          <a href="#provedor">7. Provedor de IA</a>
+          <a href="#mcp">8. MCP</a>
+          <a href="#dados">9. Onde ficam os dados</a>
+          <a href="#erros">10. Erros e soluções</a>
+          <a href="#faq">11. FAQ</a>
+          <a href="#desinstalar">12. Desinstalar</a>
+          <a href="#dev">13. Desenvolvimento</a>
+        </aside>
+
+        <div class="doc-content">
+          <section class="doc-section">
+            <span class="eyebrow">Comments 2.0 for AI</span>
+            <h2 id="topo">C2 — user guide</h2>
+            <p>
+              Tudo que o programa faz, cada opção explicada, o que precisa estar
+              instalado e o que fazer quando algo dá errado.
+            </p>
+            <p style="margin-top: var(--space-s)">
+              <strong>Em uma frase:</strong> o C2 comenta seu código automaticamente com IA
+              local e mantém o comentário atualizado, para sua IA gastar menos tokens
+              entendendo o projeto.
+            </p>
+          </section>
+
+          <!-- 1. REQUISITOS -->
+          <section class="doc-section" id="requisitos">
+            <h2>1. Requisitos</h2>
+            <h3>Para usar (pacote portátil)</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Item</th><th>Detalhe</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Sistema</strong></td>
+                    <td>Windows 10/11 (x64). Linux: build pronto, execução em validação.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>WebView2</strong></td>
+                    <td>Já vem no Windows 10/11 atualizado. Se o app abrir em branco, instale o <em>WebView2 Runtime</em> da Microsoft.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Modelo .gguf</strong></td>
+                    <td>Um arquivo GGUF no seu disco. Recomendado: Gemma 4 E2B Q4_K_M (~3,2 GB). O C2 <strong>não copia</strong> o modelo.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>GPU (opcional)</strong></td>
+                    <td>NVIDIA/AMD/Intel com Vulkan acelera. Sem GPU, use um provedor OpenAI-compatible: rodar na CPU está desativado nesta versão (o modelo iria para a RAM e cada arquivo levaria minutos).</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Disco</strong></td>
+                    <td>~120 MB do pacote + o modelo (~3 GB) + espaço para os metadados (alguns KB por arquivo).</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Internet</strong></td>
+                    <td>Só para baixar o pacote e o modelo. Depois tudo é local.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Para compilar (desenvolvimento)</h3>
+            <ul>
+              <li><strong>Rust 1.75+</strong> (<code class="inline">rustup</code>), toolchain MSVC.</li>
+              <li>
+                <strong>MSVC Build Tools + Windows SDK</strong>. Em Windows 10 build 19041 o
+                instalador do VS 2022 recusa; use o <strong>VS 2019 16.11</strong> (documentado
+                em <span class="mono">AGENTS.md</span>).
+              </li>
+              <li><strong>Node 20+</strong> e <strong>pnpm 10</strong> (<code class="inline">corepack enable</code>) para o desktop.</li>
+              <li><strong>PowerShell 7</strong> (<code class="inline">pwsh</code>) para os scripts.</li>
+              <li>Opcional: <strong>Python 3</strong> para scripts de apoio.</li>
+            </ul>
+          </section>
+
+          <!-- 2. INSTALAÇÃO -->
+          <section class="doc-section" id="instalacao">
+            <h2>2. Instalação</h2>
+            <p>Na pasta do pacote (<span class="mono">dist/desktop</span>), abra um terminal:</p>
+            <pre class="code"><span class="c"># abre o seletor gráfico de pasta (padrão: %LOCALAPPDATA%\C2)</span>
+pwsh -File instalar.ps1
+
+<span class="c"># instala direto em outra pasta/disco</span>
+pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
+
+<span class="c"># sem atalhos / sem mexer no PATH / sem diálogo</span>
+pwsh -File instalar.ps1 -NoShortcut -NoPath -NoGui</pre>
+
+            <h3>Opções do instalador</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Opção</th><th>O que faz</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="mono">-Dest &lt;pasta&gt;</td><td>Instala direto na pasta informada (sem diálogo).</td></tr>
+                  <tr><td class="mono">-NoShortcut</td><td>Não cria atalhos na Área de Trabalho/Menu Iniciar.</td></tr>
+                  <tr><td class="mono">-NoPath</td><td>Não adiciona <span class="mono">&lt;dest&gt;\cli</span> ao PATH do usuário.</td></tr>
+                  <tr><td class="mono">-NoGui</td><td>Usa prompt de texto em vez do seletor de pasta.</td></tr>
+                  <tr><td class="mono">-PrependPath</td><td>Coloca o CLI no início do PATH (pode sombrear outro <span class="mono">c2</span>).</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>O que é instalado</h3>
+            <ul>
+              <li><span class="mono">C2.exe</span> — app desktop (janela).</li>
+              <li><span class="mono">cli\c2.exe</span> — CLI do Core.</li>
+              <li><span class="mono">runtime\</span> — llama.cpp oficial (Vulkan + CPU).</li>
+              <li><span class="mono">instalar.ps1</span>, <span class="mono">desinstalar.ps1</span>, <span class="mono">LEIA-ME.txt</span>, <span class="mono">CHECKSUMS.txt</span>.</li>
+            </ul>
+            <div class="callout">
+              <h3>CLI no PATH: conflito com outro <span class="mono">c2</span></h3>
+              <p>
+                O instalador acrescenta <span class="mono">&lt;dest&gt;\cli</span> ao PATH do
+                <strong>usuário</strong> e avisa se já existe outro <span class="mono">c2</span>.
+                O Windows procura primeiro no PATH do <strong>sistema</strong>: se o outro
+                estiver lá, ele vence. Nesse caso use o caminho completo
+                (<span class="mono">&lt;dest&gt;\cli\c2.exe</span>), remova o outro ou use
+                <span class="mono">-PrependPath</span>.
+              </p>
+            </div>
+          </section>
+
+          <!-- 3. PRIMEIRO USO -->
+          <section class="doc-section" id="primeiro-uso">
+            <h2>3. Primeiro uso</h2>
+            <ol>
+              <li>Abra <span class="mono">C2.exe</span>.</li>
+              <li>
+                <strong>Abrir projeto</strong> → escolha a pasta do projeto. A janela vai para a
+                tela <strong>Engine</strong> quando o projeto já está inicializado.
+              </li>
+              <li>
+                Se não houver <span class="mono">.c2/config.json</span>, clique em
+                <strong>Inicializar</strong>.
+              </li>
+              <li>
+                <strong>Selecionar .gguf…</strong> → escolha o modelo. O C2 lê só o cabeçalho e
+                mostra nome, arquitetura, quantização, tamanho e se cabe na VRAM.
+              </li>
+              <li><strong>Iniciar</strong> → abre o modal <em>Carregar modelo na GPU</em>: ajuste contexto/camadas e confirme.</li>
+              <li>Aguarde os ciclos; os contadores e o log atualizam sozinhos.</li>
+              <li>Use <strong>Busca</strong> para consultar por significado.</li>
+            </ol>
+            <p>
+              Primeira inicialização sem modelo? O <strong>assistente de primeiros passos</strong>
+              aparece sozinho e guia: baixar modelo → abrir pasta → selecionar.
+            </p>
+
+            <h3>Pela CLI, em 4 linhas</h3>
+            <pre class="code">cd meu-projeto
+c2 init
+c2 config set model.path "H:\modelos\gemma-4-E2B-Q4_K_M.gguf"
+c2 reindex</pre>
+          </section>
+
+          <!-- 4. TELAS -->
+          <section class="doc-section" id="telas">
+            <h2>4. Tela por tela</h2>
+
+            <h3>Projetos</h3>
+            <ul>
+              <li><strong>Projeto</strong> — raiz, arquivos descobertos, metadados, sensíveis pulados.</li>
+              <li><strong>Modelo</strong> — GGUF atual, endpoint, instruções de download (HuggingFace) e botão <em>Selecionar .gguf</em>.</li>
+              <li><strong>Runtime</strong> — binário, origem (<span class="mono">runtime embarcado</span>, PATH…), versão.</li>
+              <li><strong>Segurança</strong> — política de segredos, limites de tamanho e extensões.</li>
+              <li><strong>Projetos recentes</strong> — últimos abertos (clique abre; <strong>X</strong> remove do histórico).</li>
+              <li><strong>Primeiros passos</strong> — reabre o assistente.</li>
+            </ul>
+
+            <h3>Engine</h3>
+            <ul>
+              <li><strong>Contadores</strong>: arquivos, metadados, pendentes, chamadas/tokens.</li>
+              <li><strong>Atividade atual</strong>: qual arquivo está sendo indexado (i/total).</li>
+              <li><strong>Log ao vivo</strong>: ciclos, erros, paradas (últimas 80 linhas).</li>
+              <li><strong>Iniciar/Parar</strong>: liga/desliga engine + runtime. <strong>Reindexar</strong>: uma passada e para o runtime.</li>
+            </ul>
+
+            <h3>Busca</h3>
+            <ul>
+              <li>Busca enquanto digita (debounce 320 ms) por significado, não por texto exato.</li>
+              <li>Mostra <strong>score</strong>, composição (caminho/símbolo/metadado), termos destacados e trecho.</li>
+              <li><strong>Clique</strong> abre o metadado completo; <em>ver relacionados</em> mostra <span class="mono">usa</span>/<span class="mono">usado por</span>.</li>
+            </ul>
+
+            <h3>MCP</h3>
+            <ul>
+              <li>Faz o handshake real com <span class="mono">c2 mcp</span> ao abrir a tela.</li>
+              <li>Mostra protocolo, servidor, binário e ferramentas; botão <strong>Testar conexão</strong> repete.</li>
+              <li>Configuração JSON pronta para copiar para o cliente MCP.</li>
+            </ul>
+
+            <h3>Config</h3>
+            <ul>
+              <li><strong>Workspace</strong>: extensões, diretórios excluídos, tamanho máximo, links, <span class="mono">.gitignore</span>, política de segredos.</li>
+              <li><strong>Runtime</strong>: modelo, host/porta, contexto, camadas GPU, threads, temperatura, tokens, timeout, tentativas, raciocínio, fallback LM Studio, polling e lote.</li>
+              <li>Cada campo é gravado via <span class="mono">config set</span> (validado pelo Core); o rodapé mostra quantos campos foram salvos.</li>
+            </ul>
+          </section>
+
+          <!-- 5. CLI -->
+          <section class="doc-section" id="cli">
+            <h2>5. CLI — todos os comandos</h2>
+            <p>Global: <span class="mono">--root &lt;pasta&gt;</span> (workspace) e <span class="mono">--json</span> (saída legível por máquina).</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Comando</th><th>O que faz / opções</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="mono">c2 init [--force] [--open] [--agent]</td><td>Cria <span class="mono">.c2/config.json</span> (idempotente). <span class="mono">--open</span> abre a janela; <span class="mono">--agent</span> grava o bloco de regras em <span class="mono">AGENTS.md</span>.</td></tr>
+                  <tr><td class="mono">c2 status [--json]</td><td>Arquivos, metadados, pendentes, fila, runtime, log e últimas operações.</td></tr>
+                  <tr><td class="mono">c2 reindex [--full] [--path P] [--limit N] [--dry-run] [--json]</td><td>Uma passada. <span class="mono">--full</span> ignora cache; <span class="mono">--dry-run</span> mostra o plano sem chamar modelo.</td></tr>
+                  <tr><td class="mono">c2 start [--once] [--json]</td><td>Indexa continuamente (Ctrl+C encerra limpo).</td></tr>
+                  <tr><td class="mono">c2 stop</td><td>Para engine e <span class="mono">llama-server</span>.</td></tr>
+                  <tr><td class="mono">c2 grep &lt;consulta&gt; [--limit N] [--files-only] [--explain] [--json]</td><td>Busca híbrida; <span class="mono">--explain</span> mostra a composição do score.</td></tr>
+                  <tr><td class="mono">c2 related &lt;arquivo&gt; [--json]</td><td>Dependências: <span class="mono">usa</span> e <span class="mono">usado por</span>.</td></tr>
+                  <tr><td class="mono">c2 read &lt;arquivo&gt; [--lines A:B] [--json]</td><td>Trecho com número de linha.</td></tr>
+                  <tr><td class="mono">c2 cleaner [--yes]</td><td>Lista metadados órfãos; <span class="mono">--yes</span> remove.</td></tr>
+                  <tr><td class="mono">c2 migrate [--yes] [--json]</td><td>Converte metadado antigo para o schema v1 com backup em <span class="mono">.c2/backups/</span>.</td></tr>
+                  <tr><td class="mono">c2 config get|set|list</td><td>Lê/altera configuração. Listas: <span class="mono">"rs, md"</span>; booleanos: <span class="mono">true/false</span>.</td></tr>
+                  <tr><td class="mono">c2 logs [--lines N] [--json]</td><td>Últimas linhas de <span class="mono">.c2/logs/c2.log</span>.</td></tr>
+                  <tr><td class="mono">c2 open</td><td>Abre a janela no projeto atual (passa <span class="mono">--root</span>).</td></tr>
+                  <tr><td class="mono">c2 mcp</td><td>Servidor MCP por STDIO (para agentes).</td></tr>
+                  <tr><td class="mono">c2 help</td><td>Ajuda do clap.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Exemplos</h3>
+            <pre class="code">c2 grep "onde o sistema valida permissão" --limit 5
+c2 grep "autenticação" --files-only
+c2 related src/auth/session.rs
+c2 read src/auth/session.rs --lines 40:95
+c2 reindex --limit 10 --dry-run
+c2 migrate --yes</pre>
+          </section>
+
+          <!-- 6. CONFIG -->
+          <section class="doc-section" id="config">
+            <h2>6. Configuração (chaves)</h2>
+            <p>Ficam em <span class="mono">.c2/config.json</span>. Alterar: <span class="mono">c2 config set chave valor</span> ou pela tela Config.</p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Chave</th><th>Descrição / padrão</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="mono">model.path</td><td>Caminho do <span class="mono">.gguf</span> (nunca copiado).</td></tr>
+                  <tr><td class="mono">model.name</td><td>Nome exibido.</td></tr>
+                  <tr><td class="mono">model.binary</td><td>Opcional: <span class="mono">llama-server</span> explícito (senão busca runtime embarcado/PATH).</td></tr>
+                  <tr><td class="mono">model.host / model.port</td><td>Endpoint local (padrão 127.0.0.1:8099).</td></tr>
+                  <tr><td class="mono">model.provider</td><td><span class="mono">local</span> (padrão) ou <span class="mono">openai_compat</span> (nuvem/Ollama/vLLM).</td></tr>
+                  <tr><td class="mono">model.base_url</td><td>Base URL do provedor OpenAI-compatible (ex.: <span class="mono">https://api.openai.com/v1</span>).</td></tr>
+                  <tr><td class="mono">model.cost_input_per_mtok / model.cost_output_per_mtok</td><td>Preços por 1M tokens para estimar custo (0 = não calcular).</td></tr>
+                  <tr><td class="mono">model.max_cost_usd_per_run</td><td>Teto de custo por execução em USD (0 = sem teto).</td></tr>
+                  <tr><td class="mono">model.api_key_env</td><td>Variável de ambiente com a API key (padrão <span class="mono">C2_API_KEY</span>); a chave também pode ir para o cofre pelo Config.</td></tr>
+                  <tr><td class="mono">—</td><td><strong>Esquecer chave</strong> (Config → Provedor de IA) remove do cofre local; não revoga no provedor.</td></tr>
+                  <tr><td class="mono">model.ctx_size</td><td>Contexto em tokens (padrão 8192).</td></tr>
+                  <tr><td class="mono">model.gpu_layers</td><td>Camadas na GPU (0 = CPU; 99 = todas).</td></tr>
+                  <tr><td class="mono">model.threads</td><td>Threads de CPU.</td></tr>
+                  <tr><td class="mono">model.temperature</td><td>Temperatura da inferência.</td></tr>
+                  <tr><td class="mono">model.max_tokens / retry_max_tokens</td><td>Limite de saída e do retry.</td></tr>
+                  <tr><td class="mono">model.timeout_secs / max_retries</td><td>Timeout e tentativas.</td></tr>
+                  <tr><td class="mono">model.disable_thinking</td><td>Desliga o raciocínio do modelo (mais rápido).</td></tr>
+                  <tr><td class="mono">model.allow_lmstudio</td><td>Fallback de desenvolvimento (padrão false).</td></tr>
+                  <tr><td class="mono">index.extensions</td><td>Extensões indexáveis (lista).</td></tr>
+                  <tr><td class="mono">index.excluded_dirs</td><td>Pastas ignoradas (lista).</td></tr>
+                  <tr><td class="mono">index.max_file_bytes</td><td>Tamanho máximo por arquivo.</td></tr>
+                  <tr><td class="mono">index.max_total_bytes_per_run</td><td>Teto de conteúdo por ciclo.</td></tr>
+                  <tr><td class="mono">index.max_links_per_file</td><td>Teto de arestas por arquivo.</td></tr>
+                  <tr><td class="mono">index.respect_gitignore</td><td>Respeitar <span class="mono">.gitignore</span>/<span class="mono">.c2ignore</span>.</td></tr>
+                  <tr><td class="mono">index.prompt</td><td>Instruções base enviadas ao modelo (editável na tela Config). A linha que trata o arquivo como <em>dado</em> é fixa.</td></tr>
+                  <tr><td class="mono">index.secret_policy</td><td><span class="mono">skip</span> (padrão) ou <span class="mono">mask</span>.</td></tr>
+                  <tr><td class="mono">index.secret_allow</td><td>Prefixos liberados da checagem de segredo (cuidado).</td></tr>
+                  <tr><td class="mono">index.link_fallback</td><td>Regras <span class="mono">{extension, regex}</span> para imports de linguagens sem extrator.</td></tr>
+                  <tr><td class="mono">engine.poll_interval_secs</td><td>Intervalo entre ciclos (padrão 5).</td></tr>
+                  <tr><td class="mono">engine.batch_size</td><td>Arquivos por ciclo.</td></tr>
+                  <tr><td class="mono">search.synonyms</td><td>Sinônimos usados na busca.</td></tr>
+                  <tr><td class="mono">log.level</td><td><span class="mono">error</span>/<span class="mono">warn</span>/<span class="mono">info</span>/<span class="mono">debug</span>.</td></tr>
+                  <tr><td class="mono">log.max_file_bytes / log.keep</td><td>Rotação do log (1 MiB, mantém 5).</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 8. MCP -->
+          <section class="doc-section" id="provedor">
+            <h2>7. Provedor de IA: local, nuvem e BYO endpoint</h2>
+            <p>
+              O C2 fala o padrão <strong>OpenAI-compatible</strong>. Isso cobre três arranjos:
+            </p>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Modo</th><th>O que é</th><th>Chave?</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>IA local (padrão)</td>
+                    <td>O C2 sobe e supervisiona o <span class="mono">llama-server</span> embarcado, com o seu <span class="mono">.gguf</span>.</td>
+                    <td>Não</td>
+                  </tr>
+                  <tr>
+                    <td>API na nuvem</td>
+                    <td>OpenAI, OpenRouter, Groq, DeepSeek, Gemini (endpoint compat)…</td>
+                    <td>Sim (cofre do sistema: Credential Manager no Windows, Keychain no macOS, Secret Service no Linux — ou <span class="mono">C2_API_KEY</span>)</td>
+                  </tr>
+                  <tr>
+                    <td>BYO endpoint</td>
+                    <td>Seu próprio servidor OpenAI-compatible: <strong>LM Studio</strong>, <strong>Ollama</strong>, <strong>vLLM</strong>, llama.cpp…</td>
+                    <td>Só se o servidor não for local</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Como configurar</h3>
+            <ol>
+              <li>Suba o servidor (ou use a IA local embarcada).</li>
+              <li>Abra <strong>Config → Provedor de IA</strong>.</li>
+              <li>Escolha o <strong>provedor</strong>: <span class="mono">local</span> ou <span class="mono">openai_compat</span>.</li>
+              <li>No modo compat, preencha <strong>base URL</strong> e <strong>modelo</strong> (ou use um preset) e salve.</li>
+              <li>Clique em <strong>Testar conexão</strong> antes de indexar.</li>
+            </ol>
+
+            <h3>Exemplos</h3>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Servidor</th><th>Como subir</th><th>base URL</th><th>modelo</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>LM Studio</td>
+                    <td>Developer → Start Server (porta 1234)</td>
+                    <td><span class="mono">http://127.0.0.1:1234/v1</span></td>
+                    <td>o id mostrado no servidor</td>
+                  </tr>
+                  <tr>
+                    <td>Ollama</td>
+                    <td><span class="mono">ollama pull qwen2.5:3b</span> · <span class="mono">ollama serve</span></td>
+                    <td><span class="mono">http://127.0.0.1:11434/v1</span></td>
+                    <td><span class="mono">qwen2.5:3b</span></td>
+                  </tr>
+                  <tr>
+                    <td>vLLM</td>
+                    <td><span class="mono">vllm serve Qwen/Qwen2.5-3B-Instruct --port 8000</span></td>
+                    <td><span class="mono">http://127.0.0.1:8000/v1</span></td>
+                    <td>o nome servido</td>
+                  </tr>
+                  <tr>
+                    <td>llama.cpp manual</td>
+                    <td><span class="mono">llama-server -m modelo.gguf --port 8080 -c 8192</span></td>
+                    <td><span class="mono">http://127.0.0.1:8080/v1</span></td>
+                    <td>qualquer nome</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Trade-offs: IA local (embarcada) x BYO endpoint</h3>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Aspecto</th><th>IA local (padrão)</th><th>BYO endpoint</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Quem sobe o servidor</td>
+                    <td>O C2 (embarcado)</td>
+                    <td>Você (LM Studio, Ollama, vLLM, llama.cpp)</td>
+                  </tr>
+                  <tr>
+                    <td>Escolha do modelo</td>
+                    <td>Selecionar <span class="mono">.gguf</span> no app</td>
+                    <td>No próprio servidor</td>
+                  </tr>
+                  <tr>
+                    <td>VRAM, contexto e camadas de GPU</td>
+                    <td><span class="mono">model.ctx_size</span> / <span class="mono">gpu_layers</span> no app</td>
+                    <td>Flags do servidor; mantenha contexto ≥ 8k</td>
+                  </tr>
+                  <tr>
+                    <td>Reinício / watchdog</td>
+                    <td>O C2 reinicia sozinho</td>
+                    <td>Responsabilidade sua</td>
+                  </tr>
+                  <tr>
+                    <td>API key</td>
+                    <td>Não usa</td>
+                    <td>Só se o servidor não for local</td>
+                  </tr>
+                  <tr>
+                    <td>Indicadores na UI (runtime, VRAM, .gguf)</td>
+                    <td>Refletem o runtime do C2</td>
+                    <td>Não refletem o servidor externo (o app avisa)</td>
+                  </tr>
+                  <tr>
+                    <td>Se falhar</td>
+                    <td>O C2 tenta reiniciar</td>
+                    <td>Popup de erro; <strong>não</strong> cai para o local sozinho</td>
+                  </tr>
+                  <tr>
+                    <td>Privacy</td>
+                    <td>Nada sai da máquina</td>
+                    <td>Local: nada sai · remoto: conteúdo vai ao provedor</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <ul>
+              <li>O C2 <strong>não</strong> inicia nem reinicia o servidor: ele precisa estar de pé antes de indexar.</li>
+              <li>O <span class="mono">model.path</span>, VRAM e <span class="mono">ctx_size</span> são responsabilidade do servidor (use contexto ≥ 8k).</li>
+              <li>Endpoints em <span class="mono">127.0.0.1</span>/<span class="mono">localhost</span> dispensam API key.</li>
+              <li>Se o provedor falhar, o C2 mostra um popup e <strong>não</strong> troca para o local sozinho.</li>
+              <li>No modo externo, indicadores locais (runtime do C2, VRAM, <span class="mono">.gguf</span>) não refletem o servidor real — valide com <strong>Testar conexão</strong>.</li>
+            </ul>
+          </section>
+
+          <section class="doc-section" id="mcp">
+            <h2>8. MCP (agentes de IA)</h2>
+            <p>
+              O C2 expõe o Core por MCP sobre STDIO, somente leitura:
+              <span class="mono">c2_grep</span>, <span class="mono">c2_read</span>,
+              <span class="mono">c2_related</span>, <span class="mono">c2_map</span> e <span class="mono">c2_annotate</span> (este grava apenas anotações no <span class="mono">.c2.json</span>).
+            </p>
+            <pre class="code">{
+  "mcpServers": {
+    "c2": {
+      "command": "D:\\Apps\\C2\\cli\\c2.exe",
+      "args": ["--root", "D:\\projetos\\meu-projeto", "mcp"]
+    }
+  }
+}</pre>
+            <ul>
+              <li>Cole essa configuração no cliente MCP (Claude Desktop, Cursor, etc.).</li>
+              <li>A aba <strong>MCP</strong> da janela gera essa configuração pronta.</li>
+              <li>Para testar sem cliente: <span class="mono">c2 --root . mcp</span> e envie JSON-RPC por stdin.</li>
+            </ul>
+          </section>
+
+          <!-- 8. DADOS -->
+          <section class="doc-section" id="dados">
+            <h2>9. Onde ficam os dados</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Caminho</th><th>O que é</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="mono">&lt;projeto&gt;/arquivo.c2.json</td><td>Metadado semântico ao lado de cada arquivo (versionável).</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/config.json</td><td>Configuração do workspace (por máquina).</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/state.json</td><td>Contadores, histórico, fila.</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/logs/c2.log</td><td>Log com rotação (<span class="mono">c2.log.1…N</span>).</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/logs/llama.*.log</td><td>Saída do runtime.</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/hash-cache.json</td><td>Cache de hash (tamanho+mtime).</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/backups/&lt;epoch&gt;/</td><td>Backup do <span class="mono">c2 migrate</span>.</td></tr>
+                  <tr><td class="mono">&lt;projeto&gt;/.c2/runtime.pid / engine.lock</td><td>Controle de processo.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>O C2 não envia código. O modelo é referenciado por caminho, não copiado; o agente de código que você usa pode ser na nuvem.</p>
+          </section>
+
+          <!-- 9. ERROS -->
+          <section class="doc-section" id="erros">
+            <h2>10. Erros e soluções</h2>
+            <p>Mensagens reais do programa, causa provável e o que fazer.</p>
+
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Mensagem</th><th>Causa</th><th>Solução</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>nenhum modelo .gguf selecionado</td>
+                    <td>Ao clicar Iniciar sem modelo.</td>
+                    <td>Abra o popup e selecione o <span class="mono">.gguf</span> (tela Modelo ou assistente).</td>
+                  </tr>
+                  <tr>
+                    <td>modelo GGUF nao encontrado: &lt;caminho&gt;</td>
+                    <td>Arquivo movido/renomeado ou caminho errado.</td>
+                    <td>Aponte de novo: <span class="mono">c2 config set model.path "&lt;caminho&gt;"</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>o arquivo nao parece um GGUF valido</td>
+                    <td>Download interrompido/corrompido.</td>
+                    <td>Baixe o modelo novamente e confira o tamanho.</td>
+                  </tr>
+                  <tr>
+                    <td>porta &lt;N&gt; ja esta em uso</td>
+                    <td>Outro processo (ou outro C2) usa a porta.</td>
+                    <td>Feche o processo ou troque: <span class="mono">c2 config set model.port 8100</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>API key nao configurada para … / provedor falhou</td>
+                    <td>Provedor openai_compat sem chave, sem credito ou fora do ar.</td>
+                    <td>Confira Config → Provedor de IA e o painel do provedor. O C2 <strong>nao</strong> troca para o modelo local automaticamente (a GPU pode estar em uso).</td>
+                  </tr>
+                  <tr>
+                    <td>falta de memoria ao carregar o modelo</td>
+                    <td>Contexto/camadas demais para a VRAM.</td>
+                    <td>Reduza <span class="mono">model.ctx_size</span> e <span class="mono">model.gpu_layers</span>, ou feche outros apps.</td>
+                  </tr>
+                  <tr>
+                    <td>llama-server nao respondeu</td>
+                    <td>Runtime morreu ao carregar.</td>
+                    <td>Veja <span class="mono">.c2/logs/llama.err.log</span> e <span class="mono">c2 status</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>ja existe um engine rodando neste workspace (pid …)</td>
+                    <td>Um <span class="mono">c2 start</span> anterior ainda está ativo.</td>
+                    <td><span class="mono">c2 stop</span> e tente de novo.</td>
+                  </tr>
+                  <tr>
+                    <td>segredo (&lt;tipo&gt;) em &lt;arquivo&gt;: arquivo nao indexado</td>
+                    <td>Política <span class="mono">skip</span> e o arquivo contém segredo.</td>
+                    <td>Remova/mova o segredo, use <span class="mono">mask</span> ou libere com <span class="mono">// c2:allow-secret</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>metadado de &lt;arquivo&gt; sem semantica</td>
+                    <td><span class="mono">.c2.json</span> vazio/corrompido.</td>
+                    <td>Apague o <span class="mono">.c2.json</span> e rode <span class="mono">c2 reindex</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>arquivo nao e UTF-8 valido</td>
+                    <td>Arquivo binário com extensão de texto.</td>
+                    <td>Adicione ao <span class="mono">.c2ignore</span> ou remova a extensão da lista.</td>
+                  </tr>
+                  <tr>
+                    <td>failed to parse JSON: missing field `identifier` (build)</td>
+                    <td>O Tauri lê todo <span class="mono">.json</span> de <span class="mono">capabilities/</span> e o metadado <span class="mono">.c2.json</span> caiu ali.</td>
+                    <td>Já tratado pelo <span class="mono">.c2ignore</span> do repo; para outros casos, exclua a pasta.</td>
+                  </tr>
+                  <tr>
+                    <td>ERR_CONNECTION_REFUSED 127.0.0.1:1420</td>
+                    <td>Executou o exe de <em>debug</em> sem o Vite dev.</td>
+                    <td>Use <span class="mono">pnpm tauri dev</span> ou <span class="mono">pnpm tauri build --no-bundle</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>Windows 10 build 19041: instalador do VS 2022 recusa</td>
+                    <td>VS 2022 não suporta mais essa build do Windows.</td>
+                    <td>Use VS 2019 16.11 (ver <span class="mono">AGENTS.md</span>).</td>
+                  </tr>
+                  <tr>
+                    <td>terminal piscando ao abrir o projeto</td>
+                    <td>Processo de console disparado pelo app.</td>
+                    <td>Corrigido (<span class="mono">CREATE_NO_WINDOW</span>); atualize para a versão mais recente.</td>
+                  </tr>
+                  <tr>
+                    <td>git push falha com "TIMEOUT /?"</td>
+                    <td>Hook do bd usando o TIMEOUT.EXE do Windows.</td>
+                    <td>Já corrigido no repo; alternativa: <span class="mono">git push --no-verify</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>app abre em branco</td>
+                    <td>WebView2 ausente/desatualizado.</td>
+                    <td>Instale o <em>WebView2 Runtime</em>.</td>
+                  </tr>
+                  <tr>
+                    <td>nodemon/corepack: pnpm not found</td>
+                    <td>Node sem pnpm.</td>
+                    <td><span class="mono">corepack enable &amp;&amp; corepack prepare pnpm@10 --activate</span>.</td>
+                  </tr>
+                  <tr>
+                    <td>GPU não detectada</td>
+                    <td>Sem driver Vulkan ou GPU integrada antiga.</td>
+                    <td>Roda na CPU; para acelerar, atualize o driver e reduza o contexto.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 11. FAQ -->
+          <section class="doc-section" id="faq">
+            <h2>11. FAQ</h2>
+            <div class="faq">
+              <details open>
+                <summary>Preciso do LM Studio?</summary>
+                <div class="answer">Não. O runtime oficial do llama.cpp vai no pacote.</div>
+              </details>
+              <details>
+                <summary>O modelo é copiado para o projeto?</summary>
+                <div class="answer">Não. O workspace guarda só o caminho (<span class="mono">model.path</span>).</div>
+              </details>
+              <details>
+                <summary>Posso usar CPU?</summary>
+                <div class="answer">Sim: <span class="mono">c2 config set model.gpu_layers 0</span>. Fica mais lento.</div>
+              </details>
+              <details>
+                <summary>O que é o <span class="mono">.c2.json</span>?</summary>
+                <div class="answer">
+                  Metadado semântico do arquivo ao lado dele: <span class="mono">what/why/goal/summary/responsibility</span>
+                  e <span class="mono">links[]</span>. Pode versionar; remova com <span class="mono">c2 cleaner --yes</span>.
+                </div>
+              </details>
+              <details>
+                <summary>Como ignorar uma pasta/arquivo?</summary>
+                <div class="answer">
+                  Crie um <span class="mono">.c2ignore</span> na raiz (mesma sintaxe do <span class="mono">.gitignore</span>)
+                  ou use <span class="mono">index.excluded_dirs</span>.
+                </div>
+              </details>
+              <details>
+                <summary>Como parar tudo?</summary>
+                <div class="answer"><span class="mono">c2 stop</span> e feche a janela. O runtime também para.</div>
+              </details>
+            </div>
+          </section>
+
+          <!-- 11. DESINSTALAR -->
+          <section class="doc-section" id="desinstalar">
+            <h2>12. Desinstalar</h2>
+            <pre class="code">pwsh -File "&lt;pasta instalada&gt;\desinstalar.ps1"</pre>
+            <p>
+              Remove programa, atalhos e a entrada do PATH. <strong>Não apaga</strong> os
+              <span class="mono">.c2.json</span> nem o <span class="mono">.c2/</span> dos seus
+              projetos.
+            </p>
+          </section>
+
+          <!-- 12. DEV -->
+          <section class="doc-section" id="dev">
+            <h2>13. Desenvolvimento</h2>
+            <pre class="code"><span class="c"># core + CLI</span>
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+
+<span class="c"># desktop</span>
+cd apps/desktop
+pnpm install
+pnpm tauri dev
+
+<span class="c"># pacote portátil</span>
+pwsh -File scripts/build-portable.ps1</pre>
+            <p>
+              Para o seu agente usar o índice, rode <span class="mono">c2 init --agent</span> (grava o bloco em <span class="mono">AGENTS.md</span>) ou copie o guia completo: <a href="https://github.com/everctba/C2-Desktop/blob/master/docs/agent-instructions.md" rel="noreferrer">docs/agent-instructions.md</a>.<br><br>\n              O repositório é indexado pelo próprio C2 (dogfooding): cada arquivo tem
+              <span class="mono">.c2.json</span> e o agente consulta antes de ler.
+              CI: <a href="https://github.com/everctba/C2-Desktop/actions" rel="noreferrer">GitHub Actions</a>
+              (ubuntu + windows).
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer wrap">
+      <span>C2 — ajuda · Windows 10/11</span>
+      <span>
+        <a href="index.html">Início</a> ·
+        <a href="sobre.html">Sobre / apoiar</a> ·
+        <a href="https://github.com/everctba/C2-Desktop" rel="noreferrer">GitHub</a>
+      </span>
+    </footer>
+    <script src="../i18n.js" defer></script>
+</body>
+</html>
