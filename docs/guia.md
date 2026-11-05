@@ -176,6 +176,11 @@ openai_compat`. A API key **nunca** é gravada no `.c2/config.json`: ela fica no
 Windows Credential Manager (tela Config → Provedor de IA → Salvar chave) ou na
 variável de ambiente `C2_API_KEY` (útil em CI).
 
+Na tela Config, **Esquecer chave** apaga a credencial do cofre local (não
+revoga no provedor — para isso, use o painel do provedor). A chave nunca é
+gravada no `.c2/config.json` nem aparece em logs/dumps: o `Debug` do cliente
+redige o bearer.
+
 Ao ativar a nuvem, o conteúdo dos arquivos é enviado ao provedor — a tela mostra
 esse aviso e você pode voltar para `local` quando quiser. O runtime local não é
 iniciado nesse modo; `model.base_url` apontando para `127.0.0.1` também serve

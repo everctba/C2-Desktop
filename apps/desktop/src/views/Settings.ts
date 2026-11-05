@@ -349,12 +349,13 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   );
   linha.appendChild(
     Button({
-      label: "Remover chave",
+      label: "Esquecer chave",
       size: "xs",
       variant: "ghost",
       onClick: async () => {
         await api.apiKeyDelete();
-        status.textContent = "API key removida do cofre";
+        status.textContent =
+          "chave esquecida (removida do cofre local; revogue no provedor se necessario)";
       },
     }),
   );

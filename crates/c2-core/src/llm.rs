@@ -32,7 +32,7 @@ pub struct Generated {
 }
 
 /// Cliente HTTP do modelo local.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LlmClient {
     url: String,
     health_url: String,
@@ -52,6 +52,20 @@ pub struct LlmClient {
     /// Endpoint local (llama.cpp/ollama): dispensa API key.
     local_endpoint: bool,
     bearer: Option<String>,
+}
+
+impl std::fmt::Debug for LlmClient {
+    /// Redige o bearer: `{:?}` nunca pode imprimir a API key.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LlmClient")
+            .field("url", &self.url)
+            .field("model", &self.model)
+            .field("cloud", &self.cloud)
+            .field("local_endpoint", &self.local_endpoint)
+            .field("instructions_chars", &self.instructions.chars().count())
+            .field("bearer", &self.bearer.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 /// Fonte de semantica: permite trocar o modelo por um dublê nos testes.
@@ -523,6 +537,17 @@ mod tests {
         nuvem.cache_prompt = false;
         let body = nuvem.build_body("instrucoes", "<arquivo/>", 100);
         assert!(body.get("cache_prompt").is_none());
+    }
+
+    #[test]
+    fn debug_do_cliente_nao_expoe_a_chave() {
+        let mut cliente = client("https://api.exemplo.com/v1/chat/completions");
+        cliente.cloud = true;
+        cliente.local_endpoint = false;
+        cliente.bearer = Some("sk-teste-segredo-123".to_string());
+        let dump = format!("{cliente:?}");
+        assert!(!dump.contains("sk-teste-segredo-123"), "chave vazou: {dump}");
+        assert!(dump.contains("<redacted>"), "esperava redacao: {dump}");
     }
 
     #[test]
