@@ -35,7 +35,7 @@ export interface ProjectsContext {
 /** Tela inicial: abrir/inicializar projeto, modelo e runtime. */
 export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   const page = document.createElement("div");
-  page.className = `${styles.page} ${"content"}`;
+  page.className = styles.page;
 
   const header = document.createElement("div");
   header.className = styles.header;
