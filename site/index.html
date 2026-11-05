@@ -272,6 +272,48 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
         </div>
       </section>
 
+      <!-- LEVE POR DESIGN -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Leve por design</span>
+            <h2>Cada arquivo é uma conversa nova</h2>
+            <p>
+              O C2 não mantém histórico entre arquivos: cada interpretação é uma requisição
+              isolada, com contexto pequeno e limpo. Sem acúmulo, sem contaminação de um
+              arquivo no outro e sem precisar de uma GPU enorme para segurar o projeto inteiro.
+              É o que torna o C2 viável numa máquina modesta.
+            </p>
+          </div>
+          <div class="grid grid-3">
+            <article class="card">
+              <span class="k">contexto</span>
+              <h3>Só um arquivo por vez</h3>
+              <p>
+                Instruções fixas + o arquivo atual. Nada de conversa acumulada, nada de
+                contexto que cresce a cada arquivo.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">sem viés</span>
+              <h3>Um arquivo não contamina o outro</h3>
+              <p>
+                Cada metadado nasce do conteúdo daquele arquivo — sem herdar suposições
+                do anterior. Resultado consistente e repetível.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">hardware</span>
+              <h3>Cabe em 8 GB</h3>
+              <p>
+                Um modelo 4B em Q4_K_M (~3,2 GB) roda na GPU ou na CPU. Cache de prompt,
+                quando existe, é só uma otimização opcional.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <!-- NÚMEROS -->
       <section class="section" id="numeros">
         <div class="wrap">

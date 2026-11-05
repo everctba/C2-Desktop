@@ -19,6 +19,9 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Menos erro.** Metadado com `what`, `why`, `goal`, `summary`, `responsibility`.
 - **Menos tokens.** O agente acha o arquivo certo pelo significado, sem abrir o repositório.
 - **Sempre atualizado.** Você não precisa fazer nada, sempre atualizado de maneira automática.
+- **Contexto pequeno e limpo.** Cada arquivo é interpretado do zero, numa requisição
+  independente: sem conversa acumulada, sem contexto gigante e sem contaminação de um
+  arquivo no outro — por isso roda até em máquina modesta.
 - **Busca por intenção.** Descreva o que precisa em linguagem natural
   ("onde impede valores acima do limite") — o C2 procura pelo significado do
   código, não pelo nome do arquivo.

@@ -21,6 +21,11 @@ problema em linguagem natural acha o código pelo significado (~86 ms), sem
 depender do nome do arquivo nem de grep lexical; mais chance de achar o que o
 agente precisa, mais rápido.
 
+**Vantagem de hardware (usar na landing):** cada arquivo é interpretado numa
+requisição isolada (sem histórico entre arquivos) — contexto pequeno, sem viés
+cruzado e viável em máquina modesta. Não dizer que "não precisa de prompt
+caching": cache é otimização opcional, não requisito.
+
 **Terminologia:** no comparativo, a coluna sem o C2 chama-se **"Sem C2"** (não
 "grep lexical").
 
