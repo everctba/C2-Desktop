@@ -32,7 +32,9 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
   no próprio `.c2.json` via MCP (`c2_annotate`), preservadas no reindex.
 - **BYO endpoint.** Já usa LM Studio/Ollama/vLLM? Aponte o C2 para o seu
   servidor OpenAI-compatible; o mesmo seletor serve para local e nuvem.
-- **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional.
+- **Local no contexto, não no workflow.** Modelo e índice rodam na sua máquina;
+  o C2 não envia código. O agente que escreve o código pode ser o melhor modelo
+  da nuvem — ele só lê o resumo. Nuvem no C2 é opcional.
 - **Sem GPU?** Use um provedor OpenAI-compatible com a sua API key
   (Config → Provedor de IA). Rodar na CPU está desativado nesta versão: o modelo
   (~3–4 GB) iria para a RAM e cada arquivo levaria minutos. No modo nuvem o

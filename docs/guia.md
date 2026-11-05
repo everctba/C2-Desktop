@@ -148,7 +148,8 @@ c2 status                                    # estado do índice e do runtime
 - Conteúdo com segredo é bloqueado (`index.secret_policy=skip`, padrão) ou
   mascarado (`mask`); fixtures podem ser liberadas com `// c2:allow-secret`
   ou por `index.secret_allow`.
-- Nada sai da máquina: o modelo é local.
+- O C2 não envia seu código: o modelo e o índice são locais. O agente de código
+  que você usa pode ser na nuvem (ele recebe só o que decidir ler).
 
 ### Anotações de agentes
 

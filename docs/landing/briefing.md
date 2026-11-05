@@ -16,10 +16,11 @@ atualizado em vez de reler o projeto inteiro — é um resumo vivo do código,
 feito para consumo por IA. Comentário é código para humano; Comments 2.0 é
 comentário para IA.
 
-**Posicionamento:** **local-AI-first** como destaque — o padrão é IA local e
-nada saindo da máquina; a nuvem aparece como opção explícita (API key do
-usuário), nunca escondida. Não prometer "100% offline" sem a ressalva de que
-o modo nuvem é escolha do usuário.
+**Posicionamento:** **local-AI-first** como destaque — o **contexto** (índice,
+busca, interpretação) roda local; o agente que escreve o código pode ser o melhor
+modelo da nuvem. A nuvem — no C2 — é opção explícita (API key do usuário), nunca
+escondida. **Não vender "100% offline"**: o workflow real é contexto local +
+agente de código na nuvem.
 
 **Vantagem central (usar na landing):** **consulta por intenção** — descrever o
 problema em linguagem natural acha o código pelo significado (~86 ms), sem

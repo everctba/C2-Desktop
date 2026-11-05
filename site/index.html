@@ -70,6 +70,10 @@
               <strong>what, why, goal, summary e responsibility</strong>, num loop que
               detecta o que mudou e reescreve sozinho. Sua IA paga consome esse resumo
               atualizado e gasta menos tokens — em vez de reler o projeto inteiro.
+              <br /><br />
+              <strong>Local no contexto, não no workflow:</strong> o agente que escreve o
+              código (Claude, GPT, Cursor…) pode continuar sendo o melhor modelo da nuvem.
+              Ele só lê o resumo — não o projeto inteiro.
             </p>
             <div class="cta-row">
               <a class="btn btn-primary" href="#instalar">Instalar</a>
@@ -333,9 +337,12 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
               <span class="k">padrão · local</span>
               <h3>IA local, nada sai</h3>
               <p>
-                Modelo GGUF rodando na sua GPU. Funciona offline, sem conta e sem
-                telemetria. Segredos são detectados antes do modelo e arquivos como
-                <span class="mono">.env</span> nem são abertos.
+                Modelo GGUF rodando na sua GPU. Índice e busca funcionam sem internet,
+                sem conta e sem telemetria. Segredos são detectados antes do modelo e
+                arquivos como <span class="mono">.env</span> nem são abertos.
+                <br /><br />
+                A IA que escreve seu código pode seguir na nuvem — o C2 só entrega
+                contexto pronto.
               </p>
             </article>
             <article class="card">
@@ -545,7 +552,12 @@ c2 grep "onde valida permissão de usuário"</pre>
         <div class="wrap">
           <div class="section-head">
             <span class="eyebrow">Privacidade</span>
-            <h2>Local-first: seu código não sai por padrão</h2>
+            <h2>Local-first: o contexto é local por padrão</h2>
+            <p>
+              Local aqui significa <strong>indexação, busca e interpretação</strong>.
+              O agente de código que você usa (Claude, GPT, Cursor…) pode continuar
+              na nuvem: ele recebe só o que decidir ler, e o C2 reduz esse volume.
+            </p>
           </div>
           <div class="grid grid-3">
             <article class="card">
@@ -651,14 +663,26 @@ c2 grep "onde valida permissão de usuário"</pre>
             <details>
               <summary>Precisa de internet?</summary>
               <div class="answer">
-                Só para baixar o pacote e o modelo. Índice, busca e runtime são locais.
-                Se você ativar o modo nuvem opcional, o provedor escolhido precisa de
-                internet.
+                Para baixar o pacote/modelo e para usar seu agente de código na nuvem.
+                Índice, busca e o modelo local funcionam sem internet. Se você ativar o
+                provedor de nuvem opcional no C2, ele também precisa de internet.
               </div>
             </details>
             <details>
               <summary>Meu código vai para algum servidor?</summary>
-              <div class="answer">Não. Modelo e índice ficam na máquina.</div>
+              <div class="answer">
+                O C2 não envia: modelo e índice ficam na máquina. Mas o agente de IA que
+                você usa para codar (Claude, GPT, Cursor…) pode enviar à nuvem os arquivos
+                que ele ler — o C2 reduz o que ele precisa ler.
+              </div>
+            </details>
+            <details>
+              <summary>O C2 é 100% offline?</summary>
+              <div class="answer">
+                Não usamos esse mote. Índice, busca e interpretação rodam localmente; seu
+                agente de código normalmente é na nuvem. Local-first aqui é sobre
+                <strong>contexto</strong>, não sobre o workflow inteiro.
+              </div>
             </details>
             <details>
               <summary>Funciona em monorepo?</summary>
