@@ -291,3 +291,30 @@
 .linkButton:hover {
   color: var(--accent-3);
 }
+
+.promptFluxo {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--accent-3);
+  margin-bottom: var(--space-2xs);
+}
+
+.promptArea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  margin-top: var(--space-s);
+  padding: var(--space-m);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  background: var(--bg-body);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.promptArea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

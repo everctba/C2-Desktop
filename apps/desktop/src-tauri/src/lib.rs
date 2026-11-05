@@ -650,6 +650,11 @@ async fn mcp_smoke(root: String) -> McpStatus {
 }
 
 #[tauri::command]
+fn prompt_default() -> String {
+    c2_core::config::DEFAULT_PROMPT.to_string()
+}
+
+#[tauri::command]
 fn pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
         .file()
@@ -694,6 +699,7 @@ pub fn run() {
             pick_model,
             model_inspect,
             model_set,
+            prompt_default,
             mcp_smoke,
             runtime_plan,
             model_load

@@ -234,6 +234,59 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   montarCard("Workspace", 2, WORKSPACE_FIELDS);
   montarCard("Runtime", 4, RUNTIME_FIELDS);
 
+  // ---- Prompt de indexacao (personalizavel) ----
+  const promptInicial = String(lerConfig(config, "index.prompt") ?? "");
+  iniciais.set("index.prompt", promptInicial);
+
+  const promptCard = Card({ title: "Prompt de indexação", accent: 6 });
+  const promptBody = cardBody(promptCard);
+
+  const fluxo = document.createElement("p");
+  fluxo.className = styles.promptFluxo;
+  fluxo.textContent = "prompt = instruções + conteúdo do arquivo 1 → resposta";
+  promptBody.appendChild(fluxo);
+
+  const explicacao = document.createElement("p");
+  explicacao.className = "pageHint";
+  explicacao.style.maxWidth = "none";
+  explicacao.textContent =
+    "Estas instruções são enviadas ao modelo junto com o conteúdo de cada arquivo. " +
+    "A linha que trata o arquivo como DADO (e não instrução) é fixa e não pode ser removida.";
+  promptBody.appendChild(explicacao);
+
+  const area = document.createElement("textarea");
+  area.className = styles.promptArea;
+  area.rows = 12;
+  area.spellcheck = false;
+  area.value = promptInicial;
+  promptBody.appendChild(area);
+
+  const promptAcoes = document.createElement("div");
+  promptAcoes.className = styles.actions;
+  let padrao = "";
+  try {
+    padrao = await api.promptDefault();
+  } catch {
+    padrao = "";
+  }
+  if (padrao) {
+    promptAcoes.appendChild(
+      Button({
+        label: "Restaurar padrão",
+        size: "xs",
+        variant: "secondary",
+        onClick: () => {
+          area.value = padrao;
+          status.textContent = "prompt restaurado (salve para aplicar)";
+        },
+      }),
+    );
+  }
+  promptBody.appendChild(promptAcoes);
+
+  controles.set("index.prompt", { kind: "text", get: () => area.value });
+  page.appendChild(promptCard);
+
   const rodape = document.createElement("div");
   rodape.className = styles.actions;
   const salvar = Button({

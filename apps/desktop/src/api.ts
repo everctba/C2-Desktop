@@ -68,6 +68,7 @@ export const api = {
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
+  promptDefault: () => invoke<string>("prompt_default"),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),

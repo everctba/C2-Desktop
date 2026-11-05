@@ -101,6 +101,10 @@ pub struct IndexConfig {
     pub max_links_per_file: usize,
     /// O que fazer com arquivo que contem segredo.
     pub secret_policy: SecretPolicy,
+    /// Instrucoes base enviadas ao modelo (o conteudo do arquivo e anexado
+    /// depois, sempre delimitado e marcado como dado). Vazio = invalido.
+    #[serde(default = "default_prompt")]
+    pub prompt: String,
     /// Caminhos (prefixo relativo) liberados da checagem de segredo, para
     /// arquivos com fixtures de teste. Use com cuidado.
     pub secret_allow: Vec<String>,
@@ -119,11 +123,24 @@ impl Default for IndexConfig {
             respect_gitignore: true,
             max_links_per_file: 64,
             secret_policy: SecretPolicy::Skip,
+            prompt: DEFAULT_PROMPT.to_string(),
             secret_allow: Vec::new(),
             max_total_bytes_per_run: 64 * 1024 * 1024,
             link_fallback: Vec::new(),
         }
     }
+}
+
+/// Instrucoes padrao enviadas ao modelo para gerar o metadado semantico.
+/// Editavel via `c2 config set index.prompt "<texto>"` ou pela tela Config.
+pub const DEFAULT_PROMPT: &str = "\
+Voce e um arquiteto de software. Analise o arquivo abaixo e descreva a responsabilidade dele no projeto.
+Responda APENAS com um objeto JSON valido, sem markdown, sem cercas de codigo e sem texto fora do JSON.
+Formato exato: {\"what\":\"...\",\"why\":\"...\",\"goal\":\"...\",\"summary\":\"...\",\"responsibility\":\"...\"}
+Regras: frases curtas; what = do que trata; why = por que existe; goal = o que garante; summary = responsabilidade em uma frase; responsibility = o que e de sua propriedade.";
+
+fn default_prompt() -> String {
+    DEFAULT_PROMPT.to_string()
 }
 
 /// Extensoes de texto indexaveis por padrao.
@@ -288,6 +305,9 @@ impl Config {
         }
         if self.model.max_tokens < 64 {
             return invalid("model.max_tokens deve ser >= 64".to_string());
+        }
+        if self.index.prompt.trim().is_empty() {
+            return invalid("index.prompt nao pode ser vazio".to_string());
         }
         if self.model.max_input_chars < 1000 {
             return invalid("model.max_input_chars deve ser >= 1000".to_string());
