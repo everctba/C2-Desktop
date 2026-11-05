@@ -115,24 +115,49 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
         },
       },
     };
+    const texto = JSON.stringify(config, null, 2);
+    const bloco = document.createElement("div");
+    bloco.className = styles.configCard;
+
+    const topo = document.createElement("div");
+    topo.className = styles.configTopo;
+    const rotulo = document.createElement("span");
+    rotulo.className = styles.configLabel;
+    rotulo.textContent = "configuração do cliente MCP";
+    const copiar = Button({
+      iconName: "copy",
+      iconOnly: true,
+      size: "sm",
+      variant: "secondary",
+      onClick: async () => {
+        try {
+          // plugin nativo do Tauri: copia sem o prompt de permissao do WebView2
+          const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
+          await writeText(texto);
+        } catch {
+          try {
+            await navigator.clipboard.writeText(texto);
+          } catch {
+            copiar.title = "Não foi possível copiar";
+            return;
+          }
+        }
+        copiar.title = "Copiado!";
+        setTimeout(() => {
+          copiar.title = "Copiar configuração";
+        }, 1600);
+      },
+    });
+    copiar.title = "Copiar configuração";
+    copiar.setAttribute("aria-label", "Copiar configuração");
+    topo.append(rotulo, copiar);
+
     const pre = document.createElement("pre");
     pre.className = styles.pre;
-    pre.textContent = JSON.stringify(config, null, 2);
-    conectarCorpo.appendChild(pre);
-    conectarCorpo.appendChild(
-      Button({
-        label: "Copiar configuração",
-        size: "xs",
-        variant: "secondary",
-        onClick: async () => {
-          try {
-            await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-          } catch {
-            /* sem clipboard */
-          }
-        },
-      }),
-    );
+    pre.textContent = texto;
+
+    bloco.append(topo, pre);
+    conectarCorpo.appendChild(bloco);
     const nota = document.createElement("p");
     nota.className = "pageHint";
     nota.textContent =

@@ -9,7 +9,8 @@ export type IconName =
   | "refresh"
   | "settings"
   | "close"
-  | "mcp";
+  | "mcp"
+  | "copy";
 
 const PATHS: Record<IconName, string> = {
   // pasta
@@ -22,6 +23,9 @@ const PATHS: Record<IconName, string> = {
   stop: "M3 3h9v9H3z",
   refresh: "M8 2a6 6 0 1 1-5.7 4.1l1.6.6A4.3 4.3 0 1 0 8 3.7V6L4.5 3 8 0z",
   // engrenagem
+  // prancheta com aba (copiar)
+  copy:
+    "M4 4h9v10H4zM5.5 5.5v7h6v-7zM6 2h5v2H6z",
   // plugue (MCP)
   mcp:
     "M5 2h2v3H5zM9 2h2v3H9zM4 5h8v2a4 4 0 0 1-8 0zM7 11h2v3H7z",
@@ -34,5 +38,5 @@ const PATHS: Record<IconName, string> = {
 
 export function icon(name: IconName, size = 16): string {
   const path = PATHS[name];
-  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true" focusable="false" style="display:block"><path d="${path}" fill="currentColor"/></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" aria-hidden="true" focusable="false" style="display:block"><path d="${path}" fill="currentColor" fill-rule="evenodd"/></svg>`;
 }

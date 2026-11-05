@@ -247,3 +247,27 @@
   background: var(--bg-surface-2);
   border-radius: var(--input-radius);
 }
+
+.configCard {
+  display: grid;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  padding: var(--space-s);
+  min-width: 0;
+}
+
+.configTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-s);
+  padding-bottom: var(--space-2xs);
+}
+
+.configLabel {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subtle);
+}
