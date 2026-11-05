@@ -124,7 +124,7 @@ Configuração pronta na aba **MCP** da janela.
 | | |
 |---|---|
 | Windows 10/11 (x64) | suportado e validado |
-| Linux | build pronto (`scripts/build-linux.sh`), execução em validação; cofre via Secret Service (`libdbus-1`) |
+| Linux | build em validação; cofre via Secret Service (`libdbus-1`); artefatos pelo workflow **build-linux** (Actions → Run workflow) |
 | macOS | planejado; cofre já preparado via Keychain |
 
 ## Quando NÃO vale
