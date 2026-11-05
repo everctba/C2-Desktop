@@ -1,0 +1,62 @@
+name: pages
+
+# Publica a landing/ajuda/sobre (PT na raiz e EN em /en/) no GitHub Pages.
+# Configuracao unica no repo: Settings -> Pages -> Source = "GitHub Actions".
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - "scripts/build-site-en.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy site
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias do gerador EN
+        run: pip install lxml
+
+      - name: Regenerar paginas EN
+        run: python scripts/build-site-en.py
+
+      - name: Validar site
+        run: |
+          test -f site/index.html
+          test -f site/ajuda.html
+          test -f site/sobre.html
+          test -f site/en/index.html
+          test -f site/en/ajuda.html
+          test -f site/en/sobre.html
+          grep -q 'hreflang="en"' site/index.html
+          grep -q 'hreflang="pt-BR"' site/en/index.html
+          touch site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

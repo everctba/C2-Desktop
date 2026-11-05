@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://everctba.github.io/C2-Desktop/sitemap.xml
