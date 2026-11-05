@@ -176,7 +176,18 @@ carrega a *teleologia* que o próximo agente não conseguiria inferir sozinho.
 Quando descobrir algo **não óbvio pelo código** — invariante sutil, motivo real
 da existência do arquivo, armadilha de manutenção — registre com a tool MCP
 `c2_annotate` (`file`, `text`, `kind` = `teleology` | `invariant` | `gotcha` |
-`correction` | `pending` | `note`; opcionalmente `task`/`model`). Regras:
+`correction` | `pending` | `note`; opcionalmente `task`/`model`).
+
+| kind | pergunta que responde | exemplo |
+|---|---|---|
+| `teleology` | por que existe? | “Existe para evitar N+1 no checkout.” |
+| `invariant` | o que nunca pode quebrar? | “O score nunca é negativo; empates ordenam por caminho.” |
+| `gotcha` | o que parece uma coisa e é outra? | “Parece cache opcional, mas remover quebra o 1º request.” |
+| `correction` | onde eu pensei A e era B? | “Achei que o total vinha do banco; é recalculado.” |
+| `pending` | o que ainda depende do humano? | “Confirmar com o cliente se desconto vale no frete.” |
+| `note` | genérico | observação que não se encaixa acima |
+
+Regras:
 
 - curto: até 2.000 caracteres; máximo 10 anotações por arquivo;
 - **não** anote o óbvio nem repita a semântica já gerada;

@@ -157,7 +157,18 @@ O agente de IA pode anexar descobertas não óbvias ao metadado com a tool MCP
 `c2_annotate` (ou `c2 note add <arquivo> "<texto>" --kind invariant`). Tipos:
 `teleology` (por que existe), `invariant` (regra que nunca quebra), `gotcha`
 (armadilha), `correction` (pensou A, era B), `pending` (decisao do humano
-pendente) e `note`. O critério é tirar do agente a **descrição do óbvio** e
+pendente) e `note`.
+
+| kind | pergunta que responde | exemplo |
+|---|---|---|
+| `teleology` | por que existe? | “Existe para evitar N+1 no checkout.” |
+| `invariant` | o que nunca pode quebrar? | “O score nunca é negativo; empates ordenam por caminho.” |
+| `gotcha` | o que parece uma coisa e é outra? | “Parece cache opcional, mas remover quebra o 1º request.” |
+| `correction` | onde eu pensei A e era B? | “Achei que o total vinha do banco; é recalculado.” |
+| `pending` | o que ainda depende do humano? | “Confirmar com o cliente se desconto vale no frete.” |
+| `note` | genérico | observação que não se encaixa acima |
+
+ O critério é tirar do agente a **descrição do óbvio** e
 pedir a **teleologia**: por que existe, o que quebra se remover, o que o código
 não revela — 1–2 anotações por tarefa, não uma por arquivo. As
 anotações ficam em `agent_notes`, no máximo 10 por arquivo (2.000 caracteres
