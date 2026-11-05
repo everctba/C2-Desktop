@@ -23,4 +23,4 @@ keyring = { version = "3", default-features = false, features = ["apple-native"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Secret Service: GNOME Keyring/KWallet. Em host sem cofre, use C2_API_KEY.
-keyring = { version = "3", default-features = false, features = ["sync-secret-service"] }
+keyring = { version = "3", default-features = false, features = ["sync-secret-service", "crypto-rust"] }
