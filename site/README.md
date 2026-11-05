@@ -96,3 +96,21 @@ python scripts/build-site-en.py   # gera site/en/{index,ajuda,sobre}.html + href
 
 Obs.: a tradução de parágrafos longos com links inline ainda é parcial
 (acompanhada em `c2-gj4.4`).
+
+## Deploy (GitHub Pages)
+
+O workflow [`.github/workflows/pages.yml`](../.github/workflows/pages.yml) publica
+`site/` no GitHub Pages a cada push que mexa em `site/**` (ou manualmente em
+Actions → pages).
+
+**Configuração única no repositório** (admin): **Settings → Pages → Build and
+deployment → Source = GitHub Actions**. Sem isso o primeiro run falha com
+`Resource not accessible by integration` ao criar o site.
+
+Publica a raiz (PT) e `/en/` (EN), com `sitemap.xml`, `robots.txt` e
+`.nojekyll`. URLs esperadas:
+
+```text
+https://everctba.github.io/C2-Desktop/
+https://everctba.github.io/C2-Desktop/en/
+```
