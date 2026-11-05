@@ -87,8 +87,8 @@ c2 logs --lines 20
 ## Desktop
 
 Janela Tauri com **Projetos**, **Engine** (log ao vivo, contadores),
-**Busca** (score, destaque dos termos, relacionados), **MCP** e **Config**.
-Seletor de modelo valida cabeçalho e VRAM antes de carregar.
+**Busca** (score, destaque dos termos, relacionados), **MCP** e **Config**
+(prompt de indexação editável). Seletor de modelo valida cabeçalho e VRAM antes de carregar.
 
 ## MCP
 

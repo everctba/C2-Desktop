@@ -140,6 +140,9 @@ c2 status                                    # estado do índice e do runtime
 
 - `.env`, chaves privadas (`*.pem`, `id_rsa`…) e credenciais são **pulados
   antes de serem abertos**.
+- As instruções enviadas ao modelo ficam em `index.prompt` (editável na tela
+  Config ou `c2 config set index.prompt "..."`); a linha que trata o arquivo
+  como DADO é fixa e não pode ser removida.
 - Conteúdo com segredo é bloqueado (`index.secret_policy=skip`, padrão) ou
   mascarado (`mask`); fixtures podem ser liberadas com `// c2:allow-secret`
   ou por `index.secret_allow`.
