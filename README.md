@@ -28,7 +28,10 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Resposta em milissegundos.** `c2 grep` p50 **60 ms**, `c2 related` **49 ms**;
   a consulta semântica resolve em **86 ms** o que a busca lexical não encontra.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
-- **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional. 
+- **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional.
+- **Sem GPU?** Rode na CPU (mais lento) ou use um provedor OpenAI-compatible com a
+  sua API key (Config → Provedor de IA). No modo nuvem o conteúdo dos arquivos é
+  enviado ao provedor — o app avisa antes. 
 - **Sem infra.** Sem banco, sem embeddings — só arquivos ao lado do código.
 - **Reversível.** `c2 cleaner` remove; `c2 migrate` converte metadado antigo.
 

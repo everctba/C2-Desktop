@@ -739,6 +739,11 @@ async fn provider_test(root: String) -> ProviderTest {
 }
 
 #[tauri::command]
+fn gpu_info() -> Option<c2_core::gpu::GpuInfo> {
+    c2_core::gpu::detect()
+}
+
+#[tauri::command]
 fn prompt_default() -> String {
     c2_core::config::DEFAULT_PROMPT.to_string()
 }
@@ -789,6 +794,7 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            gpu_info,
             mcp_smoke,
             api_key_set,
             api_key_delete,

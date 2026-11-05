@@ -8,6 +8,7 @@
 import type {
   FileEntry,
   Hit,
+  GpuInfo,
   McpStatus,
   ModelInspection,
   ProviderTest,
@@ -70,6 +71,7 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: () => invoke<string>("prompt_default"),
+  gpuInfo: () => invoke<GpuInfo | null>("gpu_info"),
   apiKeySet: (key: string) => invoke<void>("api_key_set", { key }),
   apiKeyDelete: () => invoke<void>("api_key_delete"),
   apiKeyStatus: () => invoke<boolean>("api_key_status"),
@@ -244,6 +246,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return MOCK_ROOT as T;
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
+    case "gpu_info":
+      return null as T;
     case "api_key_set":
       return undefined as T;
     case "api_key_delete":

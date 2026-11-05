@@ -148,6 +148,10 @@ function openWelcomeFlow(): void {
       state.route = "engine";
       render();
     },
+    openSettings: () => {
+      state.route = "settings";
+      render();
+    },
     dismiss: () => {
       localStorage.setItem("c2.onboarded", "1");
     },

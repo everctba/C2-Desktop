@@ -1,3 +1,4 @@
+import { api } from "../api";
 import { Button } from "../ui/Button";
 import { createDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
@@ -15,6 +16,8 @@ export interface WelcomeHandlers {
   finish: () => void;
   /// Fecha marcando como concluido (nao aparece de novo).
   dismiss: () => void;
+  /// Abre a tela de Configuracoes (ex.: configurar provedor de nuvem).
+  openSettings: () => void;
 }
 
 /**
@@ -76,6 +79,56 @@ export function openWelcome(handlers: WelcomeHandlers): void {
       const instrucoes = modelInstructions();
       if (instrucoes instanceof HTMLDetailsElement) instrucoes.open = true;
       corpo.appendChild(instrucoes);
+
+      // Sem GPU (ou VRAM insuficiente): sugerir CPU ou provedor de nuvem.
+      const avisoGpu = document.createElement("div");
+      corpo.appendChild(avisoGpu);
+      void api
+        .gpuInfo()
+        .then((gpu) => {
+          const suficiente = gpu !== null && gpu.total_mb >= 4096;
+          if (suficiente) {
+            const nota = texto("GPU detectada: " + gpu!.name + " (" + Math.round(gpu!.total_mb / 1024) + " GB).");
+            nota.style.opacity = "0.7";
+            avisoGpu.appendChild(nota);
+            return;
+          }
+          const box = document.createElement("div");
+          box.className = styles.gpuAviso;
+          const tituloBox = document.createElement("strong");
+          tituloBox.textContent = gpu
+            ? "VRAM insuficiente para o modelo recomendado"
+            : "Nenhuma GPU detectada";
+          const explica = document.createElement("p");
+          explica.textContent =
+            "Você não precisa de GPU para usar o C2: dá para rodar na CPU (mais lento) " +
+            "ou apontar para um provedor OpenAI-compatible com a sua própria API key " +
+            "(OpenAI, Groq, DeepSeek…). No modo nuvem o conteúdo dos arquivos sai da " +
+            "máquina — o aviso aparece na tela Config.";
+          const acoes = document.createElement("div");
+          acoes.className = styles.actions;
+          acoes.appendChild(
+            Button({
+              label: "Configurar nuvem",
+              size: "xs",
+              variant: "primary",
+              onClick: () => handlers.openSettings(),
+            }),
+          );
+          acoes.appendChild(
+            Button({
+              label: "Continuar na CPU",
+              size: "xs",
+              variant: "ghost",
+              onClick: () => handlers.dismiss(),
+            }),
+          );
+          box.append(tituloBox, explica, acoes);
+          avisoGpu.appendChild(box);
+        })
+        .catch(() => {
+          /* sem deteccao: segue o fluxo normal */
+        });
     }
 
     if (atual === 1) {

@@ -318,3 +318,19 @@
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+.gpuAviso {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-l);
+  border: 1px solid var(--warning-30);
+  border-radius: var(--radius);
+  background: var(--warning-10);
+  font-size: var(--text-s);
+  color: var(--text);
+}
+
+.gpuAviso p {
+  margin: 0;
+  color: var(--text-muted);
+}
