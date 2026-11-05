@@ -277,19 +277,6 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
             outcome.root.display()
         );
     }
-    println!("Configuracao: {}", outcome.config_path.display());
-    println!("Arquivos descobertos: {}", outcome.files);
-    if !outcome.languages.is_empty() {
-        let top: Vec<String> = outcome
-            .languages
-            .iter()
-            .rev()
-            .take(8)
-            .map(|(ext, count)| format!("{ext}:{count}"))
-            .collect();
-        println!("Linguagens: {}", top.join("  "));
-    }
-    println!();
 
     if let Some(caminho) = &agents_path {
         println!();
