@@ -301,13 +301,15 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
 /// Bloco de regras que ensina um agente a consultar os comentarios antes do codigo.
 const AGENT_SNIPPET: &str = "## Contexto antes de codigo (C2)
 
-Este projeto tem comentarios semanticos do C2: ao lado de cada arquivo existe um
-`<arquivo>.c2.json` com what/why/goal/summary/responsibility e links[].
+Existe um `<arquivo>.c2.json` ao lado de cada arquivo de codigo (mesmo
+diretorio, mesmo basename). Ele fornece o contexto semantico do codigo:
+what/why/goal/summary/responsibility e links[].
 
 Ordem de investigacao:
-1. `c2 status` - os comentarios estao atualizados?
-2. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
-3. Leia o `.c2.json` do candidato ANTES do arquivo de codigo.
+1. ANTES de ler um arquivo de codigo, leia o `<arquivo>.c2.json` ao lado.
+   Essa e a regra mais importante do projeto: contexto antes de codigo.
+2. `c2 status` - os comentarios estao atualizados?
+3. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
 4. `c2 related <arquivo>` - vizinhos do grafo.
 5. `c2 read <arquivo> --lines A:B` - so o trecho necessario.
 

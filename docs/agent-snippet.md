@@ -8,8 +8,9 @@ Cole este bloco no arquivo de regras do seu agente (CLAUDE.md, `.cursor/rules/`,
 
 ## Contexto antes de código
 
-Este projeto tem comentários semânticos do **C2**. Ao lado de cada arquivo existe um
-`<arquivo>.c2.json` com metadados semânticos gerados por modelo local. Ele
+Existe um `<arquivo>.c2.json` ao lado de cada arquivo de código (mesmo
+diretório, mesmo basename). Ele fornece o contexto semântico do código, gerado
+por modelo local. Ele
 responde "o que é, por que existe, qual o objetivo, qual a responsabilidade,
 quais arquivos se relacionam" — em ~300 tokens, contra milhares do código.
 
@@ -18,9 +19,10 @@ decidir *se* vale ler o código.
 
 ## Ordem obrigatória de investigação
 
-1. `c2 status` — engine ativo e índice atualizado? Se não: `c2 start`.
-2. `c2 grep "<tarefa em linguagem natural>" --limit 5` — candidatos.
-3. Leia o `.c2.json` de cada candidato **antes** do arquivo de código.
+1. **Antes de ler um arquivo de código, leia o `<arquivo>.c2.json` ao lado**
+   (mesmo diretório, mesmo basename). Essa é a regra mais importante do projeto.
+2. `c2 status` — engine ativo e comentários atualizados? Se não: `c2 start`.
+3. `c2 grep "<tarefa em linguagem natural>" --limit 5` — candidatos.
 4. `c2 related <arquivo>` — vizinhos do grafo antes de abrir mais arquivos.
 5. `c2 read <arquivo> --lines A:B` — só o trecho necessário.
 6. Arquivo inteiro apenas como último recurso, com motivo.

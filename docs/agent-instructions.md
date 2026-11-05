@@ -42,13 +42,16 @@ o projeto.
 
 ## 3. Ordem obrigatória de investigação
 
-1. **`c2 status`**
+1. **Antes de ler um arquivo de código, leia o `<arquivo>.c2.json` ao lado**
+   (mesmo diretório, mesmo basename). Essa é a regra mais importante do projeto:
+   contexto antes de código. O metadado diz o que é, por que existe, o que
+   garante e do que depende — em ~300 tokens.
+2. **`c2 status`**
    O índice está atualizado? Há pendentes? O engine está rodando?
    Se houver pendentes e você tiver permissão: `c2 start` (ou `c2 reindex`).
-2. **`c2 grep "<tarefa em linguagem natural>" --limit 5`**
+3. **`c2 grep "<tarefa em linguagem natural>" --limit 5`**
    Busca por significado. Use o vocabulário do **problema**, não o nome do
    arquivo que você imagina. Ex.: `c2 grep "onde impede valores acima do limite"`.
-3. **Leia o `.c2.json` de cada candidato** antes do arquivo de código.
 4. **`c2 related <arquivo>`** — vizinhos do grafo (`usa` / `usado por`).
    Só abra mais arquivos se o grafo mostrar que precisa.
 5. **`c2 read <arquivo> --lines A:B`** — apenas o trecho necessário.
