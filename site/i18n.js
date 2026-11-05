@@ -1,0 +1,380 @@
+/**
+ * i18n do site estático (landing/ajuda/sobre).
+ *
+ * Estratégia sem build e sem SPA: dicionário PT -> EN aplicado nos nós de texto
+ * e atributos (placeholder/title/aria-label). O original é guardado para voltar
+ * ao português. A escolha fica em localStorage (`site.lang`).
+ */
+(function () {
+  const CHAVE = "site.lang";
+  const PADRAO = "pt-BR";
+
+  const EN = {
+    // navegação / chrome
+    "Como funciona": "How it works",
+    "Números": "Numbers",
+    Instalar: "Install",
+    Ajuda: "Help",
+    Sobre: "About",
+    GitHub: "GitHub",
+    "Comments 2.0 for AI · local-first": "Comments 2.0 for AI · local-first",
+    "Comments 2.0 for AI": "Comments 2.0 for AI",
+
+    // hero
+    "Seu código comentado por IA local.": "Your code commented by local AI.",
+    "Sua IA lê o comentário — não o projeto.": "Your AI reads the comment — not the project.",
+    "O C2 usa uma": "C2 uses a",
+    "para comentar cada arquivo com": "to comment each file with",
+    ", num loop que": ", in a loop that",
+    "detecta o que mudou e reescreve sozinho. Sua IA paga consome esse resumo":
+      "detects what changed and rewrites itself. Your paid AI consumes this summary",
+    "atualizado e gasta menos tokens — em vez de reler o projeto inteiro.":
+      "up to date and spends fewer tokens — instead of re-reading the whole project.",
+    "Local no contexto, não no workflow:": "Local in context, not in the workflow:",
+    "o agente que escreve o código (Claude, GPT, Cursor…) pode continuar sendo o melhor modelo da nuvem.":
+      "the agent writing the code (Claude, GPT, Cursor…) can still be the best cloud model.",
+    "Ele só lê o resumo — não o projeto inteiro.": "It only reads the summary — not the whole project.",
+    "Como usar": "How to use",
+    "Windows 10/11 · local-AI-first · nuvem opcional com sua API key · sem embeddings":
+      "Windows 10/11 · local-AI-first · optional cloud with your API key · no embeddings",
+
+    // seção comentário
+    "O comentário que a sua IA deveria ler": "The comment your AI should be reading",
+    "Em vez de `// calcula o total`, o C2 escreve o significado do arquivo — e mantém isso atualizado sozinho.":
+      "Instead of `// computes the total`, C2 writes the file's meaning — and keeps it up to date automatically.",
+    "Por que isso economiza tokens": "Why this saves tokens",
+    "O comentário diz o que o arquivo faz, por que ele existe e até onde vai em poucas linhas. Sua IA entende o projeto sem abrir cada arquivo — e, quando precisa do detalhe, sabe exatamente onde clicar.":
+      "The comment says what the file does, why it exists and how far it goes in a few lines. Your AI understands the project without opening every file — and when it needs detail, it knows exactly where to look.",
+    "o que é": "what it is",
+    "por que existe": "why it exists",
+    "que objetivo garante": "which goal it guarantees",
+    "o resumo que substitui a leitura": "the summary that replaces reading",
+    "a fronteira do que não é dele": "the boundary of what is not its responsibility",
+
+    // problema
+    "Toda tarefa começa com “onde fica isso mesmo?”": "Every task starts with “where is that again?”",
+    "Um agente de IA chega sem mapa. Ele gasta contexto redescobrindo a estrutura do projeto — e ainda pode errar o arquivo.":
+      "An AI agent arrives without a map. It spends context rediscovering the project structure — and may still pick the wrong file.",
+    Tokens: "Tokens",
+    "Contexto desperdiçado": "Wasted context",
+    "Ler arquivos para descobrir a arquitetura consome a janela antes da tarefa começar.":
+      "Reading files to discover the architecture consumes the window before the task starts.",
+    "Sem C2, só grep": "Without C2, just grep",
+    "Quem busca “onde impede valores acima do permitido” não encontra `valor <= self.limite`.":
+      "Searching for “where it blocks values above the limit” does not find `valor <= self.limite`.",
+    "Índice tradicional pesa": "Traditional indexes are heavy",
+    "Embeddings e banco vetorial trazem infra, custo e tiram o dado da sua máquina.":
+      "Embeddings and vector databases bring infra, cost and take data off your machine.",
+
+    // como funciona
+    "Um loop que comenta sozinho": "A loop that comments by itself",
+    "IA local escreve; o hash decide quando reescrever. Sua IA paga só lê o resultado.":
+      "Local AI writes; the hash decides when to rewrite. Your paid AI only reads the result.",
+    "IA local comenta": "Local AI comments",
+    "O C2 lê o arquivo e pede ao modelo local `what | why | goal | summary | responsibility`. Nasce um comentário semântico de verdade.":
+      "C2 reads the file and asks the local model for `what | why | goal | summary | responsibility`. A truly semantic comment is born.",
+    "Loop detecta mudança": "Loop detects change",
+    "Um hash por arquivo mostra o que mudou. Só o alterado chama o modelo — o comentário é reescrito e fica atualizado, sem trabalho manual.":
+      "A hash per file shows what changed. Only changed files call the model — the comment is rewritten and stays current, with no manual work.",
+    "Sua IA consome": "Your AI consumes",
+    "O comentário vira contexto barato: sua IA paga entende o projeto sem reler tudo, usando `c2 grep`, `c2 related` e o MCP.":
+      "The comment becomes cheap context: your paid AI understands the project without re-reading everything, using `c2 grep`, `c2 related` and MCP.",
+    "O que entra no metadado": "What goes into the metadata",
+    "Semântica": "Semantics",
+    "O que é, por que existe, objetivo, resumo e fronteira de responsabilidade.":
+      "What it is, why it exists, goal, summary and responsibility boundary.",
+    Grafo: "Graph",
+    "Imports, mod, use, require — arestas sem chamar o modelo.":
+      "Imports, mod, use, require — edges without calling the model.",
+    Identidade: "Identity",
+    "Hash e tamanho detectam mudança real; resumo por hash reaproveita o metadado.":
+      "Hash and size detect real changes; per-hash summary reuses the metadata.",
+
+    // o que muda
+    "O que isso muda na prática": "What that changes in practice",
+    "Por intenção": "By intent",
+    "Pergunte com suas palavras": "Ask in your own words",
+    "“Onde impede valores acima do limite” acha o código certo mesmo sem o termo exato existir no arquivo.":
+      "“Where it blocks values above the limit” finds the right code even when the exact term does not exist in the file.",
+    "Mais alcance": "More reach",
+    "Ache o que o grep não acha": "Find what grep does not find",
+    "No corpus de 507 arquivos, a consulta semântica achou o que a busca lexical devolveu 0 resultados.":
+      "On the 507-file corpus, the semantic query found what the lexical search returned 0 results for.",
+    "Mais rápido": "Faster",
+    "Resposta em milissegundos": "Answer in milliseconds",
+    "Consulta em 86 ms, `c2 grep` p50 60 ms e `c2 related` 49 ms — sem varrer o projeto.":
+      "Query in 86 ms, `c2 grep` p50 60 ms and `c2 related` 49 ms — without scanning the project.",
+
+    // leve por design
+    "Leve por design": "Light by design",
+    "Cada arquivo é uma conversa nova": "Each file is a new conversation",
+    "O C2 não mantém histórico entre arquivos: cada interpretação é uma requisição isolada, com contexto pequeno e limpo. Sem acúmulo, sem contaminação de um arquivo no outro e sem precisar de uma GPU enorme para segurar o projeto inteiro. É o que torna o C2 viável numa máquina modesta.":
+      "C2 keeps no history between files: each interpretation is an isolated request with a small, clean context. No accumulation, no cross-file contamination and no huge GPU to hold the whole project. That is what makes C2 viable on a modest machine.",
+    contexto: "context",
+    "Só um arquivo por vez": "Only one file at a time",
+    "Instruções fixas + o arquivo atual. Nada de conversa acumulada, nada de contexto que cresce a cada arquivo.":
+      "Fixed instructions + the current file. No accumulated conversation, no context growing with each file.",
+    "sem viés": "no bias",
+    "Um arquivo não contamina o outro": "One file does not contaminate the other",
+    "Cada metadado nasce do conteúdo daquele arquivo — sem herdar suposições do anterior. Resultado consistente e repetível.":
+      "Each metadata item is born from that file's content — without inheriting assumptions from the previous one. Consistent and repeatable.",
+    hardware: "hardware",
+    "Cabe em sua GPU de 8 GB": "Fits in your 8 GB GPU",
+    "Um modelo de 4B como o Gemma 4 já é suficiente na GPU de 8 GB. Rodar na CPU está desativado nesta versão (a experiência seria ruim). Cache de prompt é só uma otimização opcional.":
+      "A 4B model like Gemma 4 is enough on an 8 GB GPU. Running on CPU is disabled in this version (the experience would be bad). Prompt cache is just an optional optimization.",
+
+    // local-first
+    "Primeiro local. Nuvem só se você quiser.": "Local first. Cloud only if you want it.",
+    "O padrão é a IA rodar na sua máquina: índice, busca e metadados não saem dela. Mas não escondemos o outro caminho — quem não tem GPU (ou prefere pagar pouco por modelo) pode apontar o C2 para um provedor OpenAI-compatible com a própria API key.":
+      "The default is AI running on your machine: index, search and metadata never leave it. But we do not hide the other path — those without a GPU (or who prefer paying a little per model) can point C2 at an OpenAI-compatible provider with their own API key.",
+    "padrão · local": "default · local",
+    "IA local, nada sai": "Local AI, nothing leaves",
+    "Modelo GGUF rodando na sua GPU. Índice e busca funcionam sem internet, sem conta e sem telemetria. Segredos são detectados antes do modelo e arquivos como":
+      "GGUF model running on your GPU. Index and search work without internet, account or telemetry. Secrets are detected before the model and files like",
+    "nem são abertos.": "are not even opened.",
+    "A IA que escreve seu código pode seguir na nuvem — o C2 só entrega contexto pronto.":
+      "The AI writing your code can stay in the cloud — C2 just delivers ready context.",
+    "opcional · nuvem": "optional · cloud",
+    "Sua API key, seu provedor": "Your API key, your provider",
+    "Sem GPU? Aponte para OpenAI, Groq, DeepSeek, OpenRouter… a chave fica no cofre do Windows (nunca no config) e o app avisa que o conteúdo dos arquivos será enviado. Também aceita o seu servidor local (LM Studio, Ollama, vLLM) pelo mesmo seletor.":
+      "No GPU? Point it at OpenAI, Groq, DeepSeek, OpenRouter… the key stays in the OS vault (never in the config) and the app warns that file contents will be sent. It also accepts your local server (LM Studio, Ollama, vLLM) through the same selector.",
+    "Como configurar os dois modos:": "How to configure both modes:",
+
+    // privacidade
+    Privacidade: "Privacy",
+    "Local-first: o contexto é local por padrão": "Local-first: context is local by default",
+    "Local aqui significa": "Local here means",
+    "indexação, busca e interpretação": "indexing, search and interpretation",
+    "O agente de código que você usa (Claude, GPT, Cursor…) pode continuar na nuvem: ele recebe só o que decidir ler, e o C2 reduz esse volume.":
+      "The coding agent you use (Claude, GPT, Cursor…) can stay in the cloud: it receives only what it chooses to read, and C2 reduces that volume.",
+    "Local por padrão": "Local by default",
+    "Modelo e índice rodam no seu computador. Sem conta, sem telemetria.":
+      "Model and index run on your computer. No account, no telemetry.",
+    "Nuvem é opt-in": "Cloud is opt-in",
+    "Se você ativar um provedor, o app avisa que o conteúdo sai da máquina. Nada é enviado sem essa escolha.":
+      "If you enable a provider, the app warns that content leaves the machine. Nothing is sent without that choice.",
+    "Segredos barrados": "Secrets blocked",
+    "Chaves, tokens, JWTs e senhas são detectados antes do modelo; política skip ou mask.":
+      "Keys, tokens, JWTs and passwords are detected before the model; skip or mask policy.",
+    "Sem banco": "No database",
+    "O índice são arquivos .c2.json ao lado do código — versionáveis, inspecionáveis e removíveis.":
+      "The index is .c2.json files next to the code — versionable, inspectable and removable.",
+
+    // janela
+    "A janela": "The window",
+    "Feita para desenvolvedor, não para dashboard": "Made for developers, not for dashboards",
+    "Densa, escura e sem enfeite: estado, log ao vivo e busca com evidência.":
+      "Dense, dark and plain: state, live log and search with evidence.",
+    "Busca com evidência": "Search with evidence",
+    "Metadado completo": "Full metadata",
+    "Instalação em um comando": "One-command install",
+
+    // testemunhos / FAQ
+    "Perguntas frequentes": "Frequently asked questions",
+    "Precisa de GPU?": "Do I need a GPU?",
+    "Não é obrigatório. Rodar na CPU está desativado nesta versão: o modelo inteiro iria para a RAM (~4 GB no 4B Q4 em contexto 8k) e cada arquivo levaria minutos. Com GPU Vulkan a indexação fica na casa de ~4 s/arquivo em modelo de 4 B. Sem GPU, use o modo nuvem opcional com a sua API key.":
+      "Not required. Running on CPU is disabled in this version: the whole model would go to RAM (~4 GB for 4B Q4 at 8k context) and each file would take minutes. With a Vulkan GPU indexing is around ~4 s/file on a 4B model. Without a GPU, use the optional cloud mode with your API key.",
+    "Não tenho GPU. Dá para usar?": "No GPU. Can I still use it?",
+    "Sim: use um provedor de nuvem OpenAI-compatible com a sua API key. O C2 detecta a ausência de VRAM no primeiro uso e sugere esse caminho. Rodar na CPU não é oferecido nesta versão.":
+      "Yes: use an OpenAI-compatible cloud provider with your API key. C2 detects the lack of VRAM on first use and suggests this path. Running on CPU is not offered in this version.",
+    "Já uso LM Studio, Ollama ou vLLM. Dá para aproveitar?":
+      "I already use LM Studio, Ollama or vLLM. Can I reuse it?",
+    "Sim. O C2 fala o padrão OpenAI-compatible: em Config → Provedor de IA aponte para o seu servidor local (no LM Studio, a base costuma ser http://127.0.0.1:1234/v1; no Ollama, http://127.0.0.1:11434/v1) e escolha o modelo. Endpoint local dispensa API key. É o mesmo caminho usado na nuvem — o C2 não te prende ao runtime embarcado. Passo a passo e trade-offs: guia de configuração.":
+      "Yes. C2 speaks the OpenAI-compatible standard: in Settings → AI provider point it at your local server (in LM Studio the base is usually http://127.0.0.1:1234/v1; in Ollama, http://127.0.0.1:11434/v1) and choose the model. A local endpoint requires no API key. It is the same path used for cloud — C2 does not lock you into the embedded runtime. Step by step and trade-offs: configuration guide.",
+    "Precisa de internet?": "Does it need internet?",
+    "Para baixar o pacote/modelo e para usar seu agente de código na nuvem. Índice, busca e o modelo local funcionam sem internet. Se você ativar o provedor de nuvem opcional no C2, ele também precisa de internet.":
+      "To download the package/model and to use your cloud coding agent. Index, search and the local model work without internet. If you enable the optional cloud provider in C2, it also needs internet.",
+    "Meu código vai para algum servidor?": "Does my code go to a server?",
+    "O C2 não envia: modelo e índice ficam na máquina. Mas o agente de IA que você usa para codar (Claude, GPT, Cursor…) pode enviar à nuvem os arquivos que ele ler — o C2 reduz o que ele precisa ler.":
+      "C2 does not send: model and index stay on the machine. But the AI agent you use to code (Claude, GPT, Cursor…) may send to the cloud the files it reads — C2 reduces what it needs to read.",
+    "O C2 é 100% offline?": "Is C2 100% offline?",
+    "Não usamos esse mote. Índice, busca e interpretação rodam localmente; seu agente de código normalmente é na nuvem. Local-first aqui é sobre contexto, não sobre o workflow inteiro.":
+      "We do not use that motto. Index, search and interpretation run locally; your coding agent is usually in the cloud. Local-first here is about context, not the whole workflow.",
+    "Funciona em monorepo?": "Does it work in a monorepo?",
+    "Sim. O índice é por pasta: cada projeto tem seu .c2/ e seus metadados. Subpastas e arquivos grandes são respeitados com os limites configurados.":
+      "Yes. The index is per folder: each project has its own .c2/ and metadata. Subfolders and large files respect the configured limits.",
+    "Quanto custa indexar?": "How much does indexing cost?",
+    "Local: zero por token (só o custo do seu hardware). Na nuvem opcional você define preço por token, vê uma estimativa antes de rodar e pode colocar teto por execução.":
+      "Local: zero per token (only your hardware cost). In the optional cloud you set the price per token, see an estimate before running and can cap each run.",
+
+    // instalar
+    "Instalar o C2": "Install C2",
+    "Baixe, rode e deixe a IA local comentar. Windows 10/11 (x64).": "Download, run and let local AI comment. Windows 10/11 (x64).",
+    "Release atual": "Current release",
+    "Windows x64": "Windows x64",
+    "Modelo recomendado": "Recommended model",
+    "Guia de instalação": "Installation guide",
+    "Requisitos": "Requirements",
+    "Windows 10/11 (x64)": "Windows 10/11 (x64)",
+    "8 GB de RAM (16 GB recomendado)": "8 GB RAM (16 GB recommended)",
+    "GPU com Vulkan (opcional, mas recomendada)": "Vulkan GPU (optional but recommended)",
+    "Sem GPU? Use um provedor OpenAI-compatible com a sua API key.":
+      "No GPU? Use an OpenAI-compatible provider with your API key.",
+    "Apoie o projeto": "Support the project",
+    "Doação opcional via PIX ou PayPal.": "Optional donation via PIX or PayPal.",
+    "Ver no GitHub": "View on GitHub",
+    "Todos os direitos reservados.": "All rights reserved.",
+
+    // ajuda (chrome)
+    "C2 — guia de uso": "C2 — user guide",
+    "Tudo que o programa faz, cada opção explicada, o que precisa estar": "Everything the program does, each option explained, what must be",
+    "Requisitos": "Requirements",
+    "Instalação": "Installation",
+    "Primeiro uso": "First use",
+    "Tela por tela": "Screen by screen",
+    "CLI (comandos)": "CLI (commands)",
+    "Configuração": "Configuration",
+    "Provedor de IA": "AI provider",
+    "MCP": "MCP",
+    "Onde ficam os dados": "Where data lives",
+    "Erros e soluções": "Errors and solutions",
+    "FAQ": "FAQ",
+    "Desinstalar": "Uninstall",
+    "Desenvolvimento": "Development",
+
+    // sobre (chrome)
+    "Quem faz o C2 e como apoiar o projeto com uma doação (PayPal ou PIX). O software é gratuito e continua gratuito.":
+      "Who makes C2 and how to support the project with a donation (PayPal or PIX). The software is free and stays free.",
+    "Apoie o C2": "Support C2",
+    "Internacional": "International",
+    "Brasil": "Brazil",
+  };
+
+  const originaisTexto = new WeakMap();
+  const originaisAtributo = new WeakMap();
+
+  function traduzirTexto(node, lang) {
+    const original = originaisTexto.get(node) ?? node.nodeValue;
+    if (!originaisTexto.has(node)) originaisTexto.set(node, node.nodeValue);
+    const bruto = original;
+    const chave = bruto.trim();
+    if (!chave) return;
+    const traducao = lang === "en" ? EN[chave] : undefined;
+    if (lang === "en" && traducao) {
+      const antes = bruto.slice(0, bruto.indexOf(chave));
+      const depois = bruto.slice(bruto.indexOf(chave) + chave.length);
+      node.nodeValue = antes + traducao + depois;
+    } else {
+      node.nodeValue = original;
+    }
+  }
+
+  function traduzirAtributos(el, lang) {
+    const atributos = ["placeholder", "title", "aria-label"];
+    let guardado = originaisAtributo.get(el);
+    if (!guardado) {
+      guardado = {};
+      originaisAtributo.set(el, guardado);
+    }
+    for (const attr of atributos) {
+      const valor = el.getAttribute(attr);
+      if (valor === null) continue;
+      if (!(attr in guardado)) guardado[attr] = valor;
+      const chave = guardado[attr].trim();
+      const traducao = lang === "en" ? EN[chave] : undefined;
+      el.setAttribute(attr, lang === "en" && traducao ? traducao : guardado[attr]);
+    }
+  }
+
+  function aplicar(lang) {
+    document.documentElement.lang = lang === "en" ? "en" : "pt-BR";
+    const ignorar = new Set(["SCRIPT", "STYLE", "PRE", "CODE"]);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const pai = node.parentElement;
+        if (!pai || ignorar.has(pai.tagName)) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue && node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const textos = [];
+    while (walker.nextNode()) textos.push(walker.currentNode);
+    for (const node of textos) traduzirTexto(node, lang);
+    for (const el of document.querySelectorAll("[placeholder], [title], [aria-label]")) {
+      traduzirAtributos(el, lang);
+    }
+    document.dispatchEvent(new CustomEvent("site:lang", { detail: lang }));
+  }
+
+  function bandeira(lang) {
+    if (lang === "en") {
+      return `<svg width="20" height="14" viewBox="0 0 24 16" aria-hidden="true" style="display:block;border-radius:2px"><defs><clipPath id="sb-us"><rect width="24" height="16" rx="2"/></clipPath></defs><g clip-path="url(#sb-us)"><rect width="24" height="16" fill="#fff"/><g fill="#b22234"><rect y="0" width="24" height="1.23"/><rect y="2.46" width="24" height="1.23"/><rect y="4.92" width="24" height="1.23"/><rect y="7.38" width="24" height="1.23"/><rect y="9.85" width="24" height="1.23"/><rect y="12.31" width="24" height="1.23"/></g><rect width="10" height="8.62" fill="#3c3b6e"/></g></svg>`;
+    }
+    return `<svg width="20" height="14" viewBox="0 0 24 16" aria-hidden="true" style="display:block;border-radius:2px"><defs><clipPath id="sb-br"><rect width="24" height="16" rx="2"/></clipPath></defs><g clip-path="url(#sb-br)"><rect width="24" height="16" fill="#009b3a"/><path d="M12 2.2 21.5 8 12 13.8 2.5 8z" fill="#fedf00"/><circle cx="12" cy="8" r="3.4" fill="#002776"/></g></svg>`;
+  }
+
+  function montarSeletor() {
+    if (document.querySelector("[data-site-lang]")) return;
+    const lang = localStorage.getItem(CHAVE) === "en" ? "en" : "pt-BR";
+    const wrap = document.createElement("div");
+    wrap.className = "lang-selector";
+    wrap.setAttribute("data-site-lang", lang);
+
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "lang-ball";
+    botao.setAttribute("aria-label", "Idioma / Language");
+    botao.innerHTML = bandeira(lang);
+
+    const menu = document.createElement("div");
+    menu.className = "lang-menu";
+    menu.hidden = true;
+
+    const opcoes = [
+      { lang: "pt-BR", rotulo: "Português" },
+      { lang: "en", rotulo: "English" },
+    ];
+    for (const opcao of opcoes) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "lang-option" + (opcao.lang === lang ? " is-active" : "");
+      item.innerHTML = bandeira(opcao.lang);
+      const texto = document.createElement("span");
+      texto.textContent = opcao.rotulo;
+      item.appendChild(texto);
+      item.addEventListener("click", () => {
+        localStorage.setItem(CHAVE, opcao.lang);
+        wrap.setAttribute("data-site-lang", opcao.lang);
+        botao.innerHTML = bandeira(opcao.lang);
+        menu.hidden = true;
+        atualizarAtivos();
+        aplicar(opcao.lang);
+      });
+      menu.appendChild(item);
+    }
+
+    function atualizarAtivos() {
+      const atual = localStorage.getItem(CHAVE) === "en" ? "en" : "pt-BR";
+      [...menu.children].forEach((el, indice) => {
+        el.classList.toggle("is-active", opcoes[indice].lang === atual);
+      });
+    }
+
+    botao.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      menu.hidden = !menu.hidden;
+    });
+    document.addEventListener("click", () => {
+      menu.hidden = true;
+    });
+    menu.addEventListener("click", (evento) => evento.stopPropagation());
+
+    wrap.append(botao, menu);
+    document.body.appendChild(wrap);
+  }
+
+  function iniciar() {
+    const parametro = new URLSearchParams(location.search).get("lang");
+    if (parametro === "en" || parametro === "pt-BR") {
+      localStorage.setItem(CHAVE, parametro);
+    }
+    const salvo = localStorage.getItem(CHAVE);
+    if (salvo === "en") aplicar("en");
+    montarSeletor();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", iniciar);
+  } else {
+    iniciar();
+  }
+})();
