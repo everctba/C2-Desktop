@@ -12,9 +12,9 @@ window.C2_SITE = {
   // Doações (deixe vazio "" para esconder o método)
   // e-mail do PayPal (link de doacao) ou usuario do PayPal.me (paypal.me/usuario)
   paypal: "mayerdesigner@gmail.com",
-  pixChave: "", // ex.: "everctba@exemplo.com" (copia e cola)
-  pixNome: "", // nome que aparece no app do banco
-  pixCidade: "SAO PAULO",
+  pixChave: "everson777@gmail.com", // copia e cola
+  pixNome: "Everson Mayer", // nome que aparece no app do banco
+  pixCidade: "",
 
   // Opcional
   githubSponsors: "", // ex.: "https://github.com/sponsors/everctba"
