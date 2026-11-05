@@ -306,8 +306,9 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
               <span class="k">hardware</span>
               <h3>Cabe em sua GPU de 8 GB</h3>
               <p>
-                Um modelo de 4B como o Gemma 4 já é suficiente — na GPU de 8 GB ou na
-                CPU. Cache de prompt é só uma otimização opcional.
+                Um modelo de 4B como o Gemma 4 já é suficiente na GPU de 8 GB. Na CPU
+                também roda, mas não é recomendado (~4 GB de RAM e muito mais lento).
+                Cache de prompt é só uma otimização opcional.
               </p>
             </article>
           </div>
@@ -332,7 +333,8 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
               <span class="k">padrão · local</span>
               <h3>IA local, nada sai</h3>
               <p>
-                Modelo GGUF rodando na sua GPU ou CPU. Funciona offline, sem conta e sem
+                Modelo GGUF rodando na sua GPU (CPU funciona, mas não é recomendado).
+                Funciona offline, sem conta e sem
                 telemetria. Segredos são detectados antes do modelo e arquivos como
                 <span class="mono">.env</span> nem são abertos.
               </p>
@@ -620,18 +622,21 @@ c2 grep "onde valida permissão de usuário"</pre>
             <details open>
               <summary>Precisa de GPU?</summary>
               <div class="answer">
-                Não. CPU funciona (mais lento). Com GPU Vulkan a indexação acelera para
-                ~4 s/arquivo em modelo de 4 B. Sem GPU e sem paciência? Dá para usar um
-                provedor OpenAI-compatible na nuvem com a sua própria API key — local
-                continua o padrão.
+                Não é obrigatório, mas CPU <strong>não é recomendado</strong>: o modelo
+                inteiro vai para a RAM (~4 GB no 4B Q4 em contexto 8k) e fica muito mais
+                lento — minutos por arquivo. Com GPU Vulkan a indexação fica na casa de
+                ~4 s/arquivo em modelo de 4 B. Sem GPU, o melhor caminho é um modelo
+                menor ou o modo nuvem opcional com a sua API key.
               </div>
             </details>
             <details>
               <summary>Não tenho GPU. Dá para usar?</summary>
               <div class="answer">
-                Sim, por dois caminhos: rodar na CPU (mais lento, nada sai da máquina) ou
-                configurar um provedor de nuvem OpenAI-compatible com a sua API key. O C2
-                detecta a ausência de VRAM no primeiro uso e sugere o caminho mais adequado.
+                Sim, por dois caminhos: rodar na CPU — funciona, mas é <strong>não
+                recomendado</strong> (usa ~4 GB de RAM e é muito mais lento) — ou configurar
+                um provedor de nuvem OpenAI-compatible com a sua API key. O C2 detecta a
+                ausência de VRAM no primeiro uso e mostra os dois caminhos com o custo de
+                cada um.
               </div>
             </details>
             <details>

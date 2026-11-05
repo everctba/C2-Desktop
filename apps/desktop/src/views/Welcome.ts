@@ -101,10 +101,12 @@ export function openWelcome(handlers: WelcomeHandlers): void {
             : "Nenhuma GPU detectada";
           const explica = document.createElement("p");
           explica.textContent =
-            "Você não precisa de GPU para usar o C2: dá para rodar na CPU (mais lento) " +
-            "ou apontar para um provedor OpenAI-compatible com a sua própria API key " +
-            "(OpenAI, Groq, DeepSeek…). No modo nuvem o conteúdo dos arquivos sai da " +
-            "máquina — o aviso aparece na tela Config.";
+            "Rodar na CPU funciona, mas NÃO é recomendado: o modelo inteiro vai para a " +
+            "RAM (~4 GB no modelo 4B Q4 em contexto 8k) e fica muito mais lento — " +
+            "minutos por arquivo em vez de segundos. O caminho rápido sem GPU é um " +
+            "provedor OpenAI-compatible com a sua API key (OpenAI, Groq, DeepSeek…). " +
+            "No modo nuvem o conteúdo dos arquivos sai da máquina — o aviso aparece " +
+            "na tela Config.";
           const acoes = document.createElement("div");
           acoes.className = styles.actions;
           acoes.appendChild(
@@ -117,7 +119,7 @@ export function openWelcome(handlers: WelcomeHandlers): void {
           );
           acoes.appendChild(
             Button({
-              label: "Continuar na CPU",
+              label: "Continuar na CPU (não recomendado)",
               size: "xs",
               variant: "ghost",
               onClick: () => handlers.dismiss(),

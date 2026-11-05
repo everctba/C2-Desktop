@@ -33,9 +33,10 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **BYO endpoint.** Já usa LM Studio/Ollama/vLLM? Aponte o C2 para o seu
   servidor OpenAI-compatible; o mesmo seletor serve para local e nuvem.
 - **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional.
-- **Sem GPU?** Rode na CPU (mais lento) ou use um provedor OpenAI-compatible com a
-  sua API key (Config → Provedor de IA). No modo nuvem o conteúdo dos arquivos é
-  enviado ao provedor — o app avisa antes. 
+- **Sem GPU?** CPU funciona, mas **não é recomendado**: o modelo (~3–4 GB) vai
+  para a RAM e fica muito mais lento. Prefira uma GPU ou um provedor
+  OpenAI-compatible com a sua API key (Config → Provedor de IA). No modo nuvem o
+  conteúdo dos arquivos é enviado ao provedor — o app avisa antes. 
 - **Sem infra.** Sem banco, sem embeddings — só arquivos ao lado do código.
 - **Reversível.** `c2 cleaner` remove; `c2 migrate` converte metadado antigo.
 
