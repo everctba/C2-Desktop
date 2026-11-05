@@ -105,6 +105,7 @@ input {
   font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.07em;
   color: var(--text-subtle);
   display: flex;
@@ -143,6 +144,7 @@ input {
   font-size: var(--text-2xs);
   color: var(--text-subtle);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.07em;
 }
 

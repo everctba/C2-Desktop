@@ -7,6 +7,7 @@
 .label {
   font-size: var(--text-2xs);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.07em;
   color: var(--text-subtle);
 }

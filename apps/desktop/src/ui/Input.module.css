@@ -46,5 +46,6 @@
   font-size: var(--text-2xs);
   color: var(--text-subtle);
   text-transform: uppercase;
+  font-family: var(--font-mono);
   letter-spacing: 0.07em;
 }

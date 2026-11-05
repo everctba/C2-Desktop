@@ -345,6 +345,7 @@ export function modelInstructions(): HTMLElement {
   summary.style.cursor = "pointer";
   summary.style.fontSize = "var(--text-2xs)";
   summary.style.textTransform = "uppercase";
+  summary.style.fontFamily = "var(--font-mono)";
   summary.style.letterSpacing = "0.07em";
   summary.style.color = "var(--text-subtle)";
   box.appendChild(summary);
