@@ -160,12 +160,15 @@ h3 {
 
 /* ---------- hero ---------- */
 .hero {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: var(--space-9xl);
   align-items: center;
   padding: var(--space-9xl) 0;
 }
+
 
 .cta-row {
   display: flex;
@@ -833,4 +836,27 @@ code.inline {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   color: var(--text-subtle);
+}
+
+/* ---------- ruido animado (fundo da pagina) ---------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: url("../assets/img/ruido.gif") repeat;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    display: none;
+  }
 }
