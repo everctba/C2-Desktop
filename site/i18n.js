@@ -10,7 +10,7 @@
   const PADRAO = "pt-BR";
 
   const EN = {
-  
+
     "O C2 usa uma": "C2 uses a",
     "para comentar cada arquivo com": "to comment each file with",
     ", num loop que": ", in a loop that",
