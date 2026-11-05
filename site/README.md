@@ -18,18 +18,15 @@ site/
     └── img/            capturas do app
 ```
 
-## Logo (arte em Braille)
+## Logo (arte em ASCII)
 
-A arte-fonte fica em `assets/ascii/logo.txt` (Braille Unicode, ~72 colunas,
-sem legenda). A legenda "Comments 2.0 for AI" é **texto HTML** ao lado do SVG.
-Para não depender de fonte instalada, ela é convertida em SVG vetorial:
+A arte-fonte fica em `assets/ascii/logo-ascii.txt` — **ASCII puro**
+(`/ \ _ | ( )`), por isso alinha em qualquer fonte monoespaçada e funciona em
+terminal, README e navegador sem conversão.
 
-```powershell
-python scripts/braille_svg.py   # gera assets/ascii/logo.svg
-```
-
-Use o SVG no HTML (`<img>`), nunca o `.txt` cru: Braille depende de fallback de
-fonte e pode desalinhar em console.
+No hero ela é um `<pre>` com `aria-hidden="true"` e uma legenda `sr-only`
+("C2 — Comments 2.0 for AI") para leitores de tela. Não use imagem raster:
+ASCII em `<pre>` é nítido em qualquer zoom.
 
 ## Ver localmente
 
