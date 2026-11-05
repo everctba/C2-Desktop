@@ -38,7 +38,7 @@ export function Button(props: ButtonProps): HTMLButtonElement {
   }
 
   if (props.iconName) {
-    const tamanho = size === "md" || size === "lg" ? 16 : 14;
+    const tamanho = size === "md" || size === "lg" ? 16 : 12;
     const span = document.createElement("span");
     span.className = styles.icon;
     span.style.width = `${tamanho}px`;

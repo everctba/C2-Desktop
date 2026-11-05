@@ -15,13 +15,13 @@ export type IconName =
 
 const PATHS: Record<IconName, string> = {
   // pasta
-  projects: "M2 4h4l1 2h5v5H2z",
+  projects: "M2 3h4l1 2h7v8H2z",
   // engrenagem simplificada
   engine: "M9.5 1 3 9h3.5L6 15l7-9H9z",
   // lupa
   search: "M6.5 2a4.5 4.5 0 1 1-2.8 8l-2.4 2.4 1 1L4.7 11A4.5 4.5 0 0 1 6.5 2zm0 1.6a2.9 2.9 0 1 0 0 5.8 2.9 2.9 0 0 0 0-5.8z",
-  play: "M4 2l9 5-9 5z",
-  stop: "M3 3h9v9H3z",
+  play: "M3.25 1.5 12.75 8 3.25 14.5z",
+  stop: "M3.5 3.5h9v9h-9z",
   refresh: "M8 2a6 6 0 1 1-5.7 4.1l1.6.6A4.3 4.3 0 1 0 8 3.7V6L4.5 3 8 0z",
   // engrenagem
   // prancheta com aba (copiar)
