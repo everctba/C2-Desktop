@@ -933,3 +933,14 @@ body > * {
 .lang-option.is-active {
   color: var(--accent-1, #8ee6c8);
 }
+
+.hero-sub {
+  display: block;
+  margin-top: -0.25rem;
+  margin-bottom: var(--space-l);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
