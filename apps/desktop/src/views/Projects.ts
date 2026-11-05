@@ -336,25 +336,15 @@ function inspectionBody(inspection: ModelInspection): HTMLElement {
  * Instruções para baixar um modelo do HuggingFace (sem copiar para o
  * workspace: o C2 só guarda o caminho).
  */
-export function modelInstructions(): HTMLElement {
-  const box = document.createElement("details");
+/** Conteudo do modal: passos, modelo recomendado, link e copiar link. */
+function modelInstructionsBody(): HTMLElement {
+  const box = document.createElement("div");
   box.style.display = "grid";
-  box.style.gap = "var(--space-2xs)";
-  box.style.marginTop = "var(--space-2xs)";
-
-  const summary = document.createElement("summary");
-  summary.textContent = "Como baixar um modelo (HuggingFace)";
-  summary.style.cursor = "pointer";
-  summary.style.fontSize = "var(--text-2xs)";
-  summary.style.textTransform = "uppercase";
-  summary.style.fontFamily = "var(--font-mono)";
-  summary.style.letterSpacing = "0.07em";
-  summary.style.color = "var(--text-subtle)";
-  box.appendChild(summary);
+  box.style.gap = "var(--space-s)";
 
   const passos = document.createElement("ol");
   passos.style.cssText =
-    "margin: var(--space-2xs) 0 0 var(--space-l); display: grid; gap: var(--space-3xs); " +
+    "margin: 0 0 0 var(--space-l); display: grid; gap: var(--space-3xs); " +
     "font-size: var(--text-s); color: var(--text-muted); line-height: 1.45;";
   const itens = [
     "Abra o repositório recomendado no HuggingFace (link abaixo).",
@@ -399,9 +389,14 @@ export function modelInstructions(): HTMLElement {
       variant: "secondary",
       onClick: async () => {
         try {
-          await navigator.clipboard.writeText(MODELO_RECOMENDADO.url);
+          const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
+          await writeText(MODELO_RECOMENDADO.url);
         } catch {
-          /* sem clipboard: usuario copia manualmente */
+          try {
+            await navigator.clipboard.writeText(MODELO_RECOMENDADO.url);
+          } catch {
+            /* sem clipboard: usuario copia manualmente */
+          }
         }
       },
     }),
@@ -409,6 +404,22 @@ export function modelInstructions(): HTMLElement {
 
   box.appendChild(acoes);
   return box;
+}
+
+/** Botao "Como baixar um modelo (HuggingFace)" — abre as instrucoes em modal. */
+export function modelInstructions(): HTMLElement {
+  const botao = document.createElement("button");
+  botao.type = "button";
+  botao.className = styles.linkButton;
+  botao.textContent = "Como baixar um modelo (HuggingFace)";
+  botao.addEventListener("click", () => {
+    void openDialog({
+      title: "Como baixar um modelo (HuggingFace)",
+      body: modelInstructionsBody(),
+      confirmLabel: "Fechar",
+    });
+  });
+  return botao;
 }
 
 /** Lista de projetos recentes: clique abre, X remove do historico. */

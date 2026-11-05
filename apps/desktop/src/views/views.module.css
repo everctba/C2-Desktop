@@ -273,3 +273,21 @@
   letter-spacing: 0.07em;
   color: var(--text-subtle);
 }
+
+.linkButton {
+  justify-self: start;
+  padding: 0;
+  margin-top: var(--space-2xs);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subtle);
+}
+
+.linkButton:hover {
+  color: var(--accent-3);
+}
