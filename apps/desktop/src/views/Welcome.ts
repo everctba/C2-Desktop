@@ -101,12 +101,11 @@ export function openWelcome(handlers: WelcomeHandlers): void {
             : "Nenhuma GPU detectada";
           const explica = document.createElement("p");
           explica.textContent =
-            "Rodar na CPU funciona, mas NÃO é recomendado: o modelo inteiro vai para a " +
-            "RAM (~4 GB no modelo 4B Q4 em contexto 8k) e fica muito mais lento — " +
-            "minutos por arquivo em vez de segundos. O caminho rápido sem GPU é um " +
-            "provedor OpenAI-compatible com a sua API key (OpenAI, Groq, DeepSeek…). " +
-            "No modo nuvem o conteúdo dos arquivos sai da máquina — o aviso aparece " +
-            "na tela Config.";
+            "Rodar na CPU está desativado nesta versão: o modelo inteiro iria para a " +
+            "RAM (~4 GB no 4B Q4 em contexto 8k) e cada arquivo levaria minutos. " +
+            "Use uma GPU ou um provedor OpenAI-compatible com a sua API key " +
+            "(OpenAI, Groq, DeepSeek…). No modo nuvem o conteúdo dos arquivos sai da " +
+            "máquina — o aviso aparece na tela Config.";
           const acoes = document.createElement("div");
           acoes.className = styles.actions;
           acoes.appendChild(
@@ -117,15 +116,14 @@ export function openWelcome(handlers: WelcomeHandlers): void {
               onClick: () => handlers.openSettings(),
             }),
           );
-          acoes.appendChild(
-            Button({
-              label: "Continuar na CPU (não recomendado)",
-              size: "xs",
-              variant: "ghost",
-              onClick: () => handlers.dismiss(),
-            }),
-          );
-          box.append(tituloBox, explica, acoes);
+          const notaCpu = document.createElement("p");
+          notaCpu.style.margin = "0";
+          notaCpu.style.fontSize = "var(--text-xs)";
+          notaCpu.style.opacity = "0.8";
+          notaCpu.textContent =
+            "A opção de rodar na CPU está desativada nesta versão. " +
+            "GPU AMD/Intel pode não ser detectada aqui — nesse caso, use o modo nuvem.";
+          box.append(tituloBox, explica, acoes, notaCpu);
           avisoGpu.appendChild(box);
         })
         .catch(() => {
