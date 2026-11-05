@@ -596,6 +596,13 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       },
     }),
   );
+  const dicaModelo = document.createElement("p");
+  dicaModelo.className = "pageHint";
+  dicaModelo.style.maxWidth = "none";
+  dicaModelo.textContent =
+    "O modelo é uma preferência do app: escolha uma vez e ele vale para todos os projetos " +
+    "(novos projetos herdam este caminho).";
+  modeloSimplesBody.appendChild(dicaModelo);
   modeloSimplesBody.appendChild(modeloAcoes);
   page.appendChild(modeloSimples);
 

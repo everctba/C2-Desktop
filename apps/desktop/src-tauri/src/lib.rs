@@ -51,6 +51,100 @@ fn open_workspace(root: &str) -> Result<Workspace, String> {
     Ok(workspace)
 }
 
+/// Preferencias de modelo que valem para o app inteiro (nao por projeto).
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+struct ModeloGlobal {
+    path: Option<String>,
+    name: Option<String>,
+    binary: Option<String>,
+    ctx_size: Option<u32>,
+    gpu_layers: Option<u32>,
+    threads: Option<u32>,
+    disable_thinking: Option<bool>,
+}
+
+fn caminho_modelo_global(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("global-model.json"))
+        .map_err(|erro| erro.to_string())
+}
+
+fn ler_modelo_global(app: &tauri::AppHandle) -> ModeloGlobal {
+    let Ok(caminho) = caminho_modelo_global(app) else {
+        return ModeloGlobal::default();
+    };
+    std::fs::read_to_string(caminho)
+        .ok()
+        .and_then(|texto| serde_json::from_str(&texto).ok())
+        .unwrap_or_default()
+}
+
+fn salvar_modelo_global(app: &tauri::AppHandle, modelo: &ModeloGlobal) -> Result<(), String> {
+    let caminho = caminho_modelo_global(app)?;
+    if let Some(pai) = caminho.parent() {
+        std::fs::create_dir_all(pai).map_err(|erro| erro.to_string())?;
+    }
+    let texto = serde_json::to_string_pretty(modelo).map_err(|erro| erro.to_string())?;
+    std::fs::write(&caminho, texto).map_err(|erro| erro.to_string())
+}
+
+fn capturar_modelo_global(config: &c2_core::config::Config) -> ModeloGlobal {
+    ModeloGlobal {
+        path: config.model.path.clone(),
+        name: Some(config.model.name.clone()),
+        binary: config.model.binary.clone(),
+        ctx_size: Some(config.model.ctx_size),
+        gpu_layers: Some(config.model.gpu_layers),
+        threads: Some(config.model.threads),
+        disable_thinking: Some(config.model.disable_thinking),
+    }
+}
+
+/// Se o projeto ainda nao tem modelo, aplica o modelo global (set once).
+fn aplicar_modelo_global(app: &tauri::AppHandle, workspace: &Workspace) -> Result<bool, String> {
+    if !workspace.is_initialized() {
+        return Ok(false);
+    }
+    let mut config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    let tem_modelo = config
+        .model
+        .path
+        .as_deref()
+        .map(|valor| !valor.trim().is_empty())
+        .unwrap_or(false);
+    if tem_modelo {
+        return Ok(false);
+    }
+    let global = ler_modelo_global(app);
+    let Some(caminho) = global.path.filter(|valor| Path::new(valor).is_file()) else {
+        return Ok(false);
+    };
+    config.model.path = Some(caminho);
+    if let Some(nome) = global.name.filter(|valor| !valor.trim().is_empty()) {
+        config.model.name = nome;
+    }
+    if let Some(binario) = global.binary {
+        config.model.binary = Some(binario);
+    }
+    if let Some(valor) = global.ctx_size {
+        config.model.ctx_size = valor;
+    }
+    if let Some(valor) = global.gpu_layers {
+        config.model.gpu_layers = valor;
+    }
+    if let Some(valor) = global.threads {
+        config.model.threads = valor;
+    }
+    if let Some(valor) = global.disable_thinking {
+        config.model.disable_thinking = valor;
+    }
+    workspace
+        .save_config(&config)
+        .map_err(|erro| erro.to_string())?;
+    Ok(true)
+}
+
 /// Projeto com que a janela foi aberta (se veio de `c2 open`).
 #[tauri::command]
 fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
@@ -58,11 +152,13 @@ fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
 }
 
 #[tauri::command]
-fn workspace_status(root: String) -> Result<Option<StatusReport>, String> {
+fn workspace_status(app: tauri::AppHandle, root: String) -> Result<Option<StatusReport>, String> {
     let workspace = open_workspace(&root)?;
     if !workspace.is_initialized() {
         return Ok(None);
     }
+    // Modelo e preferencia do app: se o projeto nao tem, herda o global.
+    aplicar_modelo_global(&app, &workspace)?;
     status::build(&workspace)
         .map(Some)
         .map_err(|err| err.to_string())
@@ -75,10 +171,11 @@ struct InitResult {
 }
 
 #[tauri::command]
-fn workspace_init(root: String) -> Result<InitResult, String> {
+fn workspace_init(app: tauri::AppHandle, root: String) -> Result<InitResult, String> {
     let path = c2_core::workspace::canonical_path(Path::new(&root)).map_err(|err| err.to_string())?;
     let workspace = Workspace::at(path);
     let outcome = workspace.init(false).map_err(|err| err.to_string())?;
+    let _ = aplicar_modelo_global(&app, &workspace);
     Ok(InitResult {
         created: outcome.created,
         files: outcome.files,
@@ -399,11 +496,23 @@ fn config_get(root: String) -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-fn config_set(root: String, key: String, value: String) -> Result<String, String> {
+fn config_set(app: tauri::AppHandle, root: String, key: String, value: String) -> Result<String, String> {
     let workspace = open_workspace(&root)?;
     let mut config = workspace.load_config().map_err(|err| err.to_string())?;
     config.set(&key, &value).map_err(|err| err.to_string())?;
     workspace.save_config(&config).map_err(|err| err.to_string())?;
+    const CHAVES_MODELO: [&str; 7] = [
+        "model.path",
+        "model.name",
+        "model.binary",
+        "model.ctx_size",
+        "model.gpu_layers",
+        "model.threads",
+        "model.disable_thinking",
+    ];
+    if CHAVES_MODELO.contains(&key.as_str()) {
+        salvar_modelo_global(&app, &capturar_modelo_global(&config))?;
+    }
     Ok(format!("{key} = {value}"))
 }
 
@@ -437,7 +546,7 @@ fn model_inspect(path: String) -> Result<ModelInspection, String> {
 
 /// Grava `model.path` e o nome do modelo. Nunca copia o arquivo.
 #[tauri::command]
-fn model_set(root: String, path: String) -> Result<ModelInspection, String> {
+fn model_set(app: tauri::AppHandle, root: String, path: String) -> Result<ModelInspection, String> {
     let workspace = open_workspace(&root)?;
     let inspection = inspect_model(&path)?;
     let mut config = workspace.load_config().map_err(|err| err.to_string())?;
@@ -448,6 +557,7 @@ fn model_set(root: String, path: String) -> Result<ModelInspection, String> {
     workspace
         .save_config(&config)
         .map_err(|err| err.to_string())?;
+    salvar_modelo_global(&app, &capturar_modelo_global(&config))?;
     Ok(inspection)
 }
 
@@ -495,7 +605,12 @@ fn runtime_plan(
 
 /// Grava contexto/camadas e sobe o llama-server (carrega o modelo na GPU).
 #[tauri::command]
-async fn model_load(root: String, ctx_size: u32, gpu_layers: u32) -> Result<(), String> {
+async fn model_load(
+    app: tauri::AppHandle,
+    root: String,
+    ctx_size: u32,
+    gpu_layers: u32,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = open_workspace(&root)?;
         let mut config = workspace.load_config().map_err(|err| err.to_string())?;
@@ -508,6 +623,7 @@ async fn model_load(root: String, ctx_size: u32, gpu_layers: u32) -> Result<(), 
         workspace
             .save_config(&config)
             .map_err(|err| err.to_string())?;
+        salvar_modelo_global(&app, &capturar_modelo_global(&config))?;
         runtime::ensure(&workspace, &config)
             .map(|_| ())
             .map_err(|err| err.to_string())

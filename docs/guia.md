@@ -189,6 +189,14 @@ aberturas e de 24 h desde a ultima checagem. O conteudo vem de
 - regras: um post por novidade, `date` ISO com timezone, link so http/https;
   offline/JSON invalido falha em silencio.
 
+## Modelo global (vale para todos os projetos)
+
+O `.gguf` e uma preferencia do **app**, nao do projeto. Ao selecionar um modelo no
+desktop, o caminho (e nome/ctx/camadas/threads) fica salvo em
+`%APPDATA%/dev.c2.desktop/global-model.json`. Projetos novos ou sem modelo herdam
+esse caminho automaticamente ao abrir; projetos que ja tem `model.path` proprio
+nao sao alterados. Pela CLI, a config continua por workspace.
+
 ## Configuração útil
 
 ```bash
