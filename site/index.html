@@ -6,7 +6,7 @@
     <title>C2 — Comments 2.0 for AI</title>
     <meta
       name="description"
-      content="Comments 2.0 for AI: o C2 comenta seu código automaticamente com IA local — what, why, goal, summary, responsibility — num loop que detecta mudanças. Sua IA entende o projeto e gasta menos tokens."
+      content="Comments 2.0 for AI, local-first: o C2 comenta seu código automaticamente com IA local — what, why, goal, summary, responsibility — num loop que detecta mudanças. Nuvem é opcional, com a sua API key."
     />
     <link rel="stylesheet" href="styles/site.css" />
     <meta name="theme-color" content="#0b0b0b" />
@@ -63,7 +63,7 @@
             <figcaption class="sr-only">C2 — Comments 2.0 for AI</figcaption>
           </figure>
           <div>
-            <span class="eyebrow">Comments 2.0 for AI</span>
+            <span class="eyebrow">Comments 2.0 for AI · local-first</span>
             <h1>Seu código comentado por IA local.<br />Sua IA lê o comentário — não o projeto.</h1>
             <p class="lead">
               O C2 usa uma <strong>IA local</strong> para comentar cada arquivo com
@@ -76,7 +76,7 @@
               <a class="btn btn-ghost" href="ajuda.html">Como usar</a>
             </div>
             <p class="hero-note">
-              Windows 10/11 · IA local · comentário sempre atualizado · sem embeddings
+              Windows 10/11 · local-AI-first · nuvem opcional com sua API key · sem embeddings
             </p>
           </div>
 
@@ -314,6 +314,45 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
         </div>
       </section>
 
+      <!-- LOCAL-FIRST x NUVEM -->
+      <section class="section">
+        <div class="wrap">
+          <div class="section-head">
+            <span class="eyebrow">Local-AI-first</span>
+            <h2>Primeiro local. Nuvem só se você quiser.</h2>
+            <p>
+              O padrão é a IA rodar na sua máquina: índice, busca e metadados não saem
+              dela. Mas não escondemos o outro caminho — quem não tem GPU (ou prefere
+              pagar pouco por modelo) pode apontar o C2 para um provedor
+              OpenAI-compatible com a própria API key.
+            </p>
+          </div>
+          <div class="grid grid-2">
+            <article class="card">
+              <span class="k">padrão · local</span>
+              <h3>IA local, nada sai</h3>
+              <p>
+                Modelo GGUF rodando na sua GPU ou CPU. Funciona offline, sem conta e sem
+                telemetria. Segredos são detectados antes do modelo e arquivos como
+                <span class="mono">.env</span> nem são abertos.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">opcional · nuvem</span>
+              <h3>Sua API key, seu provedor</h3>
+              <p>
+                Sem GPU? Aponte para OpenAI, Groq, DeepSeek, OpenRouter… a chave fica no
+                cofre do Windows (nunca no config) e o app avisa que o conteúdo dos
+                arquivos será enviado. Voltou para o local quando quiser.
+              </p>
+            </article>
+          </div>
+          <p class="hero-note">
+            Como configurar os dois modos: <a href="ajuda.html#config">guia de configuração</a>.
+          </p>
+        </div>
+      </section>
+
       <!-- NÚMEROS -->
       <section class="section" id="numeros">
         <div class="wrap">
@@ -504,12 +543,19 @@ c2 grep "onde valida permissão de usuário"</pre>
         <div class="wrap">
           <div class="section-head">
             <span class="eyebrow">Privacidade</span>
-            <h2>Seu código não sai da máquina</h2>
+            <h2>Local-first: seu código não sai por padrão</h2>
           </div>
           <div class="grid grid-3">
             <article class="card">
               <h3>Local por padrão</h3>
               <p>Modelo e índice rodam no seu computador. Sem conta, sem telemetria.</p>
+            </article>
+            <article class="card">
+              <h3>Nuvem é opt-in</h3>
+              <p>
+                Se você ativar um provedor, o app avisa que o conteúdo sai da máquina.
+                Nada é enviado sem essa escolha.
+              </p>
             </article>
             <article class="card">
               <h3>Segredos barrados</h3>
@@ -591,6 +637,8 @@ c2 grep "onde valida permissão de usuário"</pre>
               <summary>Precisa de internet?</summary>
               <div class="answer">
                 Só para baixar o pacote e o modelo. Índice, busca e runtime são locais.
+                Se você ativar o modo nuvem opcional, o provedor escolhido precisa de
+                internet.
               </div>
             </details>
             <details>

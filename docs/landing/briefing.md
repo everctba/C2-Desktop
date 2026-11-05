@@ -16,6 +16,11 @@ atualizado em vez de reler o projeto inteiro — é um resumo vivo do código,
 feito para consumo por IA. Comentário é código para humano; Comments 2.0 é
 comentário para IA.
 
+**Posicionamento:** **local-AI-first** como destaque — o padrão é IA local e
+nada saindo da máquina; a nuvem aparece como opção explícita (API key do
+usuário), nunca escondida. Não prometer "100% offline" sem a ressalva de que
+o modo nuvem é escolha do usuário.
+
 **Vantagem central (usar na landing):** **consulta por intenção** — descrever o
 problema em linguagem natural acha o código pelo significado (~86 ms), sem
 depender do nome do arquivo nem de grep lexical; mais chance de achar o que o
