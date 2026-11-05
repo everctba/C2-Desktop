@@ -106,7 +106,8 @@ impl LlmClient {
             disable_thinking: config.model.disable_thinking,
             max_retries: config.model.max_retries,
             instructions: config.index.prompt.clone(),
-            cache_prompt: local_endpoint,
+            // C2_NO_CACHE_PROMPT=1 desliga o cache de prefixo (apenas diagnostico/bench).
+            cache_prompt: local_endpoint && std::env::var_os("C2_NO_CACHE_PROMPT").is_none(),
             cloud,
             local_endpoint,
             bearer,
@@ -259,9 +260,7 @@ impl LlmClient {
             if self.disable_thinking {
                 body["chat_template_kwargs"] = json!({ "enable_thinking": false });
             }
-            if self.cache_prompt {
-                body["cache_prompt"] = json!(true);
-            }
+            body["cache_prompt"] = json!(self.cache_prompt);
         }
         body
     }
