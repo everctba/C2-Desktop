@@ -18,6 +18,18 @@ site/
     └── img/            capturas do app
 ```
 
+## Logo (arte em Braille)
+
+A arte-fonte fica em `assets/ascii/logo.txt` (Braille Unicode, ~72 colunas).
+Para não depender de fonte instalada, ela é convertida em SVG vetorial:
+
+```powershell
+python scripts/braille_svg.py   # gera assets/ascii/logo.svg
+```
+
+Use o SVG no HTML (`<img>`), nunca o `.txt` cru: Braille depende de fallback de
+fonte e pode desalinhar em console.
+
 ## Ver localmente
 
 ```powershell

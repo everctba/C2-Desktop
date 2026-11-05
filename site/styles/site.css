@@ -751,3 +751,19 @@ code.inline {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- logo em Braille (SVG vetorial) ---------- */
+.ascii-logo {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(440px, 78vw);
+  height: auto;
+  margin-bottom: calc(-1 * var(--space-3xl));
+}
+
+@media (max-width: 900px) {
+  .ascii-logo {
+    width: min(320px, 80vw);
+    margin-bottom: 0;
+  }
+}

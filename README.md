@@ -1,5 +1,7 @@
 # C2
 
+<p align="center"><img src="site/assets/ascii/logo.svg" width="420" alt="C2 — Comments 2.0 for AI"></p>
+
 [![ci](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml)
 
 **Comments 2.0 for AI** — contexto semântico de projeto para agentes de IA.
