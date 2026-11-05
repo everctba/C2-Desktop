@@ -51,7 +51,7 @@ Tudo fica em **`site/config.js`** (nada sai do navegador):
 
 ```js
 window.C2_SITE = {
-  nome: "Everton",
+  nome: "Everson Mayer",
   github: "everctba",        // foto/nome abrem este perfil
   bio: "...",
   paypal: "everctba",        // paypal.me/usuario; vazio esconde o cartão

@@ -3,7 +3,7 @@
  */
 window.C2_SITE = {
   // Perfil
-  nome: "Everton", // <- seu nome de exibição
+  nome: "Everson Mayer", // <- seu nome de exibição
   github: "everctba", // usuário do GitHub (foto/nome abrem este perfil)
   bio:
     "Desenvolvedor do C2. Ferramenta local-first para dar contexto semântico " +
