@@ -30,6 +30,8 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
 - **Anotações de agentes.** A IA principal pode salvar descobertas não óbvias
   no próprio `.c2.json` via MCP (`c2_annotate`), preservadas no reindex.
+- **BYO endpoint.** Já usa LM Studio/Ollama/vLLM? Aponte o C2 para o seu
+  servidor OpenAI-compatible; o mesmo seletor serve para local e nuvem.
 - **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional.
 - **Sem GPU?** Rode na CPU (mais lento) ou use um provedor OpenAI-compatible com a
   sua API key (Config → Provedor de IA). No modo nuvem o conteúdo dos arquivos é

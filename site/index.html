@@ -343,7 +343,8 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
               <p>
                 Sem GPU? Aponte para OpenAI, Groq, DeepSeek, OpenRouter… a chave fica no
                 cofre do Windows (nunca no config) e o app avisa que o conteúdo dos
-                arquivos será enviado. Voltou para o local quando quiser.
+                arquivos será enviado. Também aceita o seu servidor local
+                (LM Studio, Ollama, vLLM) pelo mesmo seletor.
               </p>
             </article>
           </div>
@@ -631,6 +632,17 @@ c2 grep "onde valida permissão de usuário"</pre>
                 Sim, por dois caminhos: rodar na CPU (mais lento, nada sai da máquina) ou
                 configurar um provedor de nuvem OpenAI-compatible com a sua API key. O C2
                 detecta a ausência de VRAM no primeiro uso e sugere o caminho mais adequado.
+              </div>
+            </details>
+            <details>
+              <summary>Já uso LM Studio, Ollama ou vLLM. Dá para aproveitar?</summary>
+              <div class="answer">
+                Sim. O C2 fala o padrão OpenAI-compatible: em Config → Provedor de IA
+                aponte para o seu servidor local (no LM Studio, a base costuma ser
+                <span class="mono">http://127.0.0.1:1234/v1</span>; no Ollama,
+                <span class="mono">http://127.0.0.1:11434/v1</span>) e escolha o modelo.
+                Endpoint local dispensa API key. É o mesmo caminho usado na nuvem —
+                o C2 não te prende ao runtime embarcado.
               </div>
             </details>
             <details>

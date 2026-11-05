@@ -58,12 +58,13 @@
           <a href="#telas">4. Tela por tela</a>
           <a href="#cli">5. CLI (comandos)</a>
           <a href="#config">6. Configuração</a>
-          <a href="#mcp">7. MCP</a>
-          <a href="#dados">8. Onde ficam os dados</a>
-          <a href="#erros">9. Erros e soluções</a>
-          <a href="#faq">10. FAQ</a>
-          <a href="#desinstalar">11. Desinstalar</a>
-          <a href="#dev">12. Desenvolvimento</a>
+          <a href="#provedor">7. Provedor de IA</a>
+          <a href="#mcp">8. MCP</a>
+          <a href="#dados">9. Onde ficam os dados</a>
+          <a href="#erros">10. Erros e soluções</a>
+          <a href="#faq">11. FAQ</a>
+          <a href="#desinstalar">12. Desinstalar</a>
+          <a href="#dev">13. Desenvolvimento</a>
         </aside>
 
         <div class="doc-content">
@@ -345,9 +346,92 @@ c2 migrate --yes</pre>
             </div>
           </section>
 
-          <!-- 7. MCP -->
+          <!-- 8. MCP -->
+          <section class="doc-section" id="provedor">
+            <h2>7. Provedor de IA: local, nuvem e BYO endpoint</h2>
+            <p>
+              O C2 fala o padrão <strong>OpenAI-compatible</strong>. Isso cobre três arranjos:
+            </p>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Modo</th><th>O que é</th><th>Chave?</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>IA local (padrão)</td>
+                    <td>O C2 sobe e supervisiona o <span class="mono">llama-server</span> embarcado, com o seu <span class="mono">.gguf</span>.</td>
+                    <td>Não</td>
+                  </tr>
+                  <tr>
+                    <td>API na nuvem</td>
+                    <td>OpenAI, OpenRouter, Groq, DeepSeek, Gemini (endpoint compat)…</td>
+                    <td>Sim (cofre do Windows ou <span class="mono">C2_API_KEY</span>)</td>
+                  </tr>
+                  <tr>
+                    <td>BYO endpoint</td>
+                    <td>Seu próprio servidor OpenAI-compatible: <strong>LM Studio</strong>, <strong>Ollama</strong>, <strong>vLLM</strong>, llama.cpp…</td>
+                    <td>Só se o servidor não for local</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Como configurar</h3>
+            <ol>
+              <li>Suba o servidor (ou use a IA local embarcada).</li>
+              <li>Abra <strong>Config → Provedor de IA</strong>.</li>
+              <li>Escolha o <strong>provedor</strong>: <span class="mono">local</span> ou <span class="mono">openai_compat</span>.</li>
+              <li>No modo compat, preencha <strong>base URL</strong> e <strong>modelo</strong> (ou use um preset) e salve.</li>
+              <li>Clique em <strong>Testar conexão</strong> antes de indexar.</li>
+            </ol>
+
+            <h3>Exemplos</h3>
+            <div class="table-wrap">
+              <table class="err-table">
+                <thead>
+                  <tr><th>Servidor</th><th>Como subir</th><th>base URL</th><th>modelo</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>LM Studio</td>
+                    <td>Developer → Start Server (porta 1234)</td>
+                    <td><span class="mono">http://127.0.0.1:1234/v1</span></td>
+                    <td>o id mostrado no servidor</td>
+                  </tr>
+                  <tr>
+                    <td>Ollama</td>
+                    <td><span class="mono">ollama pull qwen2.5:3b</span> · <span class="mono">ollama serve</span></td>
+                    <td><span class="mono">http://127.0.0.1:11434/v1</span></td>
+                    <td><span class="mono">qwen2.5:3b</span></td>
+                  </tr>
+                  <tr>
+                    <td>vLLM</td>
+                    <td><span class="mono">vllm serve Qwen/Qwen2.5-3B-Instruct --port 8000</span></td>
+                    <td><span class="mono">http://127.0.0.1:8000/v1</span></td>
+                    <td>o nome servido</td>
+                  </tr>
+                  <tr>
+                    <td>llama.cpp manual</td>
+                    <td><span class="mono">llama-server -m modelo.gguf --port 8080 -c 8192</span></td>
+                    <td><span class="mono">http://127.0.0.1:8080/v1</span></td>
+                    <td>qualquer nome</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>O que muda no modo BYO endpoint</h3>
+            <ul>
+              <li>O C2 <strong>não</strong> inicia nem reinicia o servidor: ele precisa estar de pé antes de indexar.</li>
+              <li>O <span class="mono">model.path</span>, VRAM e <span class="mono">ctx_size</span> são responsabilidade do servidor (use contexto ≥ 8k).</li>
+              <li>Endpoints em <span class="mono">127.0.0.1</span>/<span class="mono">localhost</span> dispensam API key.</li>
+              <li>Se o provedor falhar, o C2 mostra um popup e <strong>não</strong> troca para o local sozinho.</li>
+            </ul>
+          </section>
+
           <section class="doc-section" id="mcp">
-            <h2>7. MCP (agentes de IA)</h2>
+            <h2>8. MCP (agentes de IA)</h2>
             <p>
               O C2 expõe o Core por MCP sobre STDIO, somente leitura:
               <span class="mono">c2_grep</span>, <span class="mono">c2_read</span>,
@@ -370,7 +454,7 @@ c2 migrate --yes</pre>
 
           <!-- 8. DADOS -->
           <section class="doc-section" id="dados">
-            <h2>8. Onde ficam os dados</h2>
+            <h2>9. Onde ficam os dados</h2>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -393,7 +477,7 @@ c2 migrate --yes</pre>
 
           <!-- 9. ERROS -->
           <section class="doc-section" id="erros">
-            <h2>9. Erros e soluções</h2>
+            <h2>10. Erros e soluções</h2>
             <p>Mensagens reais do programa, causa provável e o que fazer.</p>
 
             <div class="table-wrap">
@@ -502,9 +586,9 @@ c2 migrate --yes</pre>
             </div>
           </section>
 
-          <!-- 10. FAQ -->
+          <!-- 11. FAQ -->
           <section class="doc-section" id="faq">
-            <h2>10. FAQ</h2>
+            <h2>11. FAQ</h2>
             <div class="faq">
               <details open>
                 <summary>Preciso do LM Studio?</summary>
@@ -541,7 +625,7 @@ c2 migrate --yes</pre>
 
           <!-- 11. DESINSTALAR -->
           <section class="doc-section" id="desinstalar">
-            <h2>11. Desinstalar</h2>
+            <h2>12. Desinstalar</h2>
             <pre class="code">pwsh -File "&lt;pasta instalada&gt;\desinstalar.ps1"</pre>
             <p>
               Remove programa, atalhos e a entrada do PATH. <strong>Não apaga</strong> os
@@ -552,7 +636,7 @@ c2 migrate --yes</pre>
 
           <!-- 12. DEV -->
           <section class="doc-section" id="dev">
-            <h2>12. Desenvolvimento</h2>
+            <h2>13. Desenvolvimento</h2>
             <pre class="code"><span class="c"># core + CLI</span>
 cargo build --workspace
 cargo test --workspace

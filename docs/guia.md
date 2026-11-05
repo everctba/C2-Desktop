@@ -198,6 +198,12 @@ Falha no provedor **não** cai automaticamente para o modelo local: o C2 mostra
 um popup de erro e mantém o provedor escolhido. O local precisa da GPU (que pode
 estar em uso por outra coisa), então a troca é sempre uma decisão do usuário.
 
+O mesmo caminho serve para **BYO endpoint** (servidor que você já roda):
+LM Studio (`http://127.0.0.1:1234/v1`), Ollama (`http://127.0.0.1:11434/v1`),
+vLLM (`http://127.0.0.1:8000/v1`) ou llama.cpp manual. Nesse modo o C2 não
+sobe nem reinicia o servidor; o contexto precisa caber no servidor (≥ 8k) e
+endpoint local dispensa API key.
+
 Ao ativar a nuvem, o conteúdo dos arquivos é enviado ao provedor — a tela mostra
 esse aviso e você pode voltar para `local` quando quiser. O runtime local não é
 iniciado nesse modo; `model.base_url` apontando para `127.0.0.1` também serve
