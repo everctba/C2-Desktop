@@ -353,9 +353,12 @@ Ordem de investigacao:
 3. `c2 grep \"<tarefa>\" --limit 5` - candidatos por significado.
 4. `c2 related <arquivo>` - vizinhos do grafo.
 5. `c2 read <arquivo> --lines A:B` - so o trecho necessario.
-6. Ao descobrir algo NAO OBVIO pelo codigo (invariante, gotcha, motivo real de
-   existencia), registre com a tool MCP `c2_annotate` (file, text, kind).
-   Seja curto (max 2000 chars) e nao anote o obvio.
+6. Pense teleologicamente antes de qualquer anotacao: por que este arquivo
+   existe? o que quebra se eu remover isso? o que o codigo NAO revela?
+   Se a resposta for nao obvia, registre com a tool MCP `c2_annotate`
+   (file, text, kind) - no maximo 1-2 por tarefa, curto (max 2000 chars).
+   Use `correction` se voce pensou A e era B; `pending` se depende do humano.
+   Nunca anote o obvio (ex.: este arquivo calcula descontos).
 
 Metadado e hipotese; codigo e evidencia. Se divergir, `c2 reindex --path <arquivo>`.
 Nao leia o projeto inteiro: comece com --limit 5.";

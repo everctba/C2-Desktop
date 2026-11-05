@@ -161,6 +161,18 @@ c2 mcp            # servidor MCP por STDIO
 
 ## 7. Anotações de agente (`c2_annotate`)
 
+### Pensamento teleológico antes de anotar
+
+Antes de escrever qualquer anotação, responda mentalmente:
+
+1. **Por que este arquivo existe?** (propósito real, não a descrição do que ele faz)
+2. **O que quebra se eu remover ou mudar isto?** (contrato, invariante)
+3. **O que o código NÃO revela?** (decisão de produto, restrição externa, armadilha)
+
+Se a resposta for **derivável só lendo o código** (ex.: “calcula descontos”,
+“faz fetch da API”), **não anote** — isso é ruído. A anotação só vale quando
+carrega a *teleologia* que o próximo agente não conseguiria inferir sozinho.
+
 Quando descobrir algo **não óbvio pelo código** — invariante sutil, motivo real
 da existência do arquivo, armadilha de manutenção — registre com a tool MCP
 `c2_annotate` (`file`, `text`, `kind` = `teleology` | `invariant` | `gotcha` |
@@ -171,6 +183,7 @@ da existência do arquivo, armadilha de manutenção — registre com a tool MCP
 - a anotação é uma hipótese do agente, datada e com o hash do arquivo; se o
   arquivo mudar, ela aparece como "revisar";
 - ela nunca altera `semantic`, `links` ou o código;
+- no máximo **1–2 anotações por tarefa**, não uma por arquivo;
 - use `correction` quando uma interpretação errada foi desfeita (pensou A,
   era B) para o próximo agente não repetir a lição; use `pending` só para
   contexto de decisão que ainda depende do humano (não é tracker de tarefas —

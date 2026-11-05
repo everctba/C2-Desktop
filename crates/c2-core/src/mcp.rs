@@ -74,7 +74,7 @@ pub fn tools() -> Value {
         },
         {
             "name": "c2_annotate",
-            "description": "Anexa uma anotacao de agente (teleology/invariant/gotcha) ao .c2.json do arquivo. Escrita restrita a agent_notes: nao altera codigo, semantic nem links. Use somente para descobertas nao obvias pelo codigo.",
+            "description": "Anexa uma anotacao de agente ao .c2.json do arquivo (campo agent_notes; nao altera codigo, semantic nem links). Use SOMENTE apos pensamento teleologico: por que existe, o que quebra se remover, o que o codigo nao revela — e apenas se isso nao for derivavel do codigo. Max 1-2 por tarefa; nunca anote o obvio.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
