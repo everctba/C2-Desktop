@@ -44,7 +44,9 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
   const hint = document.createElement("p");
   hint.className = "pageHint";
   hint.textContent =
-    "Abra a pasta de um projeto para o C2 indexar. O índice fica em .c2/ e os metadados ao lado de cada arquivo.";
+    "Abra a pasta de um projeto para o C2 indexar: o índice fica em .c2/ e os metadados ao lado de cada arquivo.";
+  // uma linha só: sem limite de 70ch neste hint
+  hint.style.maxWidth = "none";
   header.append(title, hint);
   page.appendChild(header);
 
