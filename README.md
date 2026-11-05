@@ -25,7 +25,7 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Resposta em milissegundos.** `c2 grep` p50 **60 ms**, `c2 related` **49 ms**;
   a consulta semântica resolve em **86 ms** o que a busca lexical não encontra.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
-- **Local.** Modelo e índice na sua máquina. Nada sai.
+- **Local.** Modelo local para você economizar Tokens. 
 - **Sem infra.** Sem banco, sem embeddings — só arquivos ao lado do código.
 - **Reversível.** `c2 cleaner` remove; `c2 migrate` converte metadado antigo.
 

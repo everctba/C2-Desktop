@@ -46,6 +46,17 @@
   background: var(--btn-primary-fg);
 }
 
+/* variante da marca: verde quando ligado */
+.onBrand {
+  background: var(--accent-1);
+  border-color: var(--accent-1);
+}
+
+.onBrand::after {
+  transform: translateX(16px);
+  background: var(--bg-body);
+}
+
 .control:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

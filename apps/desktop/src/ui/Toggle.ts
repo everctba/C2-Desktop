@@ -3,6 +3,8 @@ import styles from "./Toggle.module.css";
 export interface ToggleProps {
   label: string;
   checked: boolean;
+  /** "brand" usa o verde da marca (accent-1) quando ligado. */
+  tone?: "brand";
   onChange?: (checked: boolean) => void;
 }
 
@@ -17,7 +19,15 @@ export function Toggle(props: ToggleProps): { root: HTMLElement; control: HTMLBu
 
   const control = document.createElement("button");
   control.type = "button";
-  control.className = `${styles.control} ${props.checked ? styles.on : ""}`.trim();
+  const classes = (ligado: boolean) =>
+    [
+      styles.control,
+      ligado ? styles.on : "",
+      ligado && props.tone === "brand" ? styles.onBrand : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  control.className = classes(props.checked);
   control.setAttribute("role", "switch");
   control.setAttribute("aria-checked", props.checked ? "true" : "false");
   control.setAttribute("aria-label", props.label);
@@ -25,7 +35,7 @@ export function Toggle(props: ToggleProps): { root: HTMLElement; control: HTMLBu
   control.addEventListener("click", () => {
     const next = control.getAttribute("aria-checked") !== "true";
     control.setAttribute("aria-checked", next ? "true" : "false");
-    control.classList.toggle(styles.on, next);
+    control.className = classes(next);
     props.onChange?.(next);
   });
 

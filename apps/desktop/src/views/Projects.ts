@@ -3,6 +3,7 @@ import { Button } from "../ui/Button";
 import { Card, cardBody, cardFooter } from "../ui/Card";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Pill } from "../ui/Pill";
+import { Toggle } from "../ui/Toggle";
 import type { ModelInspection, RecentProject, StatusReport } from "../types";
 import type { View } from "./view";
 
@@ -240,9 +241,31 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
       onClick: () => void pickModelFlow(ctx),
     }),
   );
-  footer.appendChild(
-    Pill(status.model.disable_thinking ? "sem raciocínio" : "com raciocínio", "neutral", "xs"),
-  );
+  const raciocinio = Toggle({
+    label: "raciocínio",
+    checked: !status.model.disable_thinking,
+    tone: "brand",
+    onChange: async (ligado) => {
+      try {
+        await api.configSet(ctx.root, "model.disable_thinking", ligado ? "false" : "true");
+        ctx.onChanged();
+      } catch (erro) {
+        await openDialog({
+          title: "Não foi possível alterar o raciocínio",
+          body: dialogField("Erro", String(erro), true),
+          confirmLabel: "Entendi",
+          cancelLabel: "",
+        });
+      }
+    },
+  });
+  raciocinio.root.title =
+    "Raciocínio LIGADO (verde): o modelo pensa antes de responder. " +
+    "Medido em 6 arquivos: ~11,1 s e ~730 tokens por arquivo; descrições um pouco " +
+    "mais específicas em código ambíguo, mas pode alucinar siglas. " +
+    "DESLIGADO: ~3,5 s e ~127 tokens por arquivo; resposta menor e mais estável, " +
+    "ideal para indexar em lote. Clique para alternar.";
+  footer.appendChild(raciocinio.root);
 
   body.appendChild(modelInstructions());
   return card;
