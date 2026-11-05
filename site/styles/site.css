@@ -18,8 +18,9 @@ html {
 }
 
 body {
-  /* #0b0b0b: o ruido (screen) precisa de base nao-preta para aparecer */
-  background: #0b0b0b;
+  /* hsl(0deg 0% 5.1%) = fundo efetivo do app (~#0d0d0d, preto + ruido),
+     para a landing ter a mesma base visual (o ruido screen precisa de base nao-preta) */
+  background: hsl(0deg 0% 5.1%);
   color: var(--text-bright);
   font-family: var(--font-sans);
   font-weight: 600; /* Segoe UI Semibold (experimento) */
