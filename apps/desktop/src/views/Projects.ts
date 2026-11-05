@@ -368,6 +368,17 @@ function modelInstructionsBody(): HTMLElement {
   box.style.display = "grid";
   box.style.gap = "var(--space-s)";
 
+  const atalho = document.createElement("p");
+  atalho.style.cssText =
+    "margin: 0; padding: var(--space-s); border: 1px solid var(--border-muted); " +
+    "border-radius: var(--radius); font-size: var(--text-s); line-height: 1.45; " +
+    "color: var(--text-muted);";
+  atalho.innerHTML =
+    "Já usa modelos <strong>GGUF</strong> no <strong>LM Studio</strong> (ou em outra " +
+    "pasta)? Você não precisa baixar nada: feche este aviso, clique em " +
+    "<strong>Selecionar .gguf…</strong> e escolha o modelo que já está na sua máquina.";
+  box.appendChild(atalho);
+
   const passos = document.createElement("ol");
   passos.style.cssText =
     "margin: 0 0 0 var(--space-l); display: grid; gap: var(--space-3xs); " +
