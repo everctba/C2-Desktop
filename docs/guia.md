@@ -181,6 +181,10 @@ revoga no provedor — para isso, use o painel do provedor). A chave nunca é
 gravada no `.c2/config.json` nem aparece em logs/dumps: o `Debug` do cliente
 redige o bearer.
 
+Falha no provedor **não** cai automaticamente para o modelo local: o C2 mostra
+um popup de erro e mantém o provedor escolhido. O local precisa da GPU (que pode
+estar em uso por outra coisa), então a troca é sempre uma decisão do usuário.
+
 Ao ativar a nuvem, o conteúdo dos arquivos é enviado ao provedor — a tela mostra
 esse aviso e você pode voltar para `local` quando quiser. O runtime local não é
 iniciado nesse modo; `model.base_url` apontando para `127.0.0.1` também serve

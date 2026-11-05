@@ -423,6 +423,11 @@ c2 migrate --yes</pre>
                     <td>Feche o processo ou troque: <span class="mono">c2 config set model.port 8100</span>.</td>
                   </tr>
                   <tr>
+                    <td>API key nao configurada para … / provedor falhou</td>
+                    <td>Provedor openai_compat sem chave, sem credito ou fora do ar.</td>
+                    <td>Confira Config → Provedor de IA e o painel do provedor. O C2 <strong>nao</strong> troca para o modelo local automaticamente (a GPU pode estar em uso).</td>
+                  </tr>
+                  <tr>
                     <td>falta de memoria ao carregar o modelo</td>
                     <td>Contexto/camadas demais para a VRAM.</td>
                     <td>Reduza <span class="mono">model.ctx_size</span> e <span class="mono">model.gpu_layers</span>, ou feche outros apps.</td>

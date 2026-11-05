@@ -158,6 +158,34 @@ function openWelcomeFlow(): void {
   });
 }
 
+const falhasProvedorAvisadas = new Set<string>();
+
+/**
+ * Falha do provedor de nuvem: avisa com popup e deixa claro que NADA foi
+ * trocado para o modelo local automaticamente (o local precisa da GPU).
+ */
+async function avisarFalhaProvedor(mensagem: string): Promise<void> {
+  const chave = mensagem.trim().slice(0, 240);
+  if (!chave || falhasProvedorAvisadas.has(chave)) return;
+  falhasProvedorAvisadas.add(chave);
+  const corpo = document.createElement("div");
+  corpo.appendChild(dialogField("Erro do provedor", mensagem, true));
+  const aviso = document.createElement("p");
+  aviso.style.marginTop = "var(--space-s)";
+  aviso.style.maxWidth = "none";
+  aviso.textContent =
+    "O C2 NÃO trocou automaticamente para o modelo local: ele precisa da GPU e ela " +
+    "pode estar em uso por outra coisa. Para usar o modelo local de propósito, mude " +
+    "em Config → Provedor de IA.";
+  corpo.appendChild(aviso);
+  await openDialog({
+    title: "Provedor de IA falhou",
+    body: corpo,
+    confirmLabel: "Entendi",
+    cancelLabel: "",
+  });
+}
+
 async function runReindex(full: boolean): Promise<void> {
   if (!state.root) return;
   state.busy = true;
@@ -169,8 +197,16 @@ async function runReindex(full: boolean): Promise<void> {
       `reindex: ${report.indexed} indexados, ${report.unchanged} inalterados, ` +
         `${report.errors} erros, ${report.blocked} bloqueados por segredo`,
     );
+    if (report.errors > 0 && state.status?.model.provider === "openai_compat") {
+      await avisarFalhaProvedor(
+        report.last_error ?? "erro ao chamar o provedor de nuvem",
+      );
+    }
   } catch (error) {
     log(`erro: ${String(error)}`);
+    if (state.status?.model.provider === "openai_compat") {
+      await avisarFalhaProvedor(String(error));
+    }
   } finally {
     state.busy = false;
     await loadStatus();
@@ -535,10 +571,24 @@ function render(): void {
 function subscribeEvents(): void {
   if (!hasTauri) return;
   onEngineEvent("engine://cycle", (payload) => {
-    const report = payload as { indexed?: number; errors?: number };
+    const report = payload as {
+      indexed?: number;
+      errors?: number;
+      last_error?: string | null;
+    };
     log(`ciclo: ${report.indexed ?? 0} indexados, ${report.errors ?? 0} erros`);
+    if ((report.errors ?? 0) > 0 && state.status?.model.provider === "openai_compat") {
+      void avisarFalhaProvedor(
+        report.last_error ?? "erro no ciclo de indexacao com o provedor de nuvem",
+      );
+    }
   });
-  onEngineEvent("engine://error", (payload) => log(`erro do engine: ${String(payload)}`));
+  onEngineEvent("engine://error", (payload) => {
+    log(`erro do engine: ${String(payload)}`);
+    if (state.status?.model.provider === "openai_compat") {
+      void avisarFalhaProvedor(String(payload));
+    }
+  });
   onEngineEvent("engine://stopped", () => {
     state.running = false;
     log("engine encerrado");
