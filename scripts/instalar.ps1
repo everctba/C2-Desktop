@@ -7,6 +7,7 @@
 #   pwsh -File instalar.ps1 -NoGui        # sem dialogo: usa prompt de texto
 #   pwsh -File instalar.ps1 -NoPath       # nao adiciona o CLI ao PATH
 #   pwsh -File instalar.ps1 -PrependPath  # poe o CLI antes no PATH (ver conflito)
+#   pwsh -File instalar.ps1 -Lang en      # en (padrao) | pt-BR (sem dialogos graficos)
 #
 # O que faz:
 #   1. escolhe a pasta de instalacao (padrao %LOCALAPPDATA%\C2);
@@ -22,7 +23,10 @@ param(
     # Nao adiciona <dest>\cli ao PATH do usuario
     [switch]$NoPath,
     # Coloca o CLI no inicio do PATH do usuario (pode sombrear outro "c2")
-    [switch]$PrependPath
+    [switch]$PrependPath,
+    # Idioma: en (padrao) ou pt-BR; define o box inicial e o language.json
+    [ValidateSet('en', 'pt-BR')]
+    [string]$Lang = 'en'
 )
 
 $ErrorActionPreference = 'Continue'
@@ -32,24 +36,140 @@ if (-not (Test-Path (Join-Path $source 'C2.exe'))) {
     throw "instalar.ps1 precisa estar na pasta do pacote (com C2.exe). Pasta atual: $source"
 }
 if (-not (Test-Path (Join-Path $source 'runtime\llama-server.exe'))) {
-    Write-Warning 'runtime\llama-server.exe nao encontrado no pacote: o C2 vai exigir model.binary ou llama-server no PATH'
+    Write-Warning $T.runtimeWarn
 }
 
-$padrao = Join-Path $env:LOCALAPPDATA 'C2'
+# ---------- idioma ----------
+function MostrarSeletorIdioma {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        $form = New-Object System.Windows.Forms.Form
+        $form.Text = 'C2 — Choose language / Escolha o idioma'
+        $form.Size = New-Object System.Drawing.Size(380, 190)
+        $form.StartPosition = 'CenterScreen'
+        $form.FormBorderStyle = 'FixedDialog'
+        $form.MaximizeBox = $false
+        $form.MinimizeBox = $false
+
+        $label = New-Object System.Windows.Forms.Label
+        $label.Text = 'Install language / Idioma da instalacao:'
+        $label.Location = New-Object System.Drawing.Point(18, 18)
+        $label.AutoSize = $true
+        $form.Controls.Add($label)
+
+        $radioEn = New-Object System.Windows.Forms.RadioButton
+        $radioEn.Text = 'English (default)'
+        $radioEn.Location = New-Object System.Drawing.Point(22, 48)
+        $radioEn.AutoSize = $true
+        $radioEn.Checked = $true
+        $form.Controls.Add($radioEn)
+
+        $radioPt = New-Object System.Windows.Forms.RadioButton
+        $radioPt.Text = 'Português (Brasil)'
+        $radioPt.Location = New-Object System.Drawing.Point(22, 76)
+        $radioPt.AutoSize = $true
+        $form.Controls.Add($radioPt)
+
+        $ok = New-Object System.Windows.Forms.Button
+        $ok.Text = 'OK'
+        $ok.Location = New-Object System.Drawing.Point(270, 112)
+        $ok.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $form.Controls.Add($ok)
+        $form.AcceptButton = $ok
+
+        if ($form.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+            return $null
+        }
+        if ($radioPt.Checked) { return 'pt-BR' }
+        return 'en'
+    } catch {
+        Write-Warning "sem seletor grafico de idioma ($($_.Exception.Message)); usando -Lang $Lang"
+        return $Lang
+    }
+}
+
+$idioma = $Lang
+if (-not $PSBoundParameters.ContainsKey('Lang') -and -not $NoGui) {
+    $escolhido = MostrarSeletorIdioma
+    if ($null -eq $escolhido) {
+        Write-Host 'instalacao cancelada'
+        exit 0
+    }
+    $idioma = $escolhido
+}
+
+$M = @{
+    en = @{
+        chooseDest = 'Choose the folder where C2 will be installed'
+        cancelled = 'installation cancelled'
+        origin = 'source'
+        dest = 'target'
+        closeApp = 'close C2 Desktop before installing'
+        copying = 'copying files...'
+        pathAlready = 'PATH: {0} was already in the user PATH'
+        pathAdded = 'PATH: {0} added to the user PATH (new terminals)'
+        pathPrepend = 'PATH: {0} added to the BEGINNING of the user PATH'
+        pathFail = 'could not change the user PATH: {0}'
+        shortcut = 'shortcut: {0}'
+        installed = 'installed to: {0}'
+        next = 'next steps:'
+        next1 = '  1. open {0}\C2.exe'
+        next2 = '  2. Open project -> choose the project folder'
+        next3 = '  3. Select .gguf (the model is not copied)'
+        next4 = '  4. Start'
+        cli = "CLI: {0}\cli\c2.exe (in the user PATH: open a new terminal and run 'c2 --version')"
+        remove = 'to remove: pwsh -File "{0}"'
+        runtimeWarn = 'runtime\llama-server.exe not found: C2 will need model.binary or llama-server in PATH'
+        conflict = "another 'c2' already exists in PATH: {0}"
+        conflict2 = '  Windows checks the SYSTEM PATH first; if the other one is there it wins.'
+        conflict3 = '  use the full path "{0} --version", or rename/remove the other one.'
+        language = 'installation language: {0}'
+    }
+    pt = @{
+        chooseDest = 'Escolha a pasta onde o C2 sera instalado'
+        cancelled = 'instalacao cancelada'
+        origin = 'origem'
+        dest = 'destino'
+        closeApp = 'feche o C2 Desktop antes de instalar'
+        copying = 'copiando arquivos...'
+        pathAlready = 'PATH: {0} ja estava no PATH do usuario'
+        pathAdded = 'PATH: {0} adicionado ao PATH do usuario (vale em novos terminais)'
+        pathPrepend = 'PATH: {0} adicionado no INICIO do PATH do usuario'
+        pathFail = 'nao foi possivel alterar o PATH do usuario: {0}'
+        shortcut = 'atalho: {0}'
+        installed = 'instalado em: {0}'
+        next = 'proximos passos:'
+        next1 = '  1. abra {0}\C2.exe'
+        next2 = '  2. Abrir projeto -> escolha a pasta do projeto'
+        next3 = '  3. Selecionar .gguf (o modelo nao e copiado)'
+        next4 = '  4. Iniciar'
+        cli = "CLI: {0}\cli\c2.exe (no PATH do usuario: abra um terminal novo e rode 'c2 --version')"
+        remove = 'para remover: pwsh -File "{0}"'
+        runtimeWarn = 'runtime\llama-server.exe nao encontrado no pacote: o C2 vai exigir model.binary ou llama-server no PATH'
+        conflict = "ja existe outro 'c2' no PATH: {0}"
+        conflict2 = '  o Windows procura primeiro no PATH do SISTEMA; se o outro estiver la, ele vence.'
+        conflict3 = '  para usar o C2: "{0} --version", ou remova/renomeie o outro.'
+        language = 'idioma da instalacao: {0}'
+    }
+}
+$T = $M[$(if ($idioma -eq 'pt-BR') { 'pt' } else { 'en' })]
+Write-Host ($T.language -f $idioma)
+
+$padrao = Join-Path $env:LOCALAPPDATA 'C2\'
 
 if (-not $Dest -and -not $NoGui) {
     # Seletor grafico de pasta (escolhe qualquer disco/pasta)
     try {
         Add-Type -AssemblyName System.Windows.Forms
         $dialogo = New-Object System.Windows.Forms.FolderBrowserDialog
-        $dialogo.Description = 'Escolha a pasta onde o C2 sera instalado'
+        $dialogo.Description = $T.chooseDest
         $dialogo.UseDescriptionForTitle = $true
         $dialogo.ShowNewFolderButton = $true
         $dialogo.SelectedPath = $padrao
         if ($dialogo.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             $Dest = $dialogo.SelectedPath
         } else {
-            Write-Host 'instalacao cancelada'
+            Write-Host $T.cancelled
             exit 0
         }
     } catch {
@@ -66,17 +186,17 @@ if (-not $Dest) {
 $Dest = [System.IO.Path]::GetFullPath($Dest)
 
 Write-Host ''
-Write-Host "origem : $source"
-Write-Host "destino: $Dest"
+Write-Host "$($T.origin) : $source"
+Write-Host "$($T.dest): $Dest"
 Write-Host ''
 
 if (Get-Process C2 -ErrorAction SilentlyContinue) {
-    throw 'feche o C2 Desktop antes de instalar'
+    throw $T.closeApp
 }
 
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 
-Write-Host 'copiando arquivos...'
+Write-Host $T.copying
 foreach ($item in @('C2.exe', 'LEIA-ME.txt')) {
     $origem = Join-Path $source $item
     if (Test-Path $origem) { Copy-Item $origem (Join-Path $Dest $item) -Force }
@@ -112,7 +232,7 @@ if (Test-Path $c2Proprio) {
         if ($null -eq $atual) { $atual = '' }
         $entradas = @($atual -split ';' | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ -ne '' })
         if ($entradas -contains $pastaCli) {
-            Write-Host "PATH: $pastaCli ja estava no PATH do usuario"
+            Write-Host ($T.pathAlready -f $pastaCli)
         } else {
             $novo = if ($atual.Trim().TrimEnd(';') -eq '') {
                 $pastaCli
@@ -129,12 +249,12 @@ if (Test-Path $c2Proprio) {
                     [C2Inst.Win32]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, 'Environment', 0x0002, 1000, [ref]$resultado) | Out-Null
                 } catch { }
                 if ($PrependPath) {
-                    Write-Host "PATH: $pastaCli adicionado no INICIO do PATH do usuario"
+                    Write-Host ($T.pathPrepend -f $pastaCli)
                 } else {
-                    Write-Host "PATH: $pastaCli adicionado ao PATH do usuario (vale em novos terminais)"
+                    Write-Host ($T.pathAdded -f $pastaCli)
                 }
             } catch {
-                Write-Warning "nao foi possivel alterar o PATH do usuario: $($_.Exception.Message)"
+                Write-Warning ($T.pathFail -f $_.Exception.Message)
             }
         }
     }
@@ -154,7 +274,7 @@ if (-not $NoShortcut) {
             $link.IconLocation = Join-Path $Dest 'C2.exe'
             $link.Description = 'C2 — contexto semantico de projetos'
             $link.Save()
-            Write-Host "atalho: $atalho"
+            Write-Host ($T.shortcut -f $atalho)
         } catch {
             Write-Warning "nao foi possivel criar $atalho : $($_.Exception.Message)"
         }
@@ -162,13 +282,19 @@ if (-not $NoShortcut) {
 }
 
 Write-Host ''
-Write-Host "instalado em: $Dest"
-Write-Host 'proximos passos:'
-Write-Host "  1. abra $Dest\C2.exe"
-Write-Host '  2. Abrir projeto -> escolha a pasta do projeto'
-Write-Host '  3. Selecionar .gguf (o modelo nao e copiado)'
-Write-Host '  4. Iniciar'
+Write-Host ($T.installed -f $Dest)
+Write-Host $T.next
+Write-Host ($T.next1 -f $Dest)
+Write-Host $T.next2
+Write-Host $T.next3
+Write-Host $T.next4
 Write-Host ''
-Write-Host "CLI: $Dest\cli\c2.exe (no PATH do usuario: abra um terminal novo e rode 'c2 --version')"
+Write-Host ($T.cli -f $Dest)
 Write-Host ''
-Write-Host "para remover: pwsh -File `"$Dest\desinstalar.ps1`""
+Write-Host ($T.remove -f (Join-Path $Dest 'desinstalar.ps1'))
+
+# Preferencia de idioma para o app ler no primeiro start (i18n c2-gj4).
+$appData = Join-Path $env:APPDATA 'dev.c2.desktop'
+New-Item -ItemType Directory -Force -Path $appData | Out-Null
+$jsonIdioma = '{ "lang": "' + $idioma + '" }'
+[System.IO.File]::WriteAllText((Join-Path $appData 'language.json'), $jsonIdioma, (New-Object System.Text.UTF8Encoding($false)))

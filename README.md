@@ -67,9 +67,14 @@ Mudou o arquivo? Só ele é reindexado.
 ## Começar (Windows)
 
 ```powershell
-pwsh -File instalar.ps1                       # escolhe a pasta, cria atalho, põe o CLI no PATH
+pwsh -File instalar.ps1                       # box de idioma (English padrão) + pasta + atalho + PATH
 pwsh -File instalar.ps1 -Dest "D:\Apps\C2"
+pwsh -File instalar.ps1 -Lang pt-BR            # instala em português (sem diálogos)
 ```
+
+O instalador mostra um **box de idioma** com **English (padrão)** e **Português (Brasil)**
+e grava a escolha em `%APPDATA%\dev.c2.desktop\language.json`. A interface do app
+usa essa preferência; **comandos da CLI e tools do MCP continuam em inglês**.
 
 Depois:
 
