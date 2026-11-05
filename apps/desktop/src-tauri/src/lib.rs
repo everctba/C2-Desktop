@@ -14,7 +14,7 @@ use c2_core::search::{self, SearchOptions};
 use c2_core::status::{self, StatusReport};
 use c2_core::{cleaner, runtime, EngineState, MetaFile, Workspace};
 use serde::Serialize;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 /// Projeto passado por `c2 open --root <dir>`.
@@ -774,6 +774,44 @@ fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
 }
 
 #[tauri::command]
+fn news_fetch(url: String) -> Result<String, String> {
+    c2_core::news::fetch(&url).map_err(|erro| erro.to_string())
+}
+
+/// URL de novidades sobrescrita no dev/teste (C2_NEWS_URL).
+#[tauri::command]
+fn news_url() -> Option<String> {
+    std::env::var("C2_NEWS_URL")
+        .ok()
+        .map(|valor| valor.trim().to_string())
+        .filter(|valor| !valor.is_empty())
+}
+
+fn news_state_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("news-state.json"))
+        .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn news_state_load(app: tauri::AppHandle) -> Option<String> {
+    let caminho = news_state_path(&app).ok()?;
+    std::fs::read_to_string(caminho).ok()
+}
+
+#[tauri::command]
+fn news_state_save(app: tauri::AppHandle, state: String) -> Result<(), String> {
+    let caminho = news_state_path(&app)?;
+    if let Some(pai) = caminho.parent() {
+        std::fs::create_dir_all(pai).map_err(|erro| erro.to_string())?;
+    }
+    let temporario = caminho.with_extension("json.tmp");
+    std::fs::write(&temporario, state).map_err(|erro| erro.to_string())?;
+    std::fs::rename(&temporario, &caminho).map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
 fn prompt_default() -> String {
     c2_core::config::DEFAULT_PROMPT.to_string()
 }
@@ -824,6 +862,10 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            news_fetch,
+            news_url,
+            news_state_load,
+            news_state_save,
             gpu_info,
             mcp_smoke,
             api_key_set,

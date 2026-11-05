@@ -1,0 +1,57 @@
+.modal {
+  width: min(480px, 100%);
+}
+
+.body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.capa {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.conteudo {
+  display: grid;
+  gap: var(--space-s);
+  padding: var(--space-l);
+}
+
+.selo {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-1);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-bright);
+  line-height: 1.25;
+}
+
+.descricao {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.55;
+}
+
+.descricao a {
+  color: var(--accent-3);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.descricao a:hover {
+  color: var(--accent-1);
+}

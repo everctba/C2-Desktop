@@ -14,6 +14,7 @@ import { renderSearch } from "./views/Search";
 import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
+import { initNews } from "./news";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
 
@@ -657,6 +658,9 @@ async function boot(): Promise<void> {
   if (primeiraVez && !state.status?.model.path) {
     window.setTimeout(openWelcomeFlow, 350);
   }
+
+  // Popup de novidades (news.json estatico), sempre depois do boot.
+  initNews();
 
   // As telas cuidam da propria atualizacao: a Engine assina eventos do Core
   // e atualiza contadores/log no DOM, sem re-render (c2-e14t2).

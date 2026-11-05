@@ -1,0 +1,11 @@
+{
+  "posts": [
+    {
+      "id": "2026-11-05-custo-nuvem",
+      "title": "Custo na nuvem sob controle",
+      "description": "Agora você define preço por token, vê uma estimativa antes de indexar e um teto por execução. Veja [como configurar](https://everctba.github.io/C2-Desktop/ajuda.html#config).",
+      "date": "2026-11-05T18:00:00Z",
+      "url": "https://everctba.github.io/C2-Desktop/ajuda.html"
+    }
+  ]
+}

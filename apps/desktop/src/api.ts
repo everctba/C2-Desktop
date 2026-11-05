@@ -72,6 +72,10 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: () => invoke<string>("prompt_default"),
+  newsUrl: () => invoke<string | null>("news_url"),
+  newsStateLoad: () => invoke<string | null>("news_state_load"),
+  newsStateSave: (state: string) => invoke<void>("news_state_save", { state }),
+  newsFetch: (url: string) => invoke<string>("news_fetch", { url }),
   appVersion: async () => {
     if (!hasTauri) return "0.1.0";
     try {
@@ -269,6 +273,14 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return undefined as T;
     case "api_key_status":
       return false as T;
+    case "news_url":
+      return null as T;
+    case "news_state_load":
+      return null as T;
+    case "news_state_save":
+      return undefined as T;
+    case "news_fetch":
+      return JSON.stringify({ posts: [] }) as T;
     case "cost_estimate":
       return { pending: 0, estimated_cost_usd: 0, cap_usd: 0 } as T;
     case "provider_test":

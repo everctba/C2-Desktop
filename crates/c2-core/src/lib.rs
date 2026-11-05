@@ -19,6 +19,7 @@ pub mod log;
 pub mod mcp;
 pub mod migrate;
 pub mod notes;
+pub mod news;
 pub mod cost;
 pub mod process;
 pub mod runtime;

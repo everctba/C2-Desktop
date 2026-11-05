@@ -175,6 +175,20 @@ anotações ficam em `agent_notes`, no máximo 10 por arquivo (2.000 caracteres
 cada), são **preservadas no reindex** e marcadas como "revisar" quando o hash do
 arquivo muda. `c2 note list` mostra tudo; `c2 note remove` apaga.
 
+## Novidades (What's New)
+
+O app mostra um modal de novidades no maximo uma vez por post, depois de 5
+aberturas e de 24 h desde a ultima checagem. O conteudo vem de
+`site/news.json` (publicado junto com a landing), sem release e sem backend.
+
+- URL padrao: `https://everctba.github.io/C2-Desktop/news.json`;
+- teste local: `C2_NEWS_URL=http://127.0.0.1:8000/news.json` (servidor HTTP na
+  pasta `site/`);
+- estado: `%APPDATA%/dev.c2.desktop/news-state.json` (`launches`,
+  `lastSeenDate`, `lastCheckAt`);
+- regras: um post por novidade, `date` ISO com timezone, link so http/https;
+  offline/JSON invalido falha em silencio.
+
 ## Configuração útil
 
 ```bash
