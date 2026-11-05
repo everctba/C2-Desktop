@@ -945,3 +945,10 @@ body > * {
   text-transform: uppercase;
   color: var(--text-subtle);
 }
+
+.testimonial-note {
+  margin-top: var(--space-xl);
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+  color: var(--accent-1);
+}

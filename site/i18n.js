@@ -37,6 +37,7 @@
     "arquivo": "file",
     "arquivos": "files",
   "Deixe seu repo context-ready para agentes": "Make your repo context-ready for agents",
+  "sim, esse depoimento é da AI ;)": "yes, this testimonial is from the AI ;)",
   // navegação / chrome
     "Como funciona": "How it works",
     "Números": "Numbers",
