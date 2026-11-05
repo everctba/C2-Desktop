@@ -35,3 +35,6 @@ scripts/pf_*.py
 
 # estado local do C2 (config, logs, cache, pid) - por maquina
 /.c2/
+
+# fontes pesadas de arte (PSD ~21 MB); os PNGs exportados sao versionados
+ARTES/*.psd

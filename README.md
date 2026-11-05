@@ -1,14 +1,6 @@
 # C2
 
-```text
-         _____                          __        ___   ___
-        / ___/__  __ _  __ _  ___ ___  / /____   |_  | / _ \
-       / /__/ _ \/  ' \/  ' \/ -_) _ \/ __(_-<  / __/_/ // /
-       \___/\___/_/_/_/_/_/_/\__/_//_/\__/___/ /____(_)___/
-                 //////////////////////////
-                 //C2 Comments 2.0 for AI//
-                 //////////////////////////
-```
+<p align="center"><img src="site/assets/img/logo-horizontal-dark.png" width="460" alt="C2 — Comments 2.0 for AI"></p>
 
 [![ci](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml)
 

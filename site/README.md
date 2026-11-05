@@ -18,15 +18,18 @@ site/
     └── img/            capturas do app
 ```
 
-## Logo (arte em ASCII)
+## Logo e ícone
 
-A arte-fonte fica em `assets/ascii/logo-ascii.txt` — **ASCII puro**
-(`/ \ _ | ( )`), por isso alinha em qualquer fonte monoespaçada e funciona em
-terminal, README e navegador sem conversão.
+| Arquivo | Uso |
+|---|---|
+| `assets/img/logo-horizontal.png` | logo horizontal com fundo transparente (nav, sobre, site escuro) |
+| `assets/img/logo-horizontal-dark.png` | logo sobre fundo escuro (README/GitHub, tema claro e escuro) |
+| `assets/img/logo-horizontal-light.png` | variante invertida para fundo claro |
+| `assets/img/favicon.ico`, `favicon-32.png`, `apple-touch-icon.png` | favicon das páginas |
+| `assets/ascii/logo-ascii.txt` | arte ASCII usada no hero (ASCII puro, alinha em qualquer mono) |
 
-No hero ela é um `<pre>` com `aria-hidden="true"` e uma legenda `sr-only`
-("C2 — Comments 2.0 for AI") para leitores de tela. Não use imagem raster:
-ASCII em `<pre>` é nítido em qualquer zoom.
+Fontes originais em `ARTES/` (PSD + PNG). O ícone do executável é gerado com
+`pnpm tauri icon ARTES/icone-c2-1024.png` (saída em `apps/desktop/src-tauri/icons`).
 
 ## Ver localmente
 

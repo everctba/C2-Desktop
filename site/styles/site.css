@@ -791,3 +791,23 @@ code.inline {
     font-size: clamp(4.4px, 2.1vw, 9px);
   }
 }
+
+/* ---------- marca (logo horizontal) ---------- */
+.brand-logo {
+  display: block;
+  height: 26px;
+  width: auto;
+}
+
+.page-logo {
+  display: block;
+  width: min(360px, 70vw);
+  height: auto;
+  margin: var(--space-5xl) 0 0;
+}
+
+@media (max-width: 900px) {
+  .brand-logo {
+    height: 22px;
+  }
+}
