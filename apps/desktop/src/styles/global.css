@@ -198,3 +198,23 @@ input {
 .spacer {
   flex: 1;
 }
+
+/* ---------- textura de ruido sobre a interface (WebView2) ---------- */
+#app::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-image: url("../assets/ruido.gif");
+  background-size: 14%;
+  background-repeat: repeat;
+  opacity: 0.239;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app::after {
+    display: none;
+  }
+}

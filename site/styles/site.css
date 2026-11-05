@@ -845,7 +845,8 @@ body::before {
   inset: 0;
   z-index: 0;
   background: url("../assets/img/ruido.gif") repeat;
-  opacity: 0.05;
+  background-size: 14%;
+  opacity: 0.239;
   mix-blend-mode: overlay;
   pointer-events: none;
 }
