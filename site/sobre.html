@@ -211,11 +211,26 @@
         };
         img.src = "assets/img/avatar.webp";
 
-        // PayPal
+        // PayPal: aceita e-mail (link de doacao) ou usuario do PayPal.me
         const paypal = (cfg.paypal || "").trim();
+        const ehEmail = paypal.indexOf("@") !== -1;
+        const linkPaypal = (valor) => {
+          if (!paypal) return "#";
+          if (ehEmail) {
+            return (
+              "https://www.paypal.com/donate/?business=" +
+              encodeURIComponent(paypal) +
+              "&currency_code=USD"
+            );
+          }
+          return (
+            "https://www.paypal.com/paypalme/" +
+            encodeURIComponent(paypal) +
+            (valor ? "/" + valor : "")
+          );
+        };
         if (paypal) {
-          document.getElementById("paypal-link").href =
-            "https://www.paypal.com/paypalme/" + encodeURIComponent(paypal);
+          document.getElementById("paypal-link").href = linkPaypal();
           document.getElementById("paypal-aviso").textContent =
             "Escaneie o QR acima ou escolha o valor na página do PayPal.";
         } else {
@@ -267,11 +282,11 @@
               b.classList.toggle("selected", b === botao);
             });
             if (paypal) {
-              document.getElementById("paypal-link").href =
-                "https://www.paypal.com/paypalme/" + encodeURIComponent(paypal) + "/" + valor;
+              document.getElementById("paypal-link").href = linkPaypal(valor);
               document.getElementById("paypal-link").textContent = "Doar US$ " + valor + " com PayPal";
-              document.getElementById("paypal-aviso").textContent =
-                "Você será levado ao PayPal com o valor de US$ " + valor + ".";
+              document.getElementById("paypal-aviso").textContent = ehEmail
+                ? "Você será levado ao PayPal; informe o valor de US$ " + valor + "."
+                : "Você será levado ao PayPal com o valor de US$ " + valor + ".";
               document.getElementById("apoiar").scrollIntoView({ behavior: "smooth", block: "start" });
             } else {
               document.getElementById("paypal-aviso").textContent =

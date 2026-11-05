@@ -10,7 +10,8 @@ window.C2_SITE = {
     "a agentes de IA sem tirar o código da sua máquina.",
 
   // Doações (deixe vazio "" para esconder o método)
-  paypal: "", // ex.: "everctba" -> vira https://www.paypal.com/paypalme/everctba/5
+  // e-mail do PayPal (link de doacao) ou usuario do PayPal.me (paypal.me/usuario)
+  paypal: "mayerdesigner@gmail.com",
   pixChave: "", // ex.: "everctba@exemplo.com" (copia e cola)
   pixNome: "", // nome que aparece no app do banco
   pixCidade: "SAO PAULO",
