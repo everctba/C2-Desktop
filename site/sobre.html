@@ -107,6 +107,16 @@
             <span class="k">Internacional</span>
             <h3>PayPal</h3>
             <p>Cartão ou saldo PayPal, em dólar. Funciona fora do Brasil.</p>
+            <div class="qr-box">
+              <img
+                class="qr"
+                src="assets/img/paypal-qr.png"
+                alt="QR code do PayPal para doar"
+                width="180"
+                height="178"
+              />
+              <span class="qr-legenda">escaneie com o app do PayPal</span>
+            </div>
             <div class="cta-row" style="margin-top: var(--space-l)">
               <a class="btn btn-primary" id="paypal-link" href="#" rel="noreferrer">
                 Doar com PayPal
@@ -199,7 +209,7 @@
           img.className = "avatar-img";
           avatar.appendChild(img);
         };
-        img.src = "assets/img/avatar.jpg";
+        img.src = "assets/img/avatar.webp";
 
         // PayPal
         const paypal = (cfg.paypal || "").trim();
@@ -207,13 +217,13 @@
           document.getElementById("paypal-link").href =
             "https://www.paypal.com/paypalme/" + encodeURIComponent(paypal);
           document.getElementById("paypal-aviso").textContent =
-            "Você escolhe o valor na página do PayPal.";
+            "Escaneie o QR acima ou escolha o valor na página do PayPal.";
         } else {
           document.getElementById("paypal-link").removeAttribute("href");
           document.getElementById("paypal-link").setAttribute("aria-disabled", "true");
           document.getElementById("paypal-link").style.opacity = "0.5";
           document.getElementById("paypal-aviso").textContent =
-            "PayPal ainda não configurado (site/config.js).";
+            "Use o QR code acima (PayPal P2P) ou configure o link em site/config.js.";
         }
 
         // PIX
