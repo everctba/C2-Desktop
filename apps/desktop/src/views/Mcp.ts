@@ -125,8 +125,8 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
     rotulo.className = styles.configLabel;
     rotulo.textContent = "configuração do cliente MCP";
     const copiar = Button({
+      label: "Copiar MCP",
       iconName: "copy",
-      iconOnly: true,
       size: "sm",
       variant: "secondary",
       onClick: async () => {
@@ -142,14 +142,21 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
             return;
           }
         }
+        const rotuloBotao = copiar.lastElementChild as HTMLElement | null;
         copiar.title = "Copiado!";
+        if (rotuloBotao) rotuloBotao.textContent = "Copiado";
         setTimeout(() => {
-          copiar.title = "Copiar configuração";
+          copiar.title = "Copiar configuração MCP";
+          if (rotuloBotao) rotuloBotao.textContent = "Copiar MCP";
         }, 1600);
       },
     });
-    copiar.title = "Copiar configuração";
-    copiar.setAttribute("aria-label", "Copiar configuração");
+    copiar.title = "Copiar configuração MCP";
+    copiar.setAttribute("aria-label", "Copiar configuração MCP");
+    // tamanho fixo: o botao nao muda de largura quando o texto troca
+    copiar.style.width = "118px";
+    copiar.style.flex = "0 0 auto";
+    copiar.style.justifyContent = "center";
     topo.append(rotulo, copiar);
 
     const pre = document.createElement("pre");
