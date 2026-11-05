@@ -434,17 +434,18 @@ function modelInstructionsBody(): HTMLElement {
   return box;
 }
 
-/** Botao "Como baixar um modelo (HuggingFace)" — abre as instrucoes em modal. */
+/** Botao "Como baixar um modelo" — abre as instrucoes em modal. */
 export function modelInstructions(): HTMLElement {
   const botao = document.createElement("button");
   botao.type = "button";
   botao.className = styles.linkButton;
-  botao.textContent = "Como baixar um modelo (HuggingFace)";
+  botao.textContent = "Como baixar um modelo";
   botao.addEventListener("click", () => {
     void openDialog({
-      title: "Como baixar um modelo (HuggingFace)",
+      title: "Como baixar um modelo",
       body: modelInstructionsBody(),
       confirmLabel: "Fechar",
+      cancelLabel: "",
     });
   });
   return botao;
