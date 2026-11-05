@@ -10,7 +10,8 @@ export type IconName =
   | "settings"
   | "close"
   | "mcp"
-  | "copy";
+  | "copy"
+  | "info";
 
 const PATHS: Record<IconName, string> = {
   // pasta
@@ -32,6 +33,8 @@ const PATHS: Record<IconName, string> = {
   // X de remover
   close:
     "M4.7 3.3 3.3 4.7 6.6 8l-3.3 3.3 1.4 1.4L8 9.4l3.3 3.3 1.4-1.4L9.4 8l3.3-3.3-1.4-1.4L8 6.6z",
+  info:
+    "M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 3.1a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3zM6.9 6.9h2.2v5.6H6.9z",
   settings:
     "M8 1.2l1.1 1.4 1.7-.4.8 1.6 1.7.8-.3 1.7L14.8 8l-1.4 1.1.3 1.7-1.7.8-.8 1.6-1.7-.4L8 14.8l-1.1-1.4-1.7.4-.8-1.6-1.7-.8.3-1.7L1.2 8l1.4-1.1-.3-1.7 1.7-.8.8-1.6 1.7.4zM8 5.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z",
 };

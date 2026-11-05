@@ -13,6 +13,7 @@ import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
 import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
+import { renderAbout } from "./views/About";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
 
@@ -569,6 +570,9 @@ function render(): void {
         break;
       case "mcp":
         view = await renderMcp({ root: state.root });
+        break;
+      case "about":
+        view = await renderAbout();
         break;
       case "search":
         view = await renderSearch({ root: state.root });

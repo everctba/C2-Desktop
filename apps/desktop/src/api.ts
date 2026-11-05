@@ -72,6 +72,15 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: () => invoke<string>("prompt_default"),
+  appVersion: async () => {
+    if (!hasTauri) return "0.1.0";
+    try {
+      const { getVersion } = await import("@tauri-apps/api/app");
+      return await getVersion();
+    } catch {
+      return "0.1.0";
+    }
+  },
   gpuInfo: () => invoke<GpuInfo | null>("gpu_info"),
   apiKeySet: (key: string) => invoke<void>("api_key_set", { key }),
   apiKeyDelete: () => invoke<void>("api_key_delete"),

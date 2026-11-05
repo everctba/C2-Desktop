@@ -1,0 +1,155 @@
+.page {
+  display: grid;
+  gap: var(--space-l);
+  max-width: 880px;
+}
+
+.header {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.perfil {
+  display: flex;
+  gap: var(--space-l);
+  align-items: center;
+}
+
+.avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-muted);
+  flex: 0 0 auto;
+}
+
+.perfilInfo {
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.nome {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  margin-top: var(--space-3xs);
+}
+
+.acoes {
+  display: flex;
+  gap: var(--space-s);
+  margin-top: var(--space-m);
+  flex-wrap: wrap;
+}
+
+.apoio {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.apoio h2 {
+  margin: 0;
+  font-size: var(--text-l);
+  font-weight: 600;
+}
+
+.apoio p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  max-width: none;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-m);
+  margin-top: var(--space-s);
+}
+
+.k {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-3);
+}
+
+.qrBox {
+  display: grid;
+  place-items: center;
+  padding: var(--space-m);
+  margin-top: var(--space-s);
+  background: #fff;
+  border-radius: var(--radius);
+}
+
+.qr {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  display: block;
+}
+
+.legenda {
+  display: block;
+  margin-top: var(--space-2xs);
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+}
+
+.chaveLinha {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  margin-top: var(--space-s);
+  min-width: 0;
+}
+
+.chave {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.linha {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-m);
+  padding: var(--space-2xs) 0;
+  border-bottom: 1px solid var(--border-muted);
+  font-size: var(--text-s);
+}
+
+.linha:last-child {
+  border-bottom: 0;
+}
+
+.rotulo {
+  color: var(--text-subtle);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .perfil {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .grade {
+    grid-template-columns: 1fr;
+  }
+}
