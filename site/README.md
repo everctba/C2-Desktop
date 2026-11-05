@@ -64,7 +64,7 @@ window.C2_SITE = {
 Foto: coloque `site/assets/img/avatar.jpg` — se não existir, aparece a inicial
 do nome. Os botões US$ 5/10/15 montam `paypal.me/<usuario>/<valor>`.
 
-## Convenções
+## Ruído animado\n\nO fundo usa ssets/img/ruido.gif (mesmo do app) em ody::before:\nackground-size: 180px, opacity: 0.25, mix-blend-mode: screen. O screen\né necessário porque overlay sobre preto puro não altera nada; por isso o\nody usa #0b0b0b. Respeita prefers-reduced-motion.\n\n## Convenções
 
 - **Só tokens** de `styles/tokens.css`; nenhuma cor/medida solta e nenhum Tailwind.
 - Fonte de UI: sans do sistema. Código: **IBM Plex Mono** (woff2 local).

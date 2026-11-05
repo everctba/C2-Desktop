@@ -5,20 +5,20 @@
 [![ci](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/everctba/C2-Desktop/actions/workflows/ci.yml)
 
 **Comments 2.0 for AI** — contexto semântico de projeto para agentes de IA.
-Local. Incremental. Sem embeddings.
+Local. Incremental.
 
 O C2 comenta seu código automaticamente com IA local: `what`, `why`, `goal`,
-`summary`, `responsibility`. Um loop detecta o que mudou pelo hash e reescreve
-só o comentário afetado. Sua IA paga consome esse comentário atualizado em vez
+`summary`, `responsibility`. Um loop detecta se foi criado um arquivo novo ou alterado um antigo e reescreve
+só o comentário afetado, mantendo-se atualizado. Sua IA paga os arquivos `.c2.json` e consome esse comentário atualizado em vez
 de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 
 ---
 
 ## Por que usar
 
-- **Menos tokens.** O agente acha o arquivo certo sem abrir o repositório.
 - **Menos erro.** Metadado com `what`, `why`, `goal`, `summary`, `responsibility`.
-- **Sempre atualizado.** Incremental por SHA-256: arquivo igual não chama o modelo.
+- **Menos tokens.** O agente acha o arquivo certo sem abrir o repositório.
+- **Sempre atualizado.** Você não precisa fazer nada, sempre atualizado de maneira automática.
 - **Consulta rápida.** `c2 grep` p50 **60 ms**; `c2 related` **49 ms**.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
 - **Local.** Modelo e índice na sua máquina. Nada sai.

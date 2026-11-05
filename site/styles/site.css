@@ -18,7 +18,8 @@ html {
 }
 
 body {
-  background: var(--bg-body);
+  /* #0b0b0b: o ruido (screen) precisa de base nao-preta para aparecer */
+  background: #0b0b0b;
   color: var(--text-bright);
   font-family: var(--font-sans);
   font-weight: 600; /* Segoe UI Semibold (experimento) */
@@ -839,16 +840,16 @@ code.inline {
   color: var(--text-subtle);
 }
 
-/* ---------- ruido animado (fundo da pagina) ---------- */
+/* ---------- ruido animado (fundo da pagina, igual ao app) ---------- */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   background: url("../assets/img/ruido.gif") repeat;
-  background-size: 14%;
-  opacity: 0.239;
-  mix-blend-mode: overlay;
+  background-size: 180px;
+  opacity: 0.25;
+  mix-blend-mode: screen;
   pointer-events: none;
 }
 
