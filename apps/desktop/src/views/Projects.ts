@@ -1,4 +1,4 @@
-import { api, hasTauri } from "../api";
+import { api, hasTauri, openExternal } from "../api";
 import { Button } from "../ui/Button";
 import { Card, cardBody, cardFooter } from "../ui/Card";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
@@ -403,6 +403,11 @@ function modelInstructionsBody(): HTMLElement {
   link.className = styles.mono;
   link.textContent = MODELO_RECOMENDADO.url;
   link.style.color = "var(--accent-3)";
+  link.title = "Abrir no navegador";
+  link.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    void openExternal(MODELO_RECOMENDADO.url);
+  });
   acoes.appendChild(link);
 
   acoes.appendChild(

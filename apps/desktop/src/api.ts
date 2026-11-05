@@ -47,6 +47,20 @@ export function onEngineEvent(
   return () => unlisten?.();
 }
 
+/** Abre uma URL no navegador padrao (fora do WebView). */
+export async function openExternal(url: string): Promise<void> {
+  if (hasTauri) {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+      return;
+    } catch {
+      /* cai no fallback abaixo */
+    }
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export const api = {
   initialRoot: () => invoke<string | null>("initial_root"),
   runtimePlan: (root: string, ctxSize?: number, gpuLayers?: number) =>
