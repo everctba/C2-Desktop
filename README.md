@@ -7,6 +7,8 @@
 **Comments 2.0 for AI** — contexto semântico de projeto para agentes de IA.
 Local. Incremental.
 
+> **Deixe seu repo context-ready para agentes.**
+
 O C2 comenta seu código automaticamente com IA local: `what`, `why`, `goal`,
 `summary`, `responsibility`. Um loop detecta se foi criado um arquivo novo ou alterado um antigo e reescreve
 só o comentário afetado, mantendo-se atualizado. Sua IA paga os arquivos `.c2.json` e consome esse comentário atualizado em vez
