@@ -536,6 +536,18 @@ pub fn stop(workspace: &Workspace) -> Result<bool> {
 
 /// Resumo para `c2 status`.
 pub fn status(workspace: &Workspace, config: &Config) -> RuntimeStatus {
+    // Provedor externo (nuvem/BYO): quem gerencia o servidor e outro software.
+    // Nao sonde health (o base_url cru pode dar falso positivo) nem procure binario.
+    if !crate::config::usa_runtime_local(config) {
+        return RuntimeStatus {
+            healthy: false,
+            pid: None,
+            binary: None,
+            source: Some("externo".to_string()),
+            version: None,
+            last_error: None,
+        };
+    }
     let healthy = health(config);
     let pid = current_pid(workspace);
     let resolved = resolve_binary(workspace, config).ok();

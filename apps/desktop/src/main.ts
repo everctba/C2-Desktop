@@ -140,14 +140,14 @@ async function chooseModelForWelcome(): Promise<string | null> {
 }
 
 /** Assistente de primeira execução: baixar modelo, abrir pasta, selecionar. */
-function openWelcomeFlow(): void {
+function openWelcomeFlow(modo: "local" | "nuvem" = "local"): void {
   openWelcome({
     root: () => state.root,
     pickProject: () => pickProject(),
     chooseModel: () => chooseModelForWelcome(),
     finish: () => {
       localStorage.setItem("c2.onboarded", "1");
-      state.route = "engine";
+      state.route = modo === "nuvem" ? "settings" : "engine";
       render();
     },
     openSettings: () => {
@@ -157,6 +157,85 @@ function openWelcomeFlow(): void {
     dismiss: () => {
       localStorage.setItem("c2.onboarded", "1");
     },
+  }, modo);
+}
+
+/** Primeiro uso: escolha entre IA local e API Key/nuvem. */
+function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
+  return new Promise((resolve) => {
+    let decidido = false;
+    const handle = createDialog({
+      title: "Como você quer rodar a IA?",
+      onClose: () => {
+        if (!decidido) {
+          decidido = true;
+          resolve(null);
+        }
+      },
+    });
+    handle.element.style.width = "min(560px, 100%)";
+
+    const corpo = document.createElement("div");
+    corpo.style.display = "grid";
+    corpo.style.gap = "var(--space-s)";
+    const intro = document.createElement("p");
+    intro.textContent =
+      "Escolha o caminho inicial. Dá para trocar depois em Config → Modo de uso.";
+    intro.style.margin = "0";
+    intro.style.color = "var(--text-muted)";
+    corpo.appendChild(intro);
+
+    const finalizar = (modo: "local" | "nuvem") => {
+      if (decidido) return;
+      decidido = true;
+      handle.close();
+      resolve(modo);
+    };
+
+    const opcao = (
+      titulo: string,
+      descricao: string,
+      modo: "local" | "nuvem",
+    ): HTMLButtonElement => {
+      const box = document.createElement("button");
+      box.type = "button";
+      box.style.cssText =
+        "display: grid; gap: var(--space-2xs); text-align: left; " +
+        "padding: var(--space-m); border-radius: var(--radius); cursor: pointer; " +
+        "background: var(--bg-surface); border: 1px solid var(--border-muted);";
+      const tituloEl = document.createElement("strong");
+      tituloEl.textContent = titulo;
+      tituloEl.style.color = "var(--text-bright)";
+      const descEl = document.createElement("span");
+      descEl.textContent = descricao;
+      descEl.style.fontSize = "var(--text-s)";
+      descEl.style.color = "var(--text-muted)";
+      box.append(tituloEl, descEl);
+      box.addEventListener("click", () => finalizar(modo));
+      return box;
+    };
+
+    corpo.append(
+      opcao(
+        "IA local (padrão)",
+        "Modelo GGUF na sua GPU. Privado e sem custo por token. Precisa de GPU de 8 GB.",
+        "local",
+      ),
+      opcao(
+        "API Key / nuvem",
+        "OpenAI, Groq, DeepSeek, OpenRouter ou servidor local (LM Studio/Ollama/vLLM). Sem GPU.",
+        "nuvem",
+      ),
+    );
+    handle.body.appendChild(corpo);
+
+    const depois = Button({
+      label: "Decidir depois",
+      variant: "ghost",
+      onClick: () => finalizar("local"),
+    });
+    handle.footer.appendChild(depois);
+    depois.focus();
   });
 }
 
@@ -656,7 +735,13 @@ async function boot(): Promise<void> {
   // Primeira execucao sem modelo: abre o assistente de primeiros passos.
   const primeiraVez = localStorage.getItem("c2.onboarded") !== "1";
   if (primeiraVez && !state.status?.model.path) {
-    window.setTimeout(openWelcomeFlow, 350);
+    window.setTimeout(() => {
+      void (async () => {
+        const modo = await escolherModoInicial();
+        localStorage.setItem("c2.mode", modo ?? "local");
+        openWelcomeFlow(modo ?? "local");
+      })();
+    }, 350);
   }
 
   // Popup de novidades (news.json estatico), sempre depois do boot.

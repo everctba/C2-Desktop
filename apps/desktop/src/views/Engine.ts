@@ -30,6 +30,16 @@ interface ProgressEvent {
  * Os números e o log são atualizados por evento e por polling leve, direto no
  * DOM — sem re-render da tela (c2-e14t2).
  */
+function runtimePillFor(status: StatusReport): HTMLElement {
+  if (status.model.provider === "openai_compat") {
+    return Pill("runtime externo", "neutral");
+  }
+  return Pill(
+    status.runtime.healthy ? "runtime saudável" : "runtime parado",
+    status.runtime.healthy ? "success" : "neutral",
+  );
+}
+
 export async function renderEngine(ctx: EngineContext): Promise<View> {
   const page = document.createElement("div");
   page.className = styles.page;
@@ -156,7 +166,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
 
       runtimePill = replacePill(
         runtimePill,
-        Pill(status.runtime.healthy ? "runtime saudável" : "runtime parado", status.runtime.healthy ? "success" : "neutral"),
+        runtimePillFor(status),
       );
       const running = await api.engineRunning();
       enginePill = replacePill(
@@ -176,7 +186,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     callsMetric.set(`${ctx.status.state.llm_calls}`, `${tokens.toLocaleString("pt-BR")} tokens`);
     runtimePill = replacePill(
       runtimePill,
-      Pill(ctx.status.runtime.healthy ? "runtime saudável" : "runtime parado", ctx.status.runtime.healthy ? "success" : "neutral"),
+      runtimePillFor(ctx.status),
     );
     setActivity(ctx.running ? "engine iniciado, aguardando atividade" : "parado — clique em Iniciar para indexar");
     appendLog(`workspace carregado · ${ctx.status.files} arquivos · ${ctx.status.metadata} metadados`);

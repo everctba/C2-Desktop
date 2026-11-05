@@ -113,13 +113,23 @@ export async function renderProjects(ctx: ProjectsContext): Promise<View> {
 
   grid.appendChild(modelCard(ctx, status));
 
-  grid.appendChild(
-    projectCard("Runtime", status.runtime.healthy ? "saudável" : "parado", [
-      ["Binário", status.runtime.binary ?? "não localizado"],
-      ["Origem", status.runtime.source ?? "-"],
-      ["Versão", status.runtime.version ?? "-"],
-    ]),
-  );
+  if (status.model.provider === "openai_compat") {
+    grid.appendChild(
+      projectCard("Runtime", "gerenciado externamente", [
+        ["Servidor", "provedor / LM Studio / Ollama / vLLM"],
+        ["Endpoint", status.model.base_url ?? "nao configurado"],
+        ["Runtime local do C2", "nao se aplica neste modo"],
+      ]),
+    );
+  } else {
+    grid.appendChild(
+      projectCard("Runtime", status.runtime.healthy ? "saudável" : "parado", [
+        ["Binário", status.runtime.binary ?? "não localizado"],
+        ["Origem", status.runtime.source ?? "-"],
+        ["Versão", status.runtime.version ?? "-"],
+      ]),
+    );
+  }
 
   grid.appendChild(
     projectCard("Segurança", `política ${status.index.secret_policy}`, [
@@ -212,8 +222,66 @@ function projectCard(title: string, headline: string, fields: Array<[string, str
   return card;
 }
 
+/** No modo nuvem/BYO o card mostra o provedor, nao GGUF/VRAM. */
+function modelCardExterno(ctx: ProjectsContext, status: StatusReport): HTMLElement {
+  const card = Card({ title: "Provedor", accent: 4 });
+  const body = cardBody(card);
+
+  const nome = document.createElement("div");
+  nome.className = styles.fieldValue;
+  nome.textContent = status.model.name || "modelo nao configurado";
+  body.appendChild(nome);
+
+  for (const [rotulo, valor] of [
+    ["Modelo", status.model.name || "-"],
+    ["base URL", status.model.base_url ?? "nao configurada"],
+    ["Servidor", "externo (provedor / LM Studio / Ollama / vLLM)"],
+  ] as Array<[string, string]>) {
+    const field = document.createElement("div");
+    field.className = styles.field;
+    const label = document.createElement("span");
+    label.className = styles.fieldLabel;
+    label.textContent = rotulo;
+    const value = document.createElement("span");
+    value.className = styles.fieldValue;
+    value.textContent = valor;
+    value.title = valor;
+    field.append(label, value);
+    body.appendChild(field);
+  }
+
+  const footer = cardFooter(card);
+  footer.appendChild(Pill("nuvem", "neutral", "xs"));
+  footer.appendChild(
+    Button({
+      label: "Testar conexão",
+      size: "xs",
+      variant: "secondary",
+      onClick: async () => {
+        const resultado = await api.providerTest(ctx.root);
+        await openDialog({
+          title: "Teste do provedor",
+          body: dialogField(
+            resultado.ok ? "conexão ok" : "falhou",
+            resultado.ok
+              ? `${resultado.provider} · ${resultado.model} em ${resultado.latency_ms} ms`
+              : (resultado.error ?? "erro desconhecido"),
+            true,
+          ),
+          confirmLabel: "Fechar",
+          cancelLabel: "",
+        });
+      },
+    }),
+  );
+  return card;
+}
+
 /** Card do modelo: mostra o GGUF atual e abre o seletor com validação. */
 function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
+  if (status.model.provider === "openai_compat") {
+    return modelCardExterno(ctx, status);
+  }
   const card = Card({ title: "Modelo", accent: 4 });
   const body = cardBody(card);
 

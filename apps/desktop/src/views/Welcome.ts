@@ -24,7 +24,10 @@ export interface WelcomeHandlers {
  * Assistente de primeiros passos (c2-e16 / primeira execucao):
  * 1) baixar o modelo, 2) abrir a pasta do projeto, 3) selecionar o .gguf.
  */
-export function openWelcome(handlers: WelcomeHandlers): void {
+export function openWelcome(
+  handlers: WelcomeHandlers,
+  modo: "local" | "nuvem" = "local",
+): void {
   const dialog = createDialog({
     title: "Bem-vindo ao C2",
     onClose: () => handlers.dismiss(),
@@ -45,14 +48,15 @@ export function openWelcome(handlers: WelcomeHandlers): void {
   let atual = 0;
   let modeloEscolhido: string | null = null;
 
-  const TOTAL = 3;
-  const rotulos = ["Modelo", "Projeto", "Selecionar"];
+  const TOTAL = modo === "nuvem" ? 2 : 3;
+  const rotulos = modo === "nuvem" ? ["Nuvem", "Projeto"] : ["Modelo", "Projeto", "Selecionar"];
 
   const renderPassos = () => {
     passo.innerHTML = "";
     for (let indice = 0; indice < TOTAL; indice++) {
       const ativo = indice === atual;
-      const feito = indice < atual || (indice === 2 && modeloEscolhido);
+      const feito =
+        indice < atual || (modo === "local" && indice === 2 && modeloEscolhido);
       passo.appendChild(
         Pill(
           `${indice + 1}. ${rotulos[indice]}`,
@@ -68,7 +72,60 @@ export function openWelcome(handlers: WelcomeHandlers): void {
     corpo.innerHTML = "";
     dialog.footer.innerHTML = "";
 
-    if (atual === 0) {
+    if (modo === "nuvem" && atual === 0) {
+      corpo.appendChild(titulo("Conecte seu provedor (API Key)"));
+      corpo.appendChild(
+        texto(
+          "O C2 fala o padrao OpenAI-compatible: OpenAI, Groq, DeepSeek, OpenRouter " +
+            "ou um servidor local (LM Studio/Ollama/vLLM). A chave fica no cofre do " +
+            "sistema, nunca no config. O conteudo dos arquivos sai da maquina.",
+        ),
+      );
+      const acoesNuvem = document.createElement("div");
+      acoesNuvem.className = styles.actions;
+      acoesNuvem.appendChild(
+        Button({
+          label: "Abrir Configuracoes",
+          iconName: "settings",
+          size: "xs",
+          variant: "primary",
+          onClick: () => handlers.openSettings(),
+        }),
+      );
+      acoesNuvem.appendChild(
+        Button({
+          label: "Testar conexao",
+          size: "xs",
+          variant: "secondary",
+          onClick: async () => {
+            const raiz = handlers.root();
+            if (!raiz) {
+              const aviso = texto("Abra a pasta do projeto primeiro (proximo passo).");
+              aviso.style.color = "var(--warning-100)";
+              corpo.appendChild(aviso);
+              return;
+            }
+            const resultado = await api.providerTest(raiz);
+            const feedback = texto(
+              resultado.ok
+                ? `provedor ok: ${resultado.provider} · ${resultado.model} · ${resultado.latency_ms} ms`
+                : `falhou: ${resultado.error ?? "erro desconhecido"}`,
+            );
+            feedback.style.color = resultado.ok ? "var(--success)" : "var(--danger)";
+            corpo.appendChild(feedback);
+          },
+        }),
+      );
+      corpo.appendChild(acoesNuvem);
+      corpo.appendChild(
+        texto(
+          "Salve a chave em Config → Provedor de IA e clique em Testar conexao. " +
+            "Depois siga para o projeto.",
+        ),
+      );
+    }
+
+    if (modo === "local" && atual === 0) {
       corpo.appendChild(titulo("Baixe um modelo local (GGUF)"));
       corpo.appendChild(
         texto(
@@ -263,7 +320,9 @@ export function openWelcome(handlers: WelcomeHandlers): void {
       },
     });
     avancar.disabled =
-      (atual === 1 && !handlers.root()) || (atual === 2 && !modeloEscolhido);
+      modo === "nuvem"
+        ? atual === 1 && !handlers.root()
+        : (atual === 1 && !handlers.root()) || (atual === 2 && !modeloEscolhido);
 
     dialog.footer.append(voltar, pular, avancar);
   };

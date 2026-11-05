@@ -229,10 +229,97 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     for (const spec of fields) montar(spec, grid);
     body.appendChild(grid);
     page.appendChild(card);
+    return card;
   };
 
-  montarCard("Workspace", 2, WORKSPACE_FIELDS);
-  montarCard("Runtime", 4, RUNTIME_FIELDS);
+  // ---- Modo de uso (IA local x API Key) + simples/avancado ----
+  const avancado = localStorage.getItem("c2.config.avancado") === "1";
+  const provedorAtual = String(lerConfig(config, "model.provider") ?? "local");
+
+  const modoCard = Card({ title: "Modo de uso", accent: 1 });
+  const modoBody = cardBody(modoCard);
+  const explicaModo = document.createElement("p");
+  explicaModo.className = "pageHint";
+  explicaModo.style.maxWidth = "none";
+  explicaModo.textContent =
+    "Escolha onde a IA roda. O restante da tela se adapta ao modo; " +
+    "o que não se aplica fica oculto (abra 'avançado' para ver tudo).";
+  modoBody.appendChild(explicaModo);
+
+  const gradeModo = document.createElement("div");
+  gradeModo.style.display = "grid";
+  gradeModo.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  gradeModo.style.gap = "var(--space-m)";
+  gradeModo.style.marginTop = "var(--space-m)";
+
+  const opcaoModo = (
+    titulo: string,
+    descricao: string,
+    valor: "local" | "openai_compat",
+  ): HTMLButtonElement => {
+    const ativo = provedorAtual === valor;
+    const box = document.createElement("button");
+    box.type = "button";
+    box.style.cssText =
+      "display: grid; gap: var(--space-2xs); text-align: left; padding: var(--space-m); " +
+      "border-radius: var(--radius); cursor: pointer; background: var(--bg-surface); " +
+      `border: 1px solid ${ativo ? "var(--accent-1)" : "var(--border-muted)"};`;
+    const tituloEl = document.createElement("strong");
+    tituloEl.textContent = titulo;
+    tituloEl.style.color = "var(--text-bright)";
+    const descEl = document.createElement("span");
+    descEl.textContent = descricao;
+    descEl.style.fontSize = "var(--text-s)";
+    descEl.style.color = "var(--text-muted)";
+    descEl.style.lineHeight = "1.4";
+    box.append(tituloEl, descEl);
+    box.appendChild(Pill(ativo ? "ativo" : "escolher", ativo ? "success" : "neutral", "xs"));
+    box.addEventListener("click", async () => {
+      if (ativo) return;
+      try {
+        await api.configSet(ctx.root, "model.provider", valor);
+        localStorage.setItem("c2.mode", valor);
+        status.textContent = valor === "local" ? "modo local ativado" : "modo API/nuvem ativado";
+        ctx.onSaved();
+      } catch (erro) {
+        status.textContent = `nao foi possivel trocar o modo: ${erro}`;
+      }
+    });
+    return box;
+  };
+
+  gradeModo.append(
+    opcaoModo(
+      "IA local (padrão)",
+      "Modelo GGUF na sua GPU. Privado, sem custo por token. Precisa de GPU de 8 GB.",
+      "local",
+    ),
+    opcaoModo(
+      "API Key / nuvem",
+      "OpenAI, Groq, DeepSeek, OpenRouter ou um servidor local (LM Studio/Ollama/vLLM).",
+      "openai_compat",
+    ),
+  );
+  modoBody.appendChild(gradeModo);
+
+  const linhaAvancado = document.createElement("div");
+  linhaAvancado.className = styles.actions;
+  linhaAvancado.style.marginTop = "var(--space-m)";
+  linhaAvancado.appendChild(
+    Toggle({
+      label: "avançado",
+      checked: avancado,
+      onChange: (marcado: boolean) => {
+        localStorage.setItem("c2.config.avancado", marcado ? "1" : "0");
+        ctx.onSaved();
+      },
+    }).root,
+  );
+  modoBody.appendChild(linhaAvancado);
+  page.appendChild(modoCard);
+
+  const workspaceCard = montarCard("Workspace", 2, WORKSPACE_FIELDS);
+  const runtimeCard = montarCard("Runtime", 4, RUNTIME_FIELDS);
 
   // ---- Provedor de IA (local x nuvem) ----
   const PROVEDORES: Record<
@@ -464,6 +551,75 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   controles.set("index.prompt", { kind: "text", get: () => area.value });
   page.appendChild(promptCard);
 
+  // ---- Modelo local no modo simples (o card Runtime completo fica em avançado) ----
+  const modeloSimples = Card({ title: "Modelo local", accent: 4 });
+  const modeloSimplesBody = cardBody(modeloSimples);
+  const modeloNome = document.createElement("div");
+  modeloNome.className = styles.fieldValue;
+  modeloNome.textContent = String(lerConfig(config, "model.name") ?? "nenhum modelo");
+  modeloSimplesBody.appendChild(modeloNome);
+  const modeloCaminho = document.createElement("div");
+  modeloCaminho.className = styles.field;
+  const modeloCaminhoLabel = document.createElement("span");
+  modeloCaminhoLabel.className = styles.fieldLabel;
+  modeloCaminhoLabel.textContent = "GGUF";
+  const modeloCaminhoValor = document.createElement("span");
+  modeloCaminhoValor.className = styles.mono;
+  const caminhoInicial = String(lerConfig(config, "model.path") ?? "");
+  modeloCaminhoValor.textContent = caminhoInicial || "não configurado";
+  modeloCaminhoValor.title = caminhoInicial;
+  modeloCaminho.append(modeloCaminhoLabel, modeloCaminhoValor);
+  modeloSimplesBody.appendChild(modeloCaminho);
+  const modeloAcoes = document.createElement("div");
+  modeloAcoes.className = styles.actions;
+  modeloAcoes.appendChild(
+    Button({
+      label: "Selecionar .gguf…",
+      iconName: "projects",
+      size: "sm",
+      variant: "secondary",
+      onClick: async () => {
+        const escolhido = await api.pickModel();
+        if (!escolhido) return;
+        try {
+          await api.modelSet(ctx.root, escolhido);
+          status.textContent = "modelo atualizado";
+          ctx.onSaved();
+        } catch (erro) {
+          await openDialog({
+            title: "Modelo inválido",
+            body: dialogField("Erro", String(erro), true),
+            confirmLabel: "Entendi",
+            cancelLabel: "",
+          });
+        }
+      },
+    }),
+  );
+  modeloSimplesBody.appendChild(modeloAcoes);
+  page.appendChild(modeloSimples);
+
+  // ---- Visibilidade condicional: modo x simples/avancado ----
+  const aplicarVisibilidade = () => {
+    const cloud = seletorProvedor.select.value === "openai_compat";
+    const adv = localStorage.getItem("c2.config.avancado") === "1";
+    workspaceCard.style.display = adv ? "" : "none";
+    runtimeCard.style.display = adv ? "" : "none";
+    promptCard.style.display = adv ? "" : "none";
+    provedorCard.style.display = cloud || adv ? "" : "none";
+    modeloSimples.style.display = !cloud && !adv ? "" : "none";
+    seletorProvedor.root.style.display = adv ? "" : "none";
+    campoBase.root.style.display = adv ? "" : "none";
+    campoModelo.root.style.display = adv ? "" : "none";
+    preset.root.style.display = cloud ? "" : "none";
+    campoPrecoIn.root.style.display = cloud && adv ? "" : "none";
+    campoPrecoOut.root.style.display = cloud && adv ? "" : "none";
+    campoCap.root.style.display = cloud && adv ? "" : "none";
+    campoChave.root.style.display = cloud ? "" : "none";
+    linha.style.display = cloud ? "" : "none";
+  };
+  aplicarVisibilidade();
+
   const rodape = document.createElement("div");
   rodape.className = styles.actions;
   const salvar = Button({
@@ -523,8 +679,14 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     }),
     status,
     Pill(
-      ctx.status?.runtime.healthy ? "runtime no ar" : "runtime parado",
-      ctx.status?.runtime.healthy ? "success" : "neutral",
+      ctx.status?.model.provider === "openai_compat"
+        ? "runtime externo"
+        : ctx.status?.runtime.healthy
+          ? "runtime no ar"
+          : "runtime parado",
+      ctx.status?.runtime.healthy && ctx.status?.model.provider !== "openai_compat"
+        ? "success"
+        : "neutral",
       "xs",
     ),
   );
