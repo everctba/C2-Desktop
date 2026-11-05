@@ -77,3 +77,22 @@ do nome. Os botões US$ 5/10/15 montam `paypal.me/<usuario>/<valor>`.
 - Prints de testemunho (usuário vai fornecer) — hoje há placeholders.
 - Imagens: telas Projetos/Engine/Busca e um GIF/AVIF do fluxo completo.
 - Deploy automatizado e SEO (OG image, sitemap) — `c2-e18.5`.
+
+## Idioma (PT/EN)
+
+O site tem seletor flutuante (bolinha com bandeira + menu) nas três páginas.
+PT fica na raiz; EN é gerado em `site/en/` a partir do dicionário
+`site/i18n/en.json`:
+
+```powershell
+python scripts/build-site-en.py   # gera site/en/{index,ajuda,sobre}.html + hreflang
+```
+
+- o dicionário fica em `site/i18n.js` (fonte) e `site/i18n/en.json` (gerado);
+- `hreflang` pt-BR/en/x-default é aplicado nas páginas PT e EN;
+- o seletor navega para `/en/...` quando a versão existe (melhor SEO);
+- `?lang=en` também abre a versão EN;
+- ao mudar texto PT, rode o script e commite `site/en/` junto.
+
+Obs.: a tradução de parágrafos longos com links inline ainda é parcial
+(acompanhada em `c2-gj4.4`).
