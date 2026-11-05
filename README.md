@@ -28,7 +28,7 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 - **Resposta em milissegundos.** `c2 grep` p50 **60 ms**, `c2 related` **49 ms**;
   a consulta semântica resolve em **86 ms** o que a busca lexical não encontra.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
-- **Local.** Modelo local para você economizar Tokens. 
+- **Local por padrão.** Modelo e índice na sua máquina; nada sai. Nuvem é opcional. 
 - **Sem infra.** Sem banco, sem embeddings — só arquivos ao lado do código.
 - **Reversível.** `c2 cleaner` remove; `c2 migrate` converte metadado antigo.
 
@@ -88,7 +88,8 @@ c2 logs --lines 20
 
 Janela Tauri com **Projetos**, **Engine** (log ao vivo, contadores),
 **Busca** (score, destaque dos termos, relacionados), **MCP** e **Config**
-(prompt de indexação editável). Seletor de modelo valida cabeçalho e VRAM antes de carregar.
+(provedor local ou nuvem com sua API key, e prompt de indexação editável).
+Seletor de modelo valida cabeçalho e VRAM antes de carregar.
 
 ## MCP
 

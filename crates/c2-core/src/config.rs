@@ -12,6 +12,25 @@ use crate::security::SecretPolicy;
 /// Versao do formato de configuracao.
 pub const CONFIG_VERSION: u32 = 1;
 
+/// De onde vem a inferencia: llama-server local ou API OpenAI-compatible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Provider {
+    #[default]
+    Local,
+    #[serde(rename = "openai_compat")]
+    OpenAiCompat,
+}
+
+impl Provider {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Provider::Local => "local",
+            Provider::OpenAiCompat => "openai_compat",
+        }
+    }
+}
+
 /// Parameteros do runtime de inferencia (`llama-server`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -31,6 +50,15 @@ pub struct ModelConfig {
     pub host: String,
     /// Porta HTTP local do llama-server.
     pub port: u16,
+    /// `local` (padrao) ou `openai_compat` (nuvem ou outro servidor).
+    #[serde(default)]
+    pub provider: Provider,
+    /// Base URL do provedor OpenAI-compatible, ex.: https://api.openai.com/v1
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// Nome da variavel de ambiente com a API key (fallback do cofre).
+    #[serde(default = "default_api_key_env")]
+    pub api_key_env: String,
     pub ctx_size: u32,
     pub threads: u32,
     pub gpu_layers: u32,
@@ -52,12 +80,29 @@ pub struct ModelConfig {
 impl ModelConfig {
     /// URL do endpoint OpenAI-compat de chat.
     pub fn chat_url(&self) -> String {
-        format!("http://{}:{}/v1/chat/completions", self.host, self.port)
+        match self.provider {
+            Provider::Local => format!("http://{}:{}/v1/chat/completions", self.host, self.port),
+            Provider::OpenAiCompat => {
+                let base = self.base_url.as_deref().unwrap_or("").trim();
+                if base.is_empty() {
+                    return String::new();
+                }
+                let base = base.trim_end_matches('/').to_string();
+                if base.ends_with("/chat/completions") {
+                    base
+                } else {
+                    format!("{base}/chat/completions")
+                }
+            }
+        }
     }
 
     /// URL do health check do llama-server.
     pub fn health_url(&self) -> String {
-        format!("http://{}:{}/health", self.host, self.port)
+        match self.provider {
+            Provider::Local => format!("http://{}:{}/health", self.host, self.port),
+            Provider::OpenAiCompat => self.base_url.clone().unwrap_or_default(),
+        }
     }
 }
 
@@ -71,6 +116,9 @@ impl Default for ModelConfig {
             allow_lmstudio: false,
             host: "127.0.0.1".to_string(),
             port: 8080,
+            provider: Provider::Local,
+            base_url: None,
+            api_key_env: default_api_key_env(),
             ctx_size: 8192,
             threads: 0,
             gpu_layers: 99,
@@ -83,6 +131,16 @@ impl Default for ModelConfig {
             max_input_chars: 16000,
         }
     }
+}
+
+/// Verdadeiro quando a inferencia roda no llama-server local.
+pub fn usa_runtime_local(config: &Config) -> bool {
+    config.model.provider == Provider::Local
+}
+
+/// Nome padrao da variavel de ambiente com a API key.
+pub fn default_api_key_env() -> String {
+    "C2_API_KEY".to_string()
 }
 
 /// Regras de descoberta e indexacao.
@@ -305,6 +363,12 @@ impl Config {
         }
         if self.model.max_tokens < 64 {
             return invalid("model.max_tokens deve ser >= 64".to_string());
+        }
+        if self.model.provider == Provider::OpenAiCompat {
+            let base = self.model.base_url.as_deref().unwrap_or("").trim();
+            if !base.is_empty() && !base.starts_with("http://") && !base.starts_with("https://") {
+                return invalid("model.base_url deve comecar com http:// ou https://".to_string());
+            }
         }
         if self.index.prompt.trim().is_empty() {
             return invalid("index.prompt nao pode ser vazio".to_string());

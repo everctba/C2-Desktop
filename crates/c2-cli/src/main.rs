@@ -404,6 +404,12 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
                     "host": config.model.host,
                     "port": config.model.port,
                     "disable_thinking": config.model.disable_thinking,
+                    "provider": config.model.provider.label(),
+                    "base_url": config.model.base_url,
+                    "api_key": c2_core::secret::load(&config.model.api_key_env)
+                        .ok()
+                        .flatten()
+                        .is_some(),
                 },
                 "index": {
                     "max_file_bytes": config.index.max_file_bytes,
@@ -678,7 +684,7 @@ fn cmd_reindex(
             )
         });
     let mut runtime_started = false;
-    if !dry_run && precisa_modelo {
+    if !dry_run && precisa_modelo && c2_core::config::usa_runtime_local(&config) {
         runtime_started = !runtime::health(&config);
         runtime::ensure(&workspace, &config)?;
     }
@@ -747,7 +753,7 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
                 indexer::Decision::New | indexer::Decision::Changed
             )
         });
-    if precisa_modelo {
+    if precisa_modelo && c2_core::config::usa_runtime_local(&config) {
         runtime::ensure(&workspace, &config)?;
     }
 
@@ -796,7 +802,7 @@ fn cmd_start(root: Option<&Path>, once: bool, json_output: bool) -> Result<()> {
         if once {
             break;
         }
-        if !runtime::health(&config) {
+        if c2_core::config::usa_runtime_local(&config) && !runtime::health(&config) {
             if let Ok(outcome) = runtime::ensure(&workspace, &config) {
                 if !json_output {
                     println!("runtime reiniciado ({outcome:?})");

@@ -22,6 +22,12 @@ pub struct ModelSummary {
     pub port: u16,
     pub ctx_size: u32,
     pub disable_thinking: bool,
+    /// `local` ou `openai_compat`.
+    pub provider: String,
+    /// Base URL quando o provedor e nuvem/compat.
+    pub base_url: Option<String>,
+    /// Verdadeiro quando a API key esta disponivel (cofre ou env).
+    pub api_key: bool,
 }
 
 /// Configuracao de indice efetiva.
@@ -82,6 +88,12 @@ pub fn build(workspace: &Workspace) -> Result<StatusReport> {
         config_path: workspace.config_path().display().to_string(),
         model: ModelSummary {
             name: config.model.name.clone(),
+            provider: config.model.provider.label().to_string(),
+            base_url: config.model.base_url.clone(),
+            api_key: crate::secret::load(&config.model.api_key_env)
+                .ok()
+                .flatten()
+                .is_some(),
             path: config.model.path.clone(),
             host: config.model.host.clone(),
             port: config.model.port,

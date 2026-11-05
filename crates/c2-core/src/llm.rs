@@ -47,6 +47,11 @@ pub struct LlmClient {
     instructions: String,
     /// Reaproveita o KV cache do prefixo (llama.cpp; ignorado na nuvem).
     cache_prompt: bool,
+    /// Provedor de nuvem (OpenAI-compatible).
+    cloud: bool,
+    /// Endpoint local (llama.cpp/ollama): dispensa API key.
+    local_endpoint: bool,
+    bearer: Option<String>,
 }
 
 /// Fonte de semantica: permite trocar o modelo por um dublê nos testes.
@@ -62,8 +67,18 @@ impl SemanticProvider for LlmClient {
 
 impl LlmClient {
     pub fn from_config(config: &Config) -> Self {
+        let url = config.model.chat_url();
+        let cloud = config.model.provider == crate::config::Provider::OpenAiCompat;
+        let local_endpoint = is_local_endpoint(&url);
+        let bearer = if cloud && !local_endpoint {
+            crate::secret::load(&config.model.api_key_env)
+                .ok()
+                .flatten()
+        } else {
+            None
+        };
         Self {
-            url: config.model.chat_url(),
+            url,
             health_url: config.model.health_url(),
             model: config.model.name.clone(),
             max_input_chars: config
@@ -77,7 +92,10 @@ impl LlmClient {
             disable_thinking: config.model.disable_thinking,
             max_retries: config.model.max_retries,
             instructions: config.index.prompt.clone(),
-            cache_prompt: is_local_endpoint(&config.model.chat_url()),
+            cache_prompt: local_endpoint,
+            cloud,
+            local_endpoint,
+            bearer,
         }
     }
 
@@ -158,26 +176,54 @@ impl LlmClient {
     }
 
     fn call(&self, system: &str, user: &str, max_tokens: u32) -> Result<Value> {
-        let body = self.build_body(system, user, max_tokens);
-
-        let agent = ureq::AgentBuilder::new().timeout(self.timeout).build();
-        match agent.post(&self.url).send_json(body) {
-            Ok(response) => response
-                .into_json::<Value>()
-                .map_err(|err| C2Error::Llm(format!("resposta nao e JSON: {err}"))),
-            Err(ureq::Error::Status(status, response)) => Err(C2Error::Llm(format!(
-                "servidor respondeu {status}: {}",
-                response
-                    .into_string()
-                    .unwrap_or_default()
-                    .chars()
-                    .take(200)
-                    .collect::<String>()
-            ))),
-            Err(err) => Err(C2Error::Llm(format!(
-                "nao foi possivel falar com {}: {err}",
+        if self.url.is_empty() {
+            return Err(C2Error::Llm(
+                "model.base_url nao configurado para o provedor openai_compat".to_string(),
+            ));
+        }
+        if self.cloud && !self.local_endpoint && self.bearer.is_none() {
+            return Err(C2Error::Llm(format!(
+                "API key nao configurada para {}: defina a variavel de ambiente ou salve a chave na tela Config",
                 self.url
-            ))),
+            )));
+        }
+
+        let body = self.build_body(system, user, max_tokens);
+        let agent = ureq::AgentBuilder::new().timeout(self.timeout).build();
+        let mut tentativa = 0u32;
+
+        loop {
+            let mut requisicao = agent.post(&self.url);
+            if let Some(chave) = &self.bearer {
+                requisicao = requisicao.set("Authorization", &format!("Bearer {chave}"));
+            }
+            match requisicao.send_json(body.clone()) {
+                Ok(response) => {
+                    return response
+                        .into_json::<Value>()
+                        .map_err(|err| C2Error::Llm(format!("resposta nao e JSON: {err}")));
+                }
+                Err(ureq::Error::Status(status, response)) => {
+                    let texto = response.into_string().unwrap_or_default();
+                    // 429 e 5xx sao transitorios: backoff curto entre tentativas.
+                    if (status == 429 || status >= 500) && tentativa < self.max_retries {
+                        tentativa += 1;
+                        let espera = 500 * 2u64.pow(tentativa.min(3));
+                        std::thread::sleep(Duration::from_millis(espera));
+                        continue;
+                    }
+                    let trecho: String = texto.chars().take(200).collect();
+                    return Err(C2Error::Llm(format!(
+                        "servidor respondeu {status}: {trecho}"
+                    )));
+                }
+                Err(err) => {
+                    return Err(C2Error::Llm(format!(
+                        "nao foi possivel falar com {}: {err}",
+                        self.url
+                    )));
+                }
+            }
         }
     }
 
@@ -194,11 +240,14 @@ impl LlmClient {
             "max_tokens": max_tokens,
             "response_format": { "type": "json_object" },
         });
-        if self.disable_thinking {
-            body["chat_template_kwargs"] = json!({ "enable_thinking": false });
-        }
-        if self.cache_prompt {
-            body["cache_prompt"] = json!(true);
+        // campos especificos do llama.cpp nunca vao para provedores de nuvem
+        if self.local_endpoint {
+            if self.disable_thinking {
+                body["chat_template_kwargs"] = json!({ "enable_thinking": false });
+            }
+            if self.cache_prompt {
+                body["cache_prompt"] = json!(true);
+            }
         }
         body
     }
@@ -303,6 +352,9 @@ mod tests {
             max_input_chars: 8000,
             instructions: crate::config::DEFAULT_PROMPT.to_string(),
             cache_prompt: false,
+            cloud: false,
+            local_endpoint: true,
+            bearer: None,
         }
     }
 

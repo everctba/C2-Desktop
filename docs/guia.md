@@ -161,7 +161,25 @@ c2 config set model.disable_thinking true      # modelos de raciocínio: ~7x mai
 c2 config set index.max_file_bytes 262144
 c2 config set index.secret_policy mask
 c2 config set engine.poll_interval_secs 5
+
+# nuvem opcional (OpenAI-compatible) — a chave vai para o cofre, nao para o config
+c2 config set model.base_url https://api.openai.com/v1
+c2 config set model.name gpt-4o-mini
+c2 config set model.provider openai_compat
 ```
+
+### Provedor de IA (nuvem opcional)
+
+O padrão é `local` (llama-server embarcado). Para usar um provedor
+OpenAI-compatible, defina `model.base_url`, `model.name` e `model.provider =
+openai_compat`. A API key **nunca** é gravada no `.c2/config.json`: ela fica no
+Windows Credential Manager (tela Config → Provedor de IA → Salvar chave) ou na
+variável de ambiente `C2_API_KEY` (útil em CI).
+
+Ao ativar a nuvem, o conteúdo dos arquivos é enviado ao provedor — a tela mostra
+esse aviso e você pode voltar para `local` quando quiser. O runtime local não é
+iniciado nesse modo; `model.base_url` apontando para `127.0.0.1` também serve
+para Ollama/vLLM/LM Studio.
 
 ### Links de linguagens sem suporte nativo
 

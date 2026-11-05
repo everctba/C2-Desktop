@@ -313,6 +313,9 @@ c2 migrate --yes</pre>
                   <tr><td class="mono">model.name</td><td>Nome exibido.</td></tr>
                   <tr><td class="mono">model.binary</td><td>Opcional: <span class="mono">llama-server</span> explícito (senão busca runtime embarcado/PATH).</td></tr>
                   <tr><td class="mono">model.host / model.port</td><td>Endpoint local (padrão 127.0.0.1:8099).</td></tr>
+                  <tr><td class="mono">model.provider</td><td><span class="mono">local</span> (padrão) ou <span class="mono">openai_compat</span> (nuvem/Ollama/vLLM).</td></tr>
+                  <tr><td class="mono">model.base_url</td><td>Base URL do provedor OpenAI-compatible (ex.: <span class="mono">https://api.openai.com/v1</span>).</td></tr>
+                  <tr><td class="mono">model.api_key_env</td><td>Variável de ambiente com a API key (padrão <span class="mono">C2_API_KEY</span>); a chave também pode ir para o cofre pelo Config.</td></tr>
                   <tr><td class="mono">model.ctx_size</td><td>Contexto em tokens (padrão 8192).</td></tr>
                   <tr><td class="mono">model.gpu_layers</td><td>Camadas na GPU (0 = CPU; 99 = todas).</td></tr>
                   <tr><td class="mono">model.threads</td><td>Threads de CPU.</td></tr>

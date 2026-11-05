@@ -10,6 +10,7 @@ import type {
   Hit,
   McpStatus,
   ModelInspection,
+  ProviderTest,
   RuntimePlan,
   IndexReport,
   InitResult,
@@ -69,6 +70,10 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: () => invoke<string>("prompt_default"),
+  apiKeySet: (key: string) => invoke<void>("api_key_set", { key }),
+  apiKeyDelete: () => invoke<void>("api_key_delete"),
+  apiKeyStatus: () => invoke<boolean>("api_key_status"),
+  providerTest: (root: string) => invoke<ProviderTest>("provider_test", { root }),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),
@@ -118,6 +123,9 @@ const mockStatus: StatusReport = {
     port: 8099,
     ctx_size: 8192,
     disable_thinking: true,
+    provider: "local",
+    base_url: null,
+    api_key: false,
   },
   index: { max_file_bytes: 262144, extensions: 64, secret_policy: "skip", max_total_bytes_per_run: 67108864 },
   engine: { poll_interval_secs: 5 },
@@ -236,6 +244,14 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return MOCK_ROOT as T;
     case "pick_model":
       return "H:/modelos/gemma-4-E2B-it-Q4_K_M.gguf" as T;
+    case "api_key_set":
+      return undefined as T;
+    case "api_key_delete":
+      return undefined as T;
+    case "api_key_status":
+      return false as T;
+    case "provider_test":
+      return { ok: true, provider: "openai_compat", model: "gpt-4o-mini", latency_ms: 820, sample: "mock" } as T;
     case "mcp_smoke":
       return {
         available: true,

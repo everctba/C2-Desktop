@@ -234,6 +234,9 @@ function modelCard(ctx: ProjectsContext, status: StatusReport): HTMLElement {
 
   const footer = cardFooter(card);
   footer.appendChild(
+    Pill(status.model.provider === "local" ? "local" : "nuvem", "neutral", "xs"),
+  );
+  footer.appendChild(
     Button({
       label: "Selecionar .gguf…",
       iconName: "projects",

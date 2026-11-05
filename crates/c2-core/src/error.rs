@@ -19,7 +19,7 @@ pub enum C2Error {
         source: serde_json::Error,
     },
 
-    #[error("falha no modelo local: {0}")]
+    #[error("falha no modelo: {0}")]
     Llm(String),
 
     #[error("json invalido: {0}")]

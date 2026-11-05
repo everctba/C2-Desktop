@@ -7,6 +7,9 @@ export interface ModelSummary {
   port: number;
   ctx_size: number;
   disable_thinking: boolean;
+  provider: string;
+  base_url: string | null;
+  api_key: boolean;
 }
 
 export interface IndexSummary {
@@ -93,6 +96,15 @@ export interface RuntimePlan {
 export interface McpToolInfo {
   name: string;
   description: string;
+}
+
+export interface ProviderTest {
+  ok: boolean;
+  provider: string;
+  model: string;
+  latency_ms: number;
+  sample: string | null;
+  error: string | null;
 }
 
 export interface McpStatus {

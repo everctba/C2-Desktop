@@ -234,6 +234,149 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   montarCard("Workspace", 2, WORKSPACE_FIELDS);
   montarCard("Runtime", 4, RUNTIME_FIELDS);
 
+  // ---- Provedor de IA (local x nuvem) ----
+  const PROVEDORES: Record<string, { base: string; modelo: string }> = {
+    "OpenAI": { base: "https://api.openai.com/v1", modelo: "gpt-4o-mini" },
+    "OpenRouter": { base: "https://openrouter.ai/api/v1", modelo: "openai/gpt-4o-mini" },
+    "Groq": { base: "https://api.groq.com/openai/v1", modelo: "llama-3.3-70b-versatile" },
+    "DeepSeek": { base: "https://api.deepseek.com/v1", modelo: "deepseek-chat" },
+    "Gemini (compat)": {
+      base: "https://generativelanguage.googleapis.com/v1beta/openai",
+      modelo: "gemini-2.0-flash",
+    },
+    "Ollama (local)": { base: "http://127.0.0.1:11434/v1", modelo: "llama3.2" },
+    "LM Studio (local)": { base: "http://127.0.0.1:1234/v1", modelo: "local-model" },
+  };
+
+  const provedorCard = Card({ title: "Provedor de IA", accent: 3 });
+  const provedorBody = cardBody(provedorCard);
+
+  const avisoProvedor = document.createElement("p");
+  avisoProvedor.className = "pageHint";
+  avisoProvedor.style.maxWidth = "none";
+  avisoProvedor.textContent =
+    "Local é o padrão: o modelo roda na sua máquina e nada sai dela. " +
+    "Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor " +
+    "configurado e os tokens são cobrados na sua conta — só ative se for aceitável.";
+  provedorBody.appendChild(avisoProvedor);
+
+  const gradeProvedor = document.createElement("div");
+  gradeProvedor.style.display = "grid";
+  gradeProvedor.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  gradeProvedor.style.gap = "var(--space-m)";
+  gradeProvedor.style.marginTop = "var(--space-m)";
+
+  const seletorProvedor = Select({
+    label: "provedor",
+    value: String(lerConfig(config, "model.provider") ?? "local"),
+    options: ["local", "openai_compat"],
+  });
+  controles.set("model.provider", { kind: "select", get: () => seletorProvedor.select.value });
+  gradeProvedor.appendChild(seletorProvedor.root);
+
+  const preset = Select({
+    label: "preset",
+    value: "personalizado",
+    options: ["personalizado", ...Object.keys(PROVEDORES)],
+  });
+  gradeProvedor.appendChild(preset.root);
+
+  const campoBase = Input({
+    label: "base URL (nuvem)",
+    value: String(lerConfig(config, "model.base_url") ?? ""),
+    mono: true,
+    hint: "ex.: https://api.openai.com/v1",
+  });
+  controles.set("model.base_url", { kind: "text", get: () => campoBase.input.value });
+  gradeProvedor.appendChild(campoBase.root);
+
+  const campoModelo = Input({
+    label: "modelo",
+    value: String(lerConfig(config, "model.name") ?? ""),
+    mono: true,
+    hint: "nome enviado no campo model",
+  });
+  controles.set("model.name", { kind: "text", get: () => campoModelo.input.value });
+  gradeProvedor.appendChild(campoModelo.root);
+
+  preset.select.addEventListener("change", () => {
+    const escolhido = PROVEDORES[preset.select.value];
+    if (!escolhido) return;
+    campoBase.input.value = escolhido.base;
+    campoModelo.input.value = escolhido.modelo;
+    seletorProvedor.select.value = "openai_compat";
+    status.textContent = `preset ${preset.select.value} aplicado (salve para gravar)`;
+  });
+
+  provedorBody.appendChild(gradeProvedor);
+
+  const linha = document.createElement("div");
+  linha.className = styles.actions;
+  linha.style.marginTop = "var(--space-m)";
+
+  const campoChave = Input({
+    label: "API key (cofre do Windows)",
+    placeholder: "cole a chave do provedor",
+    mono: true,
+    hint: "nunca é gravada no .c2/config.json",
+  });
+  campoChave.input.type = "password";
+  provedorBody.appendChild(campoChave.root);
+
+  let temChave = false;
+  try {
+    temChave = await api.apiKeyStatus();
+  } catch {
+    /* modo preview */
+  }
+  const pillChave = Pill(temChave ? "chave salva" : "sem chave", temChave ? "success" : "neutral", "xs");
+
+  linha.appendChild(
+    Button({
+      label: "Salvar chave",
+      size: "xs",
+      variant: "secondary",
+      onClick: async () => {
+        try {
+          await api.apiKeySet(campoChave.input.value);
+          campoChave.input.value = "";
+          status.textContent = "API key salva no cofre do Windows";
+        } catch (erro) {
+          status.textContent = `nao foi possivel salvar a chave: ${erro}`;
+        }
+      },
+    }),
+  );
+  linha.appendChild(
+    Button({
+      label: "Remover chave",
+      size: "xs",
+      variant: "ghost",
+      onClick: async () => {
+        await api.apiKeyDelete();
+        status.textContent = "API key removida do cofre";
+      },
+    }),
+  );
+  linha.appendChild(
+    Button({
+      label: "Testar conexão",
+      size: "xs",
+      variant: "primary",
+      onClick: async () => {
+        status.textContent = "testando provedor…";
+        const resultado = await api.providerTest(ctx.root);
+        status.textContent = resultado.ok
+          ? `provedor ok (${resultado.provider} · ${resultado.model}) em ${resultado.latency_ms} ms`
+          : `falha no provedor: ${resultado.error ?? "erro desconhecido"}`;
+      },
+    }),
+  );
+  linha.appendChild(pillChave);
+  provedorBody.appendChild(linha);
+
+  page.appendChild(provedorCard);
+
   // ---- Prompt de indexacao (personalizavel) ----
   const promptInicial = String(lerConfig(config, "index.prompt") ?? "");
   iniciais.set("index.prompt", promptInicial);

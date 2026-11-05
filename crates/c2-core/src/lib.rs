@@ -22,6 +22,7 @@ pub mod process;
 pub mod runtime;
 pub mod schema;
 pub mod search;
+pub mod secret;
 pub mod security;
 pub mod state;
 pub mod status;

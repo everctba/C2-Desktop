@@ -99,7 +99,9 @@ async fn workspace_reindex(
         let client = LlmClient::from_config(&config);
         let logger = c2_core::log::Logger::for_workspace(&workspace, &config);
         logger.info("desktop", "reindex iniciado");
-        runtime::ensure(&workspace, &config).map_err(|err| err.to_string())?;
+        if c2_core::config::usa_runtime_local(&config) {
+            runtime::ensure(&workspace, &config).map_err(|err| err.to_string())?;
+        }
 
         let options = IndexOptions {
             full: full.unwrap_or(false),
@@ -154,11 +156,13 @@ fn engine_start(
     running.store(true, Ordering::SeqCst);
 
     let handle = std::thread::spawn(move || {
-        if let Err(err) = runtime::ensure(&workspace, &config) {
-            logger.error("engine", format!("falha ao subir o runtime: {err}"));
-            let _ = app.emit("engine://error", err.to_string());
-            running.store(false, Ordering::SeqCst);
-            return;
+        if c2_core::config::usa_runtime_local(&config) {
+            if let Err(err) = runtime::ensure(&workspace, &config) {
+                logger.error("engine", format!("falha ao subir o runtime: {err}"));
+                let _ = app.emit("engine://error", err.to_string());
+                running.store(false, Ordering::SeqCst);
+                return;
+            }
         }
         logger.info("engine", "engine iniciado");
 
@@ -200,7 +204,7 @@ fn engine_start(
             }
 
             // Watchdog: servidor caiu? sobe de novo (com backoff interno).
-            if !runtime::health(&config) {
+            if c2_core::config::usa_runtime_local(&config) && !runtime::health(&config) {
                 let _ = runtime::ensure(&workspace, &config);
             }
             std::thread::sleep(interval);
@@ -496,6 +500,9 @@ async fn model_load(root: String, ctx_size: u32, gpu_layers: u32) -> Result<(), 
         let workspace = open_workspace(&root)?;
         let mut config = workspace.load_config().map_err(|err| err.to_string())?;
         require_model(&config)?;
+        if !c2_core::config::usa_runtime_local(&config) {
+            return Err("modelo local nao se aplica ao provedor de nuvem".to_string());
+        }
         config.model.ctx_size = ctx_size;
         config.model.gpu_layers = gpu_layers;
         workspace
@@ -649,6 +656,88 @@ async fn mcp_smoke(root: String) -> McpStatus {
     })
 }
 
+#[derive(serde::Serialize)]
+struct ProviderTest {
+    ok: bool,
+    provider: String,
+    model: String,
+    latency_ms: u64,
+    sample: Option<String>,
+    error: Option<String>,
+}
+
+/// Grava a API key no cofre do sistema (nunca no config.json).
+#[tauri::command]
+fn api_key_set(key: String) -> Result<(), String> {
+    c2_core::secret::save(&key).map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn api_key_delete() -> Result<(), String> {
+    c2_core::secret::delete().map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn api_key_status() -> bool {
+    c2_core::secret::stored_in_keyring()
+}
+
+/// Testa o provedor configurado gerando a semantica de um arquivo minimo.
+#[tauri::command]
+async fn provider_test(root: String) -> ProviderTest {
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = c2_core::workspace::Workspace::at(std::path::Path::new(&root));
+        let config = match workspace.load_config() {
+            Ok(config) => config,
+            Err(erro) => {
+                return ProviderTest {
+                    ok: false,
+                    provider: "?".to_string(),
+                    model: "?".to_string(),
+                    latency_ms: 0,
+                    sample: None,
+                    error: Some(erro.to_string()),
+                }
+            }
+        };
+        let provider = config.model.provider.label().to_string();
+        let modelo = config.model.name.clone();
+        let cliente = c2_core::llm::LlmClient::from_config(&config);
+        let iniciado = std::time::Instant::now();
+        match c2_core::llm::SemanticProvider::semantic_for(
+            &cliente,
+            "src/exemplo_teste.rs",
+            "fn exemplo_teste() { let total = 2 + 2; }",
+        ) {
+            Ok(gerado) => ProviderTest {
+                ok: true,
+                provider,
+                model: modelo,
+                latency_ms: iniciado.elapsed().as_millis() as u64,
+                sample: Some(gerado.semantic.summary),
+                error: None,
+            },
+            Err(erro) => ProviderTest {
+                ok: false,
+                provider,
+                model: modelo,
+                latency_ms: iniciado.elapsed().as_millis() as u64,
+                sample: None,
+                error: Some(erro.to_string()),
+            },
+        }
+    })
+    .await
+    .unwrap_or_else(|erro| ProviderTest {
+        ok: false,
+        provider: "?".to_string(),
+        model: "?".to_string(),
+        latency_ms: 0,
+        sample: None,
+        error: Some(format!("falha interna: {erro}")),
+    })
+}
+
 #[tauri::command]
 fn prompt_default() -> String {
     c2_core::config::DEFAULT_PROMPT.to_string()
@@ -701,6 +790,10 @@ pub fn run() {
             model_set,
             prompt_default,
             mcp_smoke,
+            api_key_set,
+            api_key_delete,
+            api_key_status,
+            provider_test,
             runtime_plan,
             model_load
         ])
