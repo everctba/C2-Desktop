@@ -142,7 +142,9 @@ c2 status                                    # estado do índice e do runtime
   antes de serem abertos**.
 - As instruções enviadas ao modelo ficam em `index.prompt` (editável na tela
   Config ou `c2 config set index.prompt "..."`); a linha que trata o arquivo
-  como DADO é fixa e não pode ser removida.
+  como DADO é fixa e não pode ser removida. As instruções vão como mensagem
+  `system` (prefixo cacheável, com `cache_prompt: true` no modo local) e o
+  conteúdo do arquivo como `user` — o prefixo fixo é reaproveitado no lote.
 - Conteúdo com segredo é bloqueado (`index.secret_policy=skip`, padrão) ou
   mascarado (`mask`); fixtures podem ser liberadas com `// c2:allow-secret`
   ou por `index.secret_allow`.
