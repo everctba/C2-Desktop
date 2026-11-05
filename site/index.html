@@ -240,6 +240,35 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
               <p>Hash e tamanho detectam mudança real; rename por hash reaproveita o metadado.</p>
             </article>
           </div>
+
+          <h3 style="margin-top: var(--space-6xl)">O que isso muda na prática</h3>
+          <div class="grid grid-3" style="margin-top: var(--space-l)">
+            <article class="card">
+              <span class="k">por intenção</span>
+              <h3>Pergunte com suas palavras</h3>
+              <p>
+                "Onde impede valores acima do limite" acha o código certo mesmo sem o
+                termo exato existir no arquivo.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">mais alcance</span>
+              <h3>Ache o que o grep não acha</h3>
+              <p>
+                No corpus de 507 arquivos: a consulta semântica achou; a busca lexical
+                devolveu 0 resultados.
+              </p>
+            </article>
+            <article class="card">
+              <span class="k">mais rápido</span>
+              <h3>Resposta em milissegundos</h3>
+              <p>
+                Consulta em <strong>86 ms</strong>, <span class="mono">c2 grep</span>
+                p50 <strong>60 ms</strong> e <span class="mono">c2 related</span>
+                <strong>49 ms</strong> — sem varrer o projeto.
+              </p>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -302,7 +331,12 @@ usado por (1): src/mod00/arquivo_001.rs (imports)</pre>
             </a>
           </p>
 
-          <h3 style="margin-top: var(--space-6xl)">E quando o vocabulário não casa?</h3>
+          <h3 style="margin-top: var(--space-6xl)">Pergunte em linguagem natural</h3>
+          <p style="max-width: 70ch; margin-top: var(--space-s); color: var(--text-muted)">
+            O agente (ou você) descreve a intenção; o C2 procura no significado do código,
+            não no nome do arquivo. A mesma pergunta que o grep lexical não respondeu foi
+            resolvida em 86 ms.
+          </p>
           <div class="table-wrap" style="margin-top: var(--space-l)">
             <table>
               <thead>

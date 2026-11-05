@@ -16,6 +16,11 @@ atualizado em vez de reler o projeto inteiro — é um resumo vivo do código,
 feito para consumo por IA. Comentário é código para humano; Comments 2.0 é
 comentário para IA.
 
+**Vantagem central (usar na landing):** **consulta por intenção** — descrever o
+problema em linguagem natural acha o código pelo significado (~86 ms), sem
+depender do nome do arquivo nem de grep lexical; mais chance de achar o que o
+agente precisa, mais rápido.
+
 **Terminologia:** no comparativo, a coluna sem o C2 chama-se **"Sem C2"** (não
 "grep lexical").
 

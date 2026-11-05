@@ -17,9 +17,13 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
 ## Por que usar
 
 - **Menos erro.** Metadado com `what`, `why`, `goal`, `summary`, `responsibility`.
-- **Menos tokens.** O agente acha o arquivo certo sem abrir o repositório.
+- **Menos tokens.** O agente acha o arquivo certo pelo significado, sem abrir o repositório.
 - **Sempre atualizado.** Você não precisa fazer nada, sempre atualizado de maneira automática.
-- **Consulta rápida.** `c2 grep` p50 **60 ms**; `c2 related` **49 ms**.
+- **Busca por intenção.** Descreva o que precisa em linguagem natural
+  ("onde impede valores acima do limite") — o C2 procura pelo significado do
+  código, não pelo nome do arquivo.
+- **Resposta em milissegundos.** `c2 grep` p50 **60 ms**, `c2 related` **49 ms**;
+  a consulta semântica resolve em **86 ms** o que a busca lexical não encontra.
 - **Grafo sem LLM.** Imports/`use` viram arestas estáticas.
 - **Local.** Modelo e índice na sua máquina. Nada sai.
 - **Sem infra.** Sem banco, sem embeddings — só arquivos ao lado do código.
