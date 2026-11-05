@@ -186,7 +186,8 @@ c2 config set model.provider openai_compat
 O padrão é `local` (llama-server embarcado). Para usar um provedor
 OpenAI-compatible, defina `model.base_url`, `model.name` e `model.provider =
 openai_compat`. A API key **nunca** é gravada no `.c2/config.json`: ela fica no
-Windows Credential Manager (tela Config → Provedor de IA → Salvar chave) ou na
+cofre do sistema (Credential Manager no Windows, Keychain no macOS, Secret
+Service no Linux; tela Config → Provedor de IA → Salvar chave) ou na
 variável de ambiente `C2_API_KEY` (útil em CI).
 
 Na tela Config, **Esquecer chave** apaga a credencial do cofre local (não

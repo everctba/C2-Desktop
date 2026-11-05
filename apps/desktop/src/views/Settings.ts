@@ -317,7 +317,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   linha.style.marginTop = "var(--space-m)";
 
   const campoChave = Input({
-    label: "API key (cofre do Windows)",
+    label: "API key (cofre do sistema)",
     placeholder: "cole a chave do provedor",
     mono: true,
     hint: "nunca é gravada no .c2/config.json",
@@ -342,7 +342,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
         try {
           await api.apiKeySet(campoChave.input.value);
           campoChave.input.value = "";
-          status.textContent = "API key salva no cofre do Windows";
+          status.textContent = "API key salva no cofre do sistema";
         } catch (erro) {
           status.textContent = `nao foi possivel salvar a chave: ${erro}`;
         }

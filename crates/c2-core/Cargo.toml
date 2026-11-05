@@ -17,3 +17,10 @@ ureq.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Secret Service: GNOME Keyring/KWallet. Em host sem cofre, use C2_API_KEY.
+keyring = { version = "3", default-features = false, features = ["sync-secret-service"] }

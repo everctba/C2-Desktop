@@ -120,8 +120,8 @@ Configuração pronta na aba **MCP** da janela.
 | | |
 |---|---|
 | Windows 10/11 (x64) | suportado e validado |
-| Linux | build pronto (`scripts/build-linux.sh`), execução em validação |
-| macOS | fora do escopo |
+| Linux | build pronto (`scripts/build-linux.sh`), execução em validação; cofre via Secret Service (`libdbus-1`) |
+| macOS | planejado; cofre já preparado via Keychain |
 
 ## Quando NÃO vale
 
