@@ -26,6 +26,7 @@ site/
 | `assets/img/logo-horizontal-dark.png` | logo sobre fundo escuro (README/GitHub, tema claro e escuro) |
 | `assets/img/logo-horizontal-light.png` | variante invertida para fundo claro |
 | `assets/img/favicon.ico`, `favicon-32.png`, `apple-touch-icon.png` | favicon das páginas |
+| `assets/img/og-image.png` (1200×630) | preview de link (Open Graph/Twitter) |
 | `assets/ascii/logo-ascii.txt` | arte ASCII usada no hero (ASCII puro, alinha em qualquer mono) |
 
 Fontes originais em `ARTES/` (PSD + PNG). O ícone do executável é gerado com
