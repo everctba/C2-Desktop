@@ -14,7 +14,21 @@ pub const MAX_NOTES: usize = 10;
 /// Maximo de caracteres por anotacao.
 pub const MAX_TEXT_CHARS: usize = 2000;
 /// Tipos aceitos.
-pub const KINDS: [&str; 4] = ["teleology", "invariant", "gotcha", "note"];
+///
+/// - `teleology`: por que existe / proposito real;
+/// - `invariant`: regra que nunca pode quebrar;
+/// - `gotcha`: armadilha que parece uma coisa e e outra;
+/// - `correction`: interpretacao errada corrigida (A, na verdade B);
+/// - `pending`: decisao/validacao pendente do humano (contexto, nao tracker);
+/// - `note`: generico.
+pub const KINDS: [&str; 6] = [
+    "teleology",
+    "invariant",
+    "gotcha",
+    "correction",
+    "pending",
+    "note",
+];
 
 /// Normaliza e valida o caminho relativo, devolvendo o caminho do metadado.
 fn caminho_meta(workspace: &Workspace, rel: &str) -> Result<(PathBuf, String)> {

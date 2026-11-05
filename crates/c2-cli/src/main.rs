@@ -163,7 +163,7 @@ enum NoteAction {
         file: PathBuf,
         /// Texto da anotacao (max 2000 caracteres)
         texto: String,
-        /// teleology | invariant | gotcha | note
+        /// teleology | invariant | gotcha | correction | pending | note
         #[arg(long, default_value = "note")]
         kind: String,
         /// Tarefa/contexto (opcional)

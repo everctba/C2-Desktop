@@ -31,7 +31,8 @@ decidir *se* vale ler o código.
 
 - **Ao descobrir algo NÃO óbvio pelo código (invariante, gotcha, motivo real
 de existência), registre com a tool MCP `c2_annotate` (file, text, kind) —
-curto, max 2000 caracteres. Não anote o óbvio.
+curto, max 2000 caracteres. Use `correction` se você pensou A e era B; `pending`
+se depende de decisão do humano. Não anote o óbvio.
 
 Metadado é hipótese; código é evidência.** Toda afirmação sobre
   comportamento deve vir do código. Se o metadado divergir, diga isso e rode

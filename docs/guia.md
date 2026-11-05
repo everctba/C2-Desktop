@@ -153,7 +153,10 @@ c2 status                                    # estado do índice e do runtime
 ### Anotações de agentes
 
 O agente de IA pode anexar descobertas não óbvias ao metadado com a tool MCP
-`c2_annotate` (ou `c2 note add <arquivo> "<texto>" --kind invariant`). As
+`c2_annotate` (ou `c2 note add <arquivo> "<texto>" --kind invariant`). Tipos:
+`teleology` (por que existe), `invariant` (regra que nunca quebra), `gotcha`
+(armadilha), `correction` (pensou A, era B), `pending` (decisao do humano
+pendente) e `note`. As
 anotações ficam em `agent_notes`, no máximo 10 por arquivo (2.000 caracteres
 cada), são **preservadas no reindex** e marcadas como "revisar" quando o hash do
 arquivo muda. `c2 note list` mostra tudo; `c2 note remove` apaga.

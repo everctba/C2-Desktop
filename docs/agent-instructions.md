@@ -164,10 +164,14 @@ c2 mcp            # servidor MCP por STDIO
 Quando descobrir algo **não óbvio pelo código** — invariante sutil, motivo real
 da existência do arquivo, armadilha de manutenção — registre com a tool MCP
 `c2_annotate` (`file`, `text`, `kind` = `teleology` | `invariant` | `gotcha` |
-`note`; opcionalmente `task`/`model`). Regras:
+`correction` | `pending` | `note`; opcionalmente `task`/`model`). Regras:
 
 - curto: até 2.000 caracteres; máximo 10 anotações por arquivo;
 - **não** anote o óbvio nem repita a semântica já gerada;
 - a anotação é uma hipótese do agente, datada e com o hash do arquivo; se o
   arquivo mudar, ela aparece como "revisar";
-- ela nunca altera `semantic`, `links` ou o código.
+- ela nunca altera `semantic`, `links` ou o código;
+- use `correction` quando uma interpretação errada foi desfeita (pensou A,
+  era B) para o próximo agente não repetir a lição; use `pending` só para
+  contexto de decisão que ainda depende do humano (não é tracker de tarefas —
+  isso é o `bd`).

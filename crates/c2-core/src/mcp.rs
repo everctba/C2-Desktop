@@ -80,7 +80,7 @@ pub fn tools() -> Value {
                 "properties": {
                     "file": { "type": "string", "description": "Caminho relativo ao workspace" },
                     "text": { "type": "string", "description": "Descoberta nao obvia (max 2000 caracteres)" },
-                    "kind": { "type": "string", "enum": ["teleology", "invariant", "gotcha", "note"], "default": "note" },
+                    "kind": { "type": "string", "enum": ["teleology", "invariant", "gotcha", "correction", "pending", "note"], "default": "note" },
                     "task": { "type": "string", "description": "Tarefa/contexto em que a anotacao nasceu (opcional)" },
                     "model": { "type": "string", "description": "Modelo do agente (opcional)" }
                 },
