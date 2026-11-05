@@ -235,17 +235,22 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   montarCard("Runtime", 4, RUNTIME_FIELDS);
 
   // ---- Provedor de IA (local x nuvem) ----
-  const PROVEDORES: Record<string, { base: string; modelo: string }> = {
-    "OpenAI": { base: "https://api.openai.com/v1", modelo: "gpt-4o-mini" },
-    "OpenRouter": { base: "https://openrouter.ai/api/v1", modelo: "openai/gpt-4o-mini" },
-    "Groq": { base: "https://api.groq.com/openai/v1", modelo: "llama-3.3-70b-versatile" },
-    "DeepSeek": { base: "https://api.deepseek.com/v1", modelo: "deepseek-chat" },
+  const PROVEDORES: Record<
+    string,
+    { base: string; modelo: string; precoIn: number; precoOut: number }
+  > = {
+    "OpenAI": { base: "https://api.openai.com/v1", modelo: "gpt-4o-mini", precoIn: 0.15, precoOut: 0.6 },
+    "OpenRouter": { base: "https://openrouter.ai/api/v1", modelo: "openai/gpt-4o-mini", precoIn: 0.15, precoOut: 0.6 },
+    "Groq": { base: "https://api.groq.com/openai/v1", modelo: "llama-3.3-70b-versatile", precoIn: 0.59, precoOut: 0.79 },
+    "DeepSeek": { base: "https://api.deepseek.com/v1", modelo: "deepseek-chat", precoIn: 0.27, precoOut: 1.1 },
     "Gemini (compat)": {
       base: "https://generativelanguage.googleapis.com/v1beta/openai",
       modelo: "gemini-2.0-flash",
+      precoIn: 0.1,
+      precoOut: 0.4,
     },
-    "Ollama (local)": { base: "http://127.0.0.1:11434/v1", modelo: "llama3.2" },
-    "LM Studio (local)": { base: "http://127.0.0.1:1234/v1", modelo: "local-model" },
+    "Ollama (local)": { base: "http://127.0.0.1:11434/v1", modelo: "llama3.2", precoIn: 0, precoOut: 0 },
+    "LM Studio (local)": { base: "http://127.0.0.1:1234/v1", modelo: "local-model", precoIn: 0, precoOut: 0 },
   };
 
   const provedorCard = Card({ title: "Provedor de IA", accent: 3 });
@@ -301,11 +306,37 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   controles.set("model.name", { kind: "text", get: () => campoModelo.input.value });
   gradeProvedor.appendChild(campoModelo.root);
 
+  const campoPrecoIn = Input({
+    label: "preço entrada / 1M tokens",
+    value: String(lerConfig(config, "model.cost_input_per_mtok") ?? 0),
+    hint: "modo nuvem; 0 = não calcular",
+  });
+  controles.set("model.cost_input_per_mtok", { kind: "text", get: () => campoPrecoIn.input.value });
+  gradeProvedor.appendChild(campoPrecoIn.root);
+
+  const campoPrecoOut = Input({
+    label: "preço saída / 1M tokens",
+    value: String(lerConfig(config, "model.cost_output_per_mtok") ?? 0),
+    hint: "modo nuvem; 0 = não calcular",
+  });
+  controles.set("model.cost_output_per_mtok", { kind: "text", get: () => campoPrecoOut.input.value });
+  gradeProvedor.appendChild(campoPrecoOut.root);
+
+  const campoCap = Input({
+    label: "teto por execução (US$)",
+    value: String(lerConfig(config, "model.max_cost_usd_per_run") ?? 0),
+    hint: "0 = sem teto; interrompe o ciclo ao atingir",
+  });
+  controles.set("model.max_cost_usd_per_run", { kind: "text", get: () => campoCap.input.value });
+  gradeProvedor.appendChild(campoCap.root);
+
   preset.select.addEventListener("change", () => {
     const escolhido = PROVEDORES[preset.select.value];
     if (!escolhido) return;
     campoBase.input.value = escolhido.base;
     campoModelo.input.value = escolhido.modelo;
+    campoPrecoIn.input.value = String(escolhido.precoIn);
+    campoPrecoOut.input.value = String(escolhido.precoOut);
     seletorProvedor.select.value = "openai_compat";
     status.textContent = `preset ${preset.select.value} aplicado (salve para gravar)`;
   });

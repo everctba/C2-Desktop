@@ -139,6 +139,15 @@ pub struct IndexReport {
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub latency_ms: u64,
+    /// Custo real das chamadas de nuvem neste ciclo (USD).
+    #[serde(default)]
+    pub cost_usd: f64,
+    /// Estimativa de custo do plano, calculada antes das chamadas.
+    #[serde(default)]
+    pub estimated_cost_usd: f64,
+    /// Verdadeiro quando o teto de custo interrompeu o ciclo.
+    #[serde(default)]
+    pub cost_capped: bool,
     pub last_error: Option<String>,
 }
 
@@ -322,6 +331,7 @@ pub fn run<P: SemanticProvider>(
         ..IndexReport::default()
     };
     let mut processed = 0usize;
+    report.estimated_cost_usd = crate::cost::estimar_plano(config, &items);
 
     for (position, item) in items.iter().enumerate() {
         if let Some(flag) = &options.stop {
@@ -431,6 +441,21 @@ pub fn run<P: SemanticProvider>(
                 }
             }
         }
+
+        let teto = config.model.max_cost_usd_per_run;
+        if teto > 0.0 && report.cost_usd >= teto {
+            report.cost_capped = true;
+            report.deferred += total.saturating_sub(position + 1);
+            report.last_error = Some(format!(
+                "teto de custo de US$ {teto:.6} atingido; {} arquivo(s) adiado(s)",
+                total.saturating_sub(position + 1)
+            ));
+            break;
+        }
+    }
+
+    if !options.dry_run {
+        let _ = crate::cost::registrar(workspace, config, &report);
     }
 
     // Persiste o cache apenas com os arquivos atuais (orfaos saem).
@@ -515,6 +540,12 @@ fn index_one<P: SemanticProvider>(
     report.prompt_tokens += generated.prompt_tokens;
     report.completion_tokens += generated.completion_tokens;
     report.latency_ms += generated.latency_ms;
+    report.cost_usd += crate::cost::custo(
+        generated.prompt_tokens,
+        generated.completion_tokens,
+        config.model.cost_input_per_mtok,
+        config.model.cost_output_per_mtok,
+    );
 
     // O arquivo mudou enquanto o modelo analisava? Nao grava semantica velha.
     let hash_after = hash::sha256_file(&item.path)?;
@@ -1249,4 +1280,39 @@ mod tests {
         );
         std::fs::remove_dir_all(&base).ok();
     }
+
+    #[test]
+    fn custo_estimado_e_real_com_precos() {
+        let (base, workspace) = setup("cost");
+        let mut config = workspace.load_config().unwrap();
+        config.model.cost_input_per_mtok = 1.0;
+        config.model.cost_output_per_mtok = 2.0;
+        let provider = MockProvider::ok();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert!(report.estimated_cost_usd > 0.0);
+        assert!(report.cost_usd > 0.0);
+        assert!(!report.cost_capped);
+        // log cost.jsonl gravado
+        let log = base.join(".c2/logs/cost.jsonl");
+        assert!(log.is_file());
+        let linhas = std::fs::read_to_string(&log).unwrap();
+        assert!(linhas.contains("cost_usd"));
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn teto_de_custo_interrompe_o_ciclo() {
+        let (base, workspace) = setup("cost-cap");
+        let mut config = workspace.load_config().unwrap();
+        config.model.cost_input_per_mtok = 1.0;
+        config.model.cost_output_per_mtok = 2.0;
+        config.model.max_cost_usd_per_run = 0.00001; // menor que 1 chamada (2e-5)
+        let provider = MockProvider::ok();
+        let report = run(&workspace, &config, &provider, &options(), |_| {}).unwrap();
+        assert!(report.cost_capped, "deveria marcar teto: {report:?}");
+        assert!(report.deferred > 0);
+        assert!(report.calls <= 1);
+        std::fs::remove_dir_all(&base).ok();
+    }
+
 }

@@ -148,7 +148,16 @@ export interface IndexReport {
   prompt_tokens: number;
   completion_tokens: number;
   latency_ms: number;
+  cost_usd: number;
+  estimated_cost_usd: number;
+  cost_capped: boolean;
   last_error: string | null;
+}
+
+export interface CostEstimate {
+  pending: number;
+  estimated_cost_usd: number;
+  cap_usd: number;
 }
 
 export interface Evidence {

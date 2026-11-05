@@ -12,6 +12,7 @@ import type {
   McpStatus,
   ModelInspection,
   ProviderTest,
+  CostEstimate,
   RuntimePlan,
   IndexReport,
   InitResult,
@@ -76,6 +77,8 @@ export const api = {
   apiKeyDelete: () => invoke<void>("api_key_delete"),
   apiKeyStatus: () => invoke<boolean>("api_key_status"),
   providerTest: (root: string) => invoke<ProviderTest>("provider_test", { root }),
+  costEstimate: (root: string, full: boolean) =>
+    invoke<CostEstimate>("cost_estimate", { root, full }),
   modelInspect: (path: string) => invoke<ModelInspection>("model_inspect", { path }),
   modelSet: (root: string, path: string) =>
     invoke<ModelInspection>("model_set", { root, path }),
@@ -179,6 +182,9 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
         prompt_tokens: 1200,
         completion_tokens: 300,
         latency_ms: 5400,
+        cost_usd: 0,
+        estimated_cost_usd: 0,
+        cost_capped: false,
         last_error: null,
       } satisfies IndexReport as T;
     case "engine_start":
@@ -254,6 +260,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return undefined as T;
     case "api_key_status":
       return false as T;
+    case "cost_estimate":
+      return { pending: 0, estimated_cost_usd: 0, cap_usd: 0 } as T;
     case "provider_test":
       return { ok: true, provider: "openai_compat", model: "gpt-4o-mini", latency_ms: 820, sample: "mock" } as T;
     case "mcp_smoke":

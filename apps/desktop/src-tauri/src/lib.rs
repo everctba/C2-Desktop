@@ -743,6 +743,36 @@ fn gpu_info() -> Option<c2_core::gpu::GpuInfo> {
     c2_core::gpu::detect()
 }
 
+#[derive(serde::Serialize)]
+struct CostEstimate {
+    pending: usize,
+    estimated_cost_usd: f64,
+    cap_usd: f64,
+}
+
+/// Estimativa de custo do proximo reindex (antes de chamar a nuvem).
+#[tauri::command]
+fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|err| err.to_string())?;
+    let items = c2_core::indexer::plan(&workspace, &config, full, None)
+        .map_err(|err| err.to_string())?;
+    let pending = items
+        .iter()
+        .filter(|item| {
+            matches!(
+                item.decision,
+                c2_core::indexer::Decision::New | c2_core::indexer::Decision::Changed
+            )
+        })
+        .count();
+    Ok(CostEstimate {
+        pending,
+        estimated_cost_usd: c2_core::cost::estimar_plano(&config, &items),
+        cap_usd: config.model.max_cost_usd_per_run,
+    })
+}
+
 #[tauri::command]
 fn prompt_default() -> String {
     c2_core::config::DEFAULT_PROMPT.to_string()
@@ -800,6 +830,7 @@ pub fn run() {
             api_key_delete,
             api_key_status,
             provider_test,
+            cost_estimate,
             runtime_plan,
             model_load
         ])

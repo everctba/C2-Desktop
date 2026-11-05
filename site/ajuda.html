@@ -316,6 +316,8 @@ c2 migrate --yes</pre>
                   <tr><td class="mono">model.host / model.port</td><td>Endpoint local (padrão 127.0.0.1:8099).</td></tr>
                   <tr><td class="mono">model.provider</td><td><span class="mono">local</span> (padrão) ou <span class="mono">openai_compat</span> (nuvem/Ollama/vLLM).</td></tr>
                   <tr><td class="mono">model.base_url</td><td>Base URL do provedor OpenAI-compatible (ex.: <span class="mono">https://api.openai.com/v1</span>).</td></tr>
+                  <tr><td class="mono">model.cost_input_per_mtok / model.cost_output_per_mtok</td><td>Preços por 1M tokens para estimar custo (0 = não calcular).</td></tr>
+                  <tr><td class="mono">model.max_cost_usd_per_run</td><td>Teto de custo por execução em USD (0 = sem teto).</td></tr>
                   <tr><td class="mono">model.api_key_env</td><td>Variável de ambiente com a API key (padrão <span class="mono">C2_API_KEY</span>); a chave também pode ir para o cofre pelo Config.</td></tr>
                   <tr><td class="mono">—</td><td><strong>Esquecer chave</strong> (Config → Provedor de IA) remove do cofre local; não revoga no provedor.</td></tr>
                   <tr><td class="mono">model.ctx_size</td><td>Contexto em tokens (padrão 8192).</td></tr>

@@ -1154,6 +1154,9 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
                 "prompt_tokens": report.prompt_tokens,
                 "completion_tokens": report.completion_tokens,
                 "latency_ms": report.latency_ms,
+                "cost_usd": report.cost_usd,
+                "estimated_cost_usd": report.estimated_cost_usd,
+                "cost_capped": report.cost_capped,
                 "last_error": report.last_error,
             }))?
         );
@@ -1190,6 +1193,10 @@ fn print_report(report: &IndexReport, dry_run: bool, json_output: bool) -> Resul
             report.prompt_tokens + report.completion_tokens,
             per_call
         );
+    }
+    let resumo = c2_core::cost::resumo(report);
+    if !resumo.is_empty() {
+        println!("{resumo}");
     }
     if let Some(err) = &report.last_error {
         eprintln!("ultimo erro: {err}");

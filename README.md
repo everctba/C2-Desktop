@@ -32,6 +32,8 @@ de reler o projeto inteiro: **menos tokens, menos erro, menos releitura.**
   no próprio `.c2.json` via MCP (`c2_annotate`), preservadas no reindex.
 - **BYO endpoint.** Já usa LM Studio/Ollama/vLLM? Aponte o C2 para o seu
   servidor OpenAI-compatible; o mesmo seletor serve para local e nuvem.
+- **Custo sob controle.** Na nuvem: preços por 1M tokens, estimativa antes do
+  run, teto por execução e log em `.c2/logs/cost.jsonl`.
 - **Local no contexto, não no workflow.** Modelo e índice rodam na sua máquina;
   o C2 não envia código. O agente que escreve o código pode ser o melhor modelo
   da nuvem — ele só lê o resumo. Nuvem no C2 é opcional.

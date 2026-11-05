@@ -180,6 +180,9 @@ c2 config set engine.poll_interval_secs 5
 c2 config set model.base_url https://api.openai.com/v1
 c2 config set model.name gpt-4o-mini
 c2 config set model.provider openai_compat
+c2 config set model.cost_input_per_mtok 0.15   # preço por 1M tokens de entrada
+c2 config set model.cost_output_per_mtok 0.60  # preço por 1M tokens de saída
+c2 config set model.max_cost_usd_per_run 0.50  # teto por execução (0 = sem teto)
 ```
 
 ### Provedor de IA (nuvem opcional)

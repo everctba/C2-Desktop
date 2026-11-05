@@ -191,11 +191,44 @@ async function runReindex(full: boolean): Promise<void> {
   state.busy = true;
   render();
   log(full ? "reindex completo iniciado" : "reindex (limite 10) iniciado");
+
+  // Estimativa de custo antes de chamar a nuvem (c2-f4p.4).
+  if (state.status?.model.provider === "openai_compat") {
+    try {
+      const estimativa = await api.costEstimate(state.root, full);
+      if (estimativa.estimated_cost_usd > 0) {
+        const seguir = await openDialog({
+          title: "Custo estimado",
+          body: dialogField(
+            "Estimativa",
+            `~US$ ${estimativa.estimated_cost_usd.toFixed(4)} para ${estimativa.pending} arquivo(s).` +
+              (estimativa.cap_usd > 0
+                ? ` Teto por execução: US$ ${estimativa.cap_usd.toFixed(2)}.`
+                : " Sem teto configurado.") +
+              "\n\nValores aproximados; confira os preços do provedor.",
+          ),
+          confirmLabel: "Indexar",
+          cancelLabel: "Cancelar",
+        });
+        if (!seguir) {
+          state.busy = false;
+          render();
+          return;
+        }
+      }
+    } catch {
+      /* sem estimativa: segue */
+    }
+  }
+
   try {
     const report = await api.reindex(state.root, full, full ? undefined : 10);
     log(
       `reindex: ${report.indexed} indexados, ${report.unchanged} inalterados, ` +
-        `${report.errors} erros, ${report.blocked} bloqueados por segredo`,
+        `${report.errors} erros, ${report.blocked} bloqueados por segredo` +
+          (report.cost_usd > 0
+            ? ` | custo US$ ${report.cost_usd.toFixed(4)} (estimado ${report.estimated_cost_usd.toFixed(4)})`
+            : ""),
     );
     if (report.errors > 0 && state.status?.model.provider === "openai_compat") {
       await avisarFalhaProvedor(

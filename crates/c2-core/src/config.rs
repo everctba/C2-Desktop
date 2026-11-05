@@ -59,6 +59,15 @@ pub struct ModelConfig {
     /// Nome da variavel de ambiente com a API key (fallback do cofre).
     #[serde(default = "default_api_key_env")]
     pub api_key_env: String,
+    /// Preco de entrada por 1M tokens (0 = nao calcular custo).
+    #[serde(default)]
+    pub cost_input_per_mtok: f64,
+    /// Preco de saida por 1M tokens (0 = nao calcular custo).
+    #[serde(default)]
+    pub cost_output_per_mtok: f64,
+    /// Teto de custo por execucao em USD (0 = sem teto).
+    #[serde(default)]
+    pub max_cost_usd_per_run: f64,
     pub ctx_size: u32,
     pub threads: u32,
     pub gpu_layers: u32,
@@ -119,6 +128,9 @@ impl Default for ModelConfig {
             provider: Provider::Local,
             base_url: None,
             api_key_env: default_api_key_env(),
+            cost_input_per_mtok: 0.0,
+            cost_output_per_mtok: 0.0,
+            max_cost_usd_per_run: 0.0,
             ctx_size: 8192,
             threads: 0,
             gpu_layers: 99,
@@ -369,6 +381,12 @@ impl Config {
             if !base.is_empty() && !base.starts_with("http://") && !base.starts_with("https://") {
                 return invalid("model.base_url deve comecar com http:// ou https://".to_string());
             }
+        }
+        if self.model.cost_input_per_mtok < 0.0
+            || self.model.cost_output_per_mtok < 0.0
+            || self.model.max_cost_usd_per_run < 0.0
+        {
+            return invalid("precos/teto de custo nao podem ser negativos".to_string());
         }
         if self.index.prompt.trim().is_empty() {
             return invalid("index.prompt nao pode ser vazio".to_string());
