@@ -3,6 +3,8 @@
   display: grid;
   gap: var(--space-4xl);
   align-content: start;
+  grid-auto-rows: max-content;
+  min-height: max-content;
 }
 
 .header {
@@ -13,6 +15,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-auto-rows: minmax(max-content, auto);
   gap: 1px;
   background: var(--bg-surface);
   border-radius: var(--card-radius);

@@ -80,6 +80,9 @@ input {
 .content {
   padding: var(--space-5xl);
   overflow: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  min-height: 0;
   display: grid;
   gap: var(--space-4xl);
   align-content: start;

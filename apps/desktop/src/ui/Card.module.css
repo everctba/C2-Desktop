@@ -8,6 +8,7 @@
   gap: var(--space-xs);
   transition: background 150ms ease;
   min-width: 0;
+  min-height: max-content;
 }
 
 .interactive {
