@@ -79,6 +79,23 @@ e grava a escolha em `%APPDATA%\dev.c2.desktop\language.json`. A interface do ap
 usa essa preferência e permite trocar a qualquer momento em **Config → Idioma**
 (bandeiras 🇺🇸/🇧🇷); **comandos da CLI e tools do MCP continuam em inglês**.
 
+### Instalador Windows (.exe)
+
+O instalador oficial para Windows é gerado com **Inno Setup 6**:
+
+```powershell
+pwsh -File scripts/build-installer.ps1
+# saída: dist\installer\C2-Setup-<versao>.exe (+ .sha256)
+```
+
+Ele pede **UAC/admin**, deixa escolher a pasta, instala o desktop, a CLI e o
+atalho MCP (`cli\c2-mcp.cmd`), copia o runtime e adiciona `cli` ao
+**PATH do sistema** (opção marcada por padrão; desmarcável). O desinstalador
+remove a entrada do PATH e preserva projetos/modelos.
+
+O `instalar.ps1` acima continua disponível para o pacote portátil (sem admin,
+PATH do usuário).
+
 Depois:
 
 ```powershell

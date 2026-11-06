@@ -76,6 +76,18 @@ escolha é gravada no mesmo `language.json`.
 Os **comandos da CLI e as tools do MCP permanecem em inglês**
 (`c2 reindex`, `c2_annotate`, etc.) — é a API pública do produto.
 
+## Instalador Windows (Inno Setup)
+
+Para a experiência de duplo clique, gere o instalador com Inno Setup 6:
+
+```powershell
+pwsh -File scripts/build-installer.ps1
+```
+
+O `.exe` resultante instala desktop + CLI + MCP + runtime, permite escolher a
+pasta, cria atalhos e adiciona `cli` ao **PATH do sistema** (requer admin;
+opção desmarcável). O código do instalador fica em `scripts/c2.iss`.
+
 ## Primeiro uso
 
 ```bash

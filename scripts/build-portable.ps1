@@ -55,6 +55,7 @@ if (-not (Test-Path $coreExe)) {
 }
 if (Test-Path $coreExe) {
     Copy-Item $coreExe (Join-Path $cliDir 'c2.exe') -Force
+    Copy-Item (Join-Path $root 'scripts\c2-mcp.cmd') (Join-Path $cliDir 'c2-mcp.cmd') -Force
 } else {
     Write-Warning "CLI c2.exe nao encontrada em target\$buildProfile"
 }
@@ -84,6 +85,7 @@ O que tem aqui
 --------------
 C2.exe             app desktop (janela), com o frontend embutido
 cli\c2.exe         CLI do Core (init, status, grep, related, read)
+cli\c2-mcp.cmd     atalho para o servidor MCP (STDIO JSON-RPC)
 runtime\            llama-server oficial do llama.cpp (Vulkan + CPU)
 instalar.ps1       instalador com escolha de pasta
 desinstalar.ps1    remove a instalacao (preserva os projetos)
@@ -113,6 +115,14 @@ Primeiro uso
 
 O runtime do llama.cpp ja vai junto: nao precisa de LM Studio nem de CUDA.
 A CLI em cli\c2.exe usa o mesmo runtime (procura ..\runtime).
+
+MCP (agentes)
+-------------
+O MCP e servido pela CLI:   c2 --root "<projeto>" mcp
+Se o CLI estiver no PATH (instalador), o agente pode usar:
+  command: "c2"
+  args: ["--root", "<projeto>", "mcp"]
+Atalho equivalente: cli\c2-mcp.cmd --root "<projeto>"
 
 O indice fica em <projeto>/.c2 e os metadados em <arquivo>.c2.json ao lado de
 cada arquivo.
