@@ -79,6 +79,21 @@ e grava a escolha em `%APPDATA%\dev.c2.desktop\language.json`. A interface do ap
 usa essa preferência e permite trocar a qualquer momento em **Config → Idioma**
 (bandeiras 🇺🇸/🇧🇷); **comandos da CLI e tools do MCP continuam em inglês**.
 
+### Ver erros no console
+
+Release normal esconde o console. Para diagnosticar, gere a variante console:
+
+```powershell
+pwsh -File scripts/build-console.ps1
+dist\desktop\C2-console.exe
+```
+
+Ela abre uma janela de console e mostra logs do Rust/panic e erros do
+frontend encaminhados para `[frontend] ...`. O script usa o **Tauri CLI**;
+`cargo build` puro compila em modo dev e abre `http://127.0.0.1:1420`
+(por isso uma janela “travada”/em branco). Para o console JS completo, use
+`pnpm tauri dev` ou o CDP do WebView2.
+
 ### Instalador Windows (.exe)
 
 O instalador oficial para Windows é gerado com **Inno Setup 6**:

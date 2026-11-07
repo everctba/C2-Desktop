@@ -72,6 +72,7 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: () => invoke<string>("prompt_default"),
+  frontendLog: (message: string) => invoke<void>("frontend_log", { message }),
   languageLoad: () => invoke<string | null>("language_load"),
   languageSave: (lang: string) => invoke<void>("language_save", { lang }),
   newsUrl: () => invoke<string | null>("news_url"),
@@ -275,6 +276,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return undefined as T;
     case "api_key_status":
       return false as T;
+    case "frontend_log":
+      return undefined as T;
     case "language_load":
       return null as T;
     case "language_save":

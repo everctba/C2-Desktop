@@ -714,16 +714,49 @@ function subscribeEvents(): void {
   });
 }
 
+function instalarLogDeErros(): void {
+  const enviar = (texto: string) => {
+    try {
+      void api.frontendLog(texto).catch(() => {});
+    } catch {
+      /* Tauri indisponivel */
+    }
+  };
+  window.addEventListener("error", (evento) => {
+    enviar(`erro: ${evento.message} (${evento.filename}:${evento.lineno}:${evento.colno})`);
+  });
+  window.addEventListener("unhandledrejection", (evento) => {
+    enviar(`promise rejeitada: ${String(evento.reason)}`);
+  });
+  const erroOriginal = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    erroOriginal(...args);
+    enviar(`console.error: ${args.map((arg) => String(arg)).join(" ")}`);
+  };
+}
+
 async function boot(): Promise<void> {
+  instalarLogDeErros();
+  const logBoot = (etapa: string) => {
+    try {
+      void api.frontendLog(`boot: ${etapa}`).catch(() => {});
+    } catch {
+      /* Tauri indisponivel */
+    }
+  };
+  logBoot("iniciando");
   await initLang();
+  logBoot("idioma ok");
   // `c2 open --root <dir>` vence o ultimo projeto salvo na janela.
   const fromArgs = await api.initialRoot();
+  logBoot("initialRoot ok");
   if (fromArgs) {
     state.root = fromArgs.replace(/\\/g, "/");
     localStorage.setItem("c2.root", state.root);
     rememberProject(state.root);
   }
   await loadStatus();
+  logBoot("status ok");
   if (fromArgs && state.status?.initialized) {
     // `c2 open --root` abre direto na Engine.
     state.route = "engine";
@@ -734,6 +767,7 @@ async function boot(): Promise<void> {
   subscribeEvents();
   window.addEventListener("c2:lang", () => render());
   render();
+  logBoot("render ok");
 
   // Primeira execucao sem modelo: abre o assistente de primeiros passos.
   const primeiraVez = localStorage.getItem("c2.onboarded") !== "1";
@@ -754,4 +788,6 @@ async function boot(): Promise<void> {
   // e atualiza contadores/log no DOM, sem re-render (c2-e14t2).
 }
 
-void boot();
+void boot().catch((erro) => {
+  console.error("boot falhou", erro);
+});

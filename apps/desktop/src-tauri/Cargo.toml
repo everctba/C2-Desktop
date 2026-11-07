@@ -23,3 +23,6 @@ tauri-plugin-opener = "2"
 
 # Crate proprio: nao entra no workspace Rust do projeto (que compila no GNU).
 [workspace]
+
+[features]
+console = []

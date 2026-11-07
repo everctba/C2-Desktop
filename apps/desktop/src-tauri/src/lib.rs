@@ -890,6 +890,11 @@ fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
 }
 
 #[tauri::command]
+fn frontend_log(message: String) {
+    eprintln!("[frontend] {message}");
+}
+
+#[tauri::command]
 fn language_load(app: tauri::AppHandle) -> Option<String> {
     let caminho = app
         .path()
@@ -968,6 +973,7 @@ fn pick_model(app: tauri::AppHandle) -> Option<String> {
 /// Ponto de entrada chamado por `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    eprintln!("[c2] run: iniciando");
     // `c2 open --root <dir>` passa o projeto para a janela.
     let args: Vec<String> = std::env::args().collect();
     let root = args
@@ -1002,6 +1008,7 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            frontend_log,
             language_load,
             language_save,
             news_fetch,
@@ -1018,6 +1025,10 @@ pub fn run() {
             runtime_plan,
             model_load
         ])
+        .setup(|_app| {
+            eprintln!("[c2] setup: janela pronta");
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o C2 Desktop");
 }
