@@ -896,6 +896,23 @@ fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
 }
 
 #[tauri::command]
+fn open_project_folder(root: String) -> Result<(), String> {
+    let workspace = open_workspace(&root)?;
+    let caminho = workspace.root().to_path_buf();
+    #[cfg(target_os = "windows")]
+    let mut comando = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut comando = std::process::Command::new("open");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut comando = std::process::Command::new("xdg-open");
+    comando
+        .arg(&caminho)
+        .spawn()
+        .map(|_| ())
+        .map_err(|erro| format!("nao foi possivel abrir {}: {erro}", caminho.display()))
+}
+
+#[tauri::command]
 fn frontend_log(message: String) {
     eprintln!("[frontend] {message}");
 }
@@ -1018,6 +1035,7 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            open_project_folder,
             frontend_log,
             language_load,
             language_save,

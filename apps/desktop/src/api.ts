@@ -72,6 +72,7 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: (lang?: string) => invoke<string>("prompt_default", { lang }),
+  openProjectFolder: (root: string) => invoke<void>("open_project_folder", { root }),
   frontendLog: (message: string) => invoke<void>("frontend_log", { message }),
   languageLoad: () => invoke<string | null>("language_load"),
   languageSave: (lang: string) => invoke<void>("language_save", { lang }),
@@ -276,6 +277,10 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return undefined as T;
     case "api_key_status":
       return false as T;
+    case "prompt_default":
+      return "You are a software architect." as T;
+    case "open_project_folder":
+      return undefined as T;
     case "frontend_log":
       return undefined as T;
     case "language_load":

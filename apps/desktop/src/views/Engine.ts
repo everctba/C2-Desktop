@@ -105,6 +105,19 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       onClick: () => ctx.onReindex(true),
     }),
   );
+  if (ctx.root) {
+    actions.appendChild(
+      Button({
+        label: t("Abrir pasta no Explorer"),
+        iconName: "projects",
+        size: "sm",
+        variant: "ghost",
+        onClick: () => {
+          void api.openProjectFolder(ctx.root).catch(() => {});
+        },
+      }),
+    );
+  }
   page.appendChild(actions);
 
   const dicaReindex = document.createElement("p");
