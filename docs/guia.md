@@ -327,6 +327,17 @@ Não precisa fechar o outro programa nem rodar `c2 config set model.port`.
 Se nenhuma porta livre for encontrada, a mensagem antiga ainda orienta a trocar
 manualmente.
 
+## Hot reload (desenvolvimento)
+
+```powershell
+pwsh -File scripts/dev.ps1          # Tauri + Vite (HMR)
+pwsh -File scripts/dev.ps1 -UiOnly  # so navegador, mocks, sem Rust
+```
+
+- `.ts/.css/.html` → Vite HMR/reload imediato, sem recompilar Rust;
+- `src-tauri/*.rs` → recompila e reinicia a janela (incremental);
+- release/instalador só quando necessário (`scripts/dev.ps1 -Build`).
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

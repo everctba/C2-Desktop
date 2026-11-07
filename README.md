@@ -123,6 +123,23 @@ c2 grep "onde valida permissão de usuário"
 
 Ou abra **C2.exe**: abrir projeto → selecionar `.gguf` → carregar na GPU → indexar → buscar.
 
+## Desenvolvimento rapido (hot reload)
+
+```powershell
+# janela Tauri real; CSS/texto com HMR e Rust so recompila se mudar .rs
+pwsh -File scripts/dev.ps1
+
+# so frontend no navegador (mocks, sem MSVC/Rust) para ajustar texto/CSS
+pwsh -File scripts/dev.ps1 -UiOnly
+
+# quando precisar do pacote/instalador
+pwsh -File scripts/dev.ps1 -Build
+```
+
+No modo Tauri, `pnpm tauri dev` inicia o Vite em `http://127.0.0.1:1420`;
+mudancas em `.ts/.css/.html` atualizam na hora, sem rebuild do app. Mudancas em
+`src-tauri/*.rs` recompilam e reiniciam a janela (incremental).
+
 ## CLI
 
 ```bash
