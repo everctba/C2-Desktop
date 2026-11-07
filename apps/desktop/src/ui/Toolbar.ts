@@ -8,6 +8,8 @@ export interface ToolbarProps {
   projectPath: string;
   running: boolean;
   busy: boolean;
+  modelLoaded: boolean;
+  vramMb: number | null;
   onPlay: () => void;
   onStop: () => void;
   onReindex: () => void;
@@ -38,6 +40,20 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
   bar.appendChild(
     Pill(t(props.running ? "engine rodando" : "engine parado"), props.running ? "success" : "neutral", "xs"),
   );
+
+  if (props.modelLoaded) {
+    const banner = document.createElement("div");
+    banner.className = `${styles.modelBanner} ${props.running ? styles.modelBannerOn : styles.modelBannerIdle}`;
+    banner.setAttribute("data-model-banner", "1");
+    const titulo = document.createElement("span");
+    titulo.textContent = t(props.running ? "Model on GPU" : "Model on GPU loaded");
+    const vram = document.createElement("span");
+    vram.setAttribute("data-model-vram", "1");
+    vram.textContent =
+      props.vramMb !== null ? `VRAM ${(props.vramMb / 1024).toFixed(1)} GB` : "VRAM —";
+    banner.append(titulo, vram);
+    bar.appendChild(banner);
+  }
 
   const spacer = document.createElement("div");
   spacer.className = styles.spacer;

@@ -364,8 +364,9 @@ fn engine_start(
             std::thread::sleep(interval);
         }
 
-        logger.info("engine", "engine encerrado");
-        let _ = runtime::stop(&workspace);
+        logger.info("engine", "engine encerrado (modelo mantido na GPU)");
+        // Nao para o runtime: o modelo continua na VRAM para o banner
+        // "Model on GPU loaded" e para religar o engine rapidamente.
         let _ = app.emit("engine://stopped", ());
     });
 
@@ -374,11 +375,10 @@ fn engine_start(
 }
 
 #[tauri::command]
-fn engine_stop(root: String, engine: State<'_, Engine>) -> Result<(), String> {
+fn engine_stop(_root: String, engine: State<'_, Engine>) -> Result<(), String> {
     engine.running.store(false, Ordering::SeqCst);
-    if let Ok(workspace) = open_workspace(&root) {
-        let _ = runtime::stop(&workspace);
-    }
+    // O runtime/modelo permanece na GPU; o banner fica em "Model on GPU loaded"
+    // (estado idle) e um novo Start reaproveita o runtime saudavel.
     Ok(())
 }
 

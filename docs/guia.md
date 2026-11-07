@@ -385,6 +385,20 @@ runtime (poll de `gpu_info` a cada 500 ms) e uma interpolacao pelo tempo para
 nao ficar parada enquanto o llama-server le os tensores. Sem GPU detectada,
 usa a barra indeterminada. O rotulo mostra `Carregando modelo… N% (usado/total GB)`.
 
+## Model on GPU (banner)
+
+Com runtime local saudavel, o topo da janela mostra no centro:
+
+```text
+Model on GPU · VRAM 4.3 GB
+```
+
+- engine rodando: banner destacado (verde/accents);
+- engine parado mas modelo carregado: `Model on GPU loaded`, cinza/apagado.
+  O Stop do desktop mantem o runtime/modelo na VRAM para religar rapido;
+  para liberar a GPU, feche o C2 (ou pare o runtime manualmente).
+- a VRAM e atualizada a cada 5 s via `gpu_info`.
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

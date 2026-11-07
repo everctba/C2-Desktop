@@ -73,6 +73,7 @@ interface AppState {
   busy: boolean;
   logs: string[];
   error: string | null;
+  gpuUsedMb: number | null;
 }
 
 const state: AppState = {
@@ -83,6 +84,7 @@ const state: AppState = {
   busy: false,
   logs: [],
   error: null,
+  gpuUsedMb: null,
 };
 
 function log(message: string): void {
@@ -94,14 +96,28 @@ function log(message: string): void {
 async function loadStatus(): Promise<void> {
   if (!state.root) {
     state.status = null;
+    state.gpuUsedMb = null;
     return;
   }
   try {
     state.status = await api.status(state.root);
     state.running = await api.engineRunning();
+    state.gpuUsedMb = null;
+    if (
+      state.status?.runtime.healthy &&
+      state.status.model.provider !== "openai_compat"
+    ) {
+      try {
+        const gpu = await api.gpuInfo();
+        state.gpuUsedMb = gpu?.used_mb ?? null;
+      } catch {
+        /* sem nvidia-smi/GPU */
+      }
+    }
     state.error = null;
   } catch (error) {
     state.status = null;
+    state.gpuUsedMb = null;
     state.error = String(error);
   }
 }
@@ -678,6 +694,10 @@ function shell(content: HTMLElement): void {
       projectPath: state.root,
       running: state.running,
       busy: state.busy,
+      modelLoaded:
+        Boolean(state.status?.runtime.healthy) &&
+        state.status?.model.provider !== "openai_compat",
+      vramMb: state.gpuUsedMb,
       onPlay: () => void toggleEngine(),
       onStop: () => void toggleEngine(),
       onReindex: () => void runReindex(true),
@@ -865,6 +885,22 @@ async function boot(): Promise<void> {
       })();
     }, 350);
   }
+
+  // Atualiza a VRAM do banner sem re-renderizar a tela.
+  const atualizarVram = () => {
+    const alvo = document.querySelector<HTMLElement>("[data-model-vram]");
+    if (!alvo || !state.status?.runtime.healthy) return;
+    void api
+      .gpuInfo()
+      .then((gpu) => {
+        if (!gpu) return;
+        state.gpuUsedMb = gpu.used_mb;
+        alvo.textContent = `VRAM ${(gpu.used_mb / 1024).toFixed(1)} GB`;
+      })
+      .catch(() => {});
+  };
+  window.setInterval(atualizarVram, 5000);
+  atualizarVram();
 
   // Popup de novidades (news.json estatico), sempre depois do boot.
   initNews();

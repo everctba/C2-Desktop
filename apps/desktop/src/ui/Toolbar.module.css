@@ -1,5 +1,6 @@
 /* Toolbar 32–40px, borda inferior, fundo --bg-surface (§9) */
 .toolbar {
+  position: relative;
   height: 40px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
@@ -40,4 +41,33 @@
 
 .spacer {
   flex: 1;
+}
+
+.modelBanner {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding: 3px var(--space-m);
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.modelBannerOn {
+  color: var(--accent-1);
+  background: var(--accent-1-10);
+  border-color: var(--accent-1);
+}
+
+.modelBannerIdle {
+  color: var(--text-subtle);
+  background: var(--overlay-5);
+  border-color: var(--border-subtle);
+  opacity: 0.65;
 }
