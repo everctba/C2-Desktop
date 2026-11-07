@@ -44,6 +44,8 @@ Get-Process C2, c2-desktop -ErrorAction SilentlyContinue |
 
 $destExe = Join-Path $out 'C2.exe'
 Copy-Item $appExe $destExe -Force
+# C2-console.exe e artefato de diagnostico, nao vai no pacote
+Remove-Item (Join-Path $out 'C2-console.exe') -Force -ErrorAction SilentlyContinue
 if (-not (Test-Path $destExe)) { throw 'falha ao copiar C2.exe para dist/desktop' }
 
 # Windows e case-insensitive: a CLI vai para cli\c2.exe para nao sobrescrever C2.exe
