@@ -12,6 +12,7 @@ export interface ButtonProps {
   iconOnly?: boolean;
   busy?: boolean;
   disabled?: boolean;
+  title?: string;
   onClick?: () => void;
 }
 
@@ -29,6 +30,7 @@ export function Button(props: ButtonProps): HTMLButtonElement {
     .join(" ");
 
   if (props.disabled) button.disabled = true;
+  if (props.title) button.title = props.title;
   if (props.busy) {
     button.setAttribute("aria-busy", "true");
     button.disabled = true;

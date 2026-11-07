@@ -160,6 +160,23 @@ c2 status                                    # estado do índice e do runtime
 - Re-hash depois da análise: se o arquivo mudou durante a inferência, o
   resultado é descartado e o arquivo entra no próximo ciclo.
 
+### Reindexar: passada normal x “Reindexar tudo”
+
+- **Reindexar (10)** (toolbar/Engine) faz uma passada limitada a 10 arquivos
+  pendentes. Repetir o clique continua de onde parou.
+- **Reindexar tudo** usa `--full`: ignora o hash e chama o modelo para **todos**
+  os arquivos, mesmo os que não mudaram. Use quando trocou o modelo/prompt de
+  indexação, quer regenerar todos os metadados ou suspeita que algum está ruim.
+  É caro na nuvem (cobra tokens por arquivo).
+- O engine **Iniciar** já indexa continuamente em background; o botão é uma
+  passada única.
+- **Não roda o `cleaner` e não apaga os `.c2.json` antes.** Cada arquivo é
+  reanalisado e o metadado é **sobrescrito atomicamente** ao final. Metadados
+  órfãos (arquivo-fonte removido) e metadados de rename são tratados pelo plano
+  normal; para apagar metadados em massa use `c2 cleaner` (explícito).
+- Se a chamada ao modelo falhar, o metadado antigo daquele arquivo permanece —
+  o C2 não grava semântica vazia.
+
 ## Segurança
 
 - `.env`, chaves privadas (`*.pem`, `id_rsa`…) e credenciais são **pulados

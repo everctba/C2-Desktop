@@ -107,10 +107,22 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     Button({
       label: t("Reindexar tudo"),
       disabled: ctx.busy,
+      title: t("Força reindexar mesmo sem mudanças; consome o modelo em todos os arquivos."),
       onClick: () => ctx.onReindex(true),
     }),
   );
   page.appendChild(actions);
+
+  const dicaReindex = document.createElement("p");
+  dicaReindex.className = "pageHint";
+  dicaReindex.style.maxWidth = "none";
+  dicaReindex.textContent = t(
+    "Reindexar tudo força reindexar mesmo os arquivos cujo hash não mudou. " +
+      "Use quando: trocou o modelo/prompt de indexação; quer regenerar todos os metadados; " +
+      "suspeita que algum metadado está ruim. É caro: chama o modelo para todos os arquivos " +
+      "(na nuvem, custa tokens).",
+  );
+  page.appendChild(dicaReindex);
 
   /* log ao vivo */
   const logCard = Card({ title: t("Log"), accent: 7 });
