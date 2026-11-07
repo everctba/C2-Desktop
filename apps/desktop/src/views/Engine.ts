@@ -6,6 +6,7 @@ import { Card, cardBody } from "../ui/Card";
 import { Pill } from "../ui/Pill";
 import { TreeRow } from "../ui/TreeRow";
 import styles from "./views.module.css";
+import { limparMetadados } from "./Cleanup";
 
 export interface EngineContext {
   root: string;
@@ -15,6 +16,7 @@ export interface EngineContext {
   onPlay: () => void;
   onStop: () => void;
   onReindex: (full: boolean) => void;
+  onCleanupDone: () => void;
 }
 
 import type { View } from "./view";
@@ -117,6 +119,19 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         },
       }),
     );
+    const limpar = Button({
+      label: t("Remove all c2.json files"),
+      size: "sm",
+      variant: "destructive",
+      onClick: () => {
+        void limparMetadados(ctx.root, {
+          setStatus: () => {},
+          onDone: () => ctx.onCleanupDone(),
+        });
+      },
+    });
+    limpar.style.marginLeft = "auto";
+    actions.appendChild(limpar);
   }
   page.appendChild(actions);
 

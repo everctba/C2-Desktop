@@ -635,6 +635,12 @@ function render(): void {
           onPlay: () => void toggleEngine(),
           onStop: () => void toggleEngine(),
           onReindex: (full: boolean) => void runReindex(full),
+          onCleanupDone: () =>
+            void (async () => {
+              await loadStatus();
+              log("metadados removidos");
+              render();
+            })(),
         });
         break;
       case "settings":

@@ -347,7 +347,8 @@ c2 cleaner          # dry-run: lista e conta
 c2 cleaner --yes    # remove todos os .c2.json
 ```
 
-No desktop: Config -> modo avancado -> **Manutenção** -> Limpar metadados.
+No desktop: Config -> modo avancado -> **Manutenção** -> **Remove all c2.json files**
+(ou o mesmo botão à direita na barra de ações da Engine).
 O app mostra a contagem, exige digitar `DELETE` em maiúsculo e só então remove.
 Código e `.c2/config.json` não são alterados; para recriar o contexto, rode
 Reindexar tudo depois. Anotações de agentes são perdidas.
