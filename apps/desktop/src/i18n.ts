@@ -286,6 +286,8 @@ const EN: Record<string, string> = {
   "falha ao carregar prompt": "failed to load prompt",
   "O idioma dos metadados é definido por este prompt, não pelo idioma da interface. Use English/Português acima ou edite livremente.":
     "The metadata language is defined by this prompt, not by the interface language. Use English/Português above or edit freely.",
+  "Trocar o idioma do prompt não traduz metadados antigos. Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.":
+    "Changing the prompt language does not translate old metadata. To regenerate everything in the new language, run Reindex all in the Engine.",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

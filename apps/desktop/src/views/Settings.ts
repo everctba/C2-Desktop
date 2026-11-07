@@ -635,6 +635,16 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   );
   promptBody.appendChild(notaPrompt);
 
+  const avisoTraducao = document.createElement("p");
+  avisoTraducao.className = "pageHint";
+  avisoTraducao.style.maxWidth = "none";
+  avisoTraducao.style.color = "var(--warning)";
+  avisoTraducao.textContent = t(
+    "Trocar o idioma do prompt não traduz metadados antigos. " +
+      "Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.",
+  );
+  promptBody.appendChild(avisoTraducao);
+
   controles.set("index.prompt", { kind: "text", get: () => area.value });
   page.appendChild(promptCard);
 
