@@ -47,7 +47,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
     Button({
       label: t(props.running ? "Parar" : "Iniciar"),
       iconName: props.running ? "stop" : "play",
-      variant: props.running ? "secondary" : "primary",
+      variant: props.running ? "warning" : "primary",
       busy: props.busy,
       disabled: !props.projectPath,
       onClick: props.running ? props.onStop : props.onPlay,

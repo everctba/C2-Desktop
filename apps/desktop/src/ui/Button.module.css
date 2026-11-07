@@ -67,6 +67,17 @@
   background: var(--overlay-20);
 }
 
+.warning {
+  background: var(--warning);
+  color: var(--bg-body);
+}
+.warning:hover {
+  filter: brightness(1.08);
+}
+.warning:active {
+  filter: brightness(0.92);
+}
+
 .destructive {
   background: var(--danger-10);
   color: var(--danger);

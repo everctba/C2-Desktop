@@ -289,6 +289,8 @@ const EN: Record<string, string> = {
   "Trocar o idioma do prompt não traduz metadados antigos. Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.":
     "Changing the prompt language does not translate old metadata. To regenerate everything in the new language, run Reindex all in the Engine.",
   "Abrir pasta no Explorer": "Open folder in Explorer",
+  "Parar engine": "Stop engine",
+  "Iniciar engine": "Start engine",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

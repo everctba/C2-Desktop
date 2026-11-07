@@ -1,7 +1,7 @@
 import { icon, type IconName } from "../icons/index";
 import styles from "./Button.module.css";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "warning";
 export type ButtonSize = "micro" | "xs" | "sm" | "md" | "lg";
 
 export interface ButtonProps {

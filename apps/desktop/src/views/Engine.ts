@@ -92,9 +92,9 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   actions.className = styles.actions;
   actions.append(
     Button({
-      label: ctx.running ? "Parar engine" : "Iniciar engine",
+      label: t(ctx.running ? "Parar engine" : "Iniciar engine"),
       iconName: ctx.running ? "stop" : "play",
-      variant: ctx.running ? "secondary" : "primary",
+      variant: ctx.running ? "warning" : "primary",
       busy: ctx.busy,
       onClick: ctx.running ? ctx.onStop : ctx.onPlay,
     }),
