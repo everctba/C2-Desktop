@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
 import { dialogField, openDialog } from "../ui/Dialog";
 import { limparMetadados } from "./Cleanup";
+import { iniciarProbeUI } from "../perf";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
 import { flagBR, flagUS } from "../ui/Flags";
@@ -733,6 +734,22 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     },
   });
   manutencaoBody.appendChild(limpar);
+
+  const diagToggle = Toggle({
+    label: t("Registrar cliques e latência (diagnóstico)"),
+    checked: localStorage.getItem("c2.perf") === "1",
+    tone: "brand",
+    onChange: (ligado) => {
+      if (ligado) {
+        localStorage.setItem("c2.perf", "1");
+        iniciarProbeUI();
+      } else {
+        localStorage.removeItem("c2.perf");
+      }
+    },
+  });
+  manutencaoBody.appendChild(diagToggle.root);
+
   page.appendChild(manutencaoCard);
 
   // ---- Visibilidade condicional: modo x simples/avancado ----

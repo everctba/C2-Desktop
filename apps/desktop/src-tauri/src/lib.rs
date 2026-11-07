@@ -17,6 +17,8 @@ use serde::Serialize;
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
+mod perf;
+
 /// Projeto passado por `c2 open --root <dir>`.
 struct InitialRoot(Option<String>);
 
@@ -152,16 +154,40 @@ fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
 }
 
 #[tauri::command]
-fn workspace_status(app: tauri::AppHandle, root: String) -> Result<Option<StatusReport>, String> {
-    let workspace = open_workspace(&root)?;
-    if !workspace.is_initialized() {
-        return Ok(None);
-    }
-    // Modelo e preferencia do app: se o projeto nao tem, herda o global.
-    aplicar_modelo_global(&app, &workspace)?;
-    status::build(&workspace)
-        .map(Some)
-        .map_err(|err| err.to_string())
+async fn workspace_status(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<Option<StatusReport>, String> {
+    let inicio = std::time::Instant::now();
+    let app_dentro = app.clone();
+    let root_dentro = root.clone();
+    // A varredura do projeto e a leitura de metadados sao bloqueantes: fora da
+    // thread da UI para a janela continuar respondendo durante o cold start.
+    let (resultado, timings) = tauri::async_runtime::spawn_blocking(
+        move || -> Result<(Option<StatusReport>, Option<status::StatusTimings>), String> {
+            let workspace = open_workspace(&root_dentro)?;
+            if !workspace.is_initialized() {
+                return Ok((None, None));
+            }
+            // Modelo e preferencia do app: se o projeto nao tem, herda o global.
+            aplicar_modelo_global(&app_dentro, &workspace)?;
+            let (report, timings) =
+                status::build_timed(&workspace).map_err(|err| err.to_string())?;
+            Ok((Some(report), Some(timings)))
+        },
+    )
+    .await
+    .map_err(|err| err.to_string())??;
+    perf::registrar(
+        &app,
+        "workspace_status",
+        serde_json::json!({
+            "ms": inicio.elapsed().as_millis() as u64,
+            "initialized": resultado.is_some(),
+            "timings": timings,
+        }),
+    );
+    Ok(resultado)
 }
 
 #[derive(Serialize)]
@@ -947,6 +973,16 @@ fn open_project_folder(root: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn perf_log(app: tauri::AppHandle, event: String, data: Option<serde_json::Value>) {
+    perf::registrar(&app, &event, data.unwrap_or_else(|| serde_json::json!({})));
+}
+
+#[tauri::command]
+fn startup_elapsed_ms() -> u64 {
+    perf::elapsed_ms()
+}
+
+#[tauri::command]
 fn frontend_log(message: String) {
     eprintln!("[frontend] {message}");
 }
@@ -1034,6 +1070,7 @@ fn pick_model(app: tauri::AppHandle) -> Option<String> {
 /// Ponto de entrada chamado por `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    perf::marcar_inicio();
     eprintln!("[c2] run: iniciando");
     // `c2 open --root <dir>` passa o projeto para a janela.
     let args: Vec<String> = std::env::args().collect();
@@ -1069,6 +1106,8 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            perf_log,
+            startup_elapsed_ms,
             cleaner_plan,
             cleaner_run,
             open_project_folder,
@@ -1089,7 +1128,8 @@ pub fn run() {
             runtime_plan,
             model_load
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            perf::registrar(app.handle(), "tauri_setup", serde_json::json!({}));
             eprintln!("[c2] setup: janela pronta");
             Ok(())
         })

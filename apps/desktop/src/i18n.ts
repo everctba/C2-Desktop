@@ -305,6 +305,7 @@ const EN: Record<string, string> = {
   falhas: "failures",
   "falha ao limpar": "failed to clear",
   Cancelar: "Cancel",
+  "Registrar cliques e latência (diagnóstico)": "Log clicks and latency (diagnostics)",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

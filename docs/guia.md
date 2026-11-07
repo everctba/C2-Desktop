@@ -353,6 +353,29 @@ O app mostra a contagem, exige digitar `DELETE` em maiúsculo e só então remov
 Código e `.c2/config.json` não são alterados; para recriar o contexto, rode
 Reindexar tudo depois. Anotações de agentes são perdidas.
 
+## Diagnóstico de cold start
+
+O desktop grava marcas de boot em `%APPDATA%/dev.c2.desktop/perf.log` (JSONL):
+`js_boot_start`, `init_lang_ok`, `status_ok` (com ms), `render_ok`, `first_raf`,
+`workspace_status` e `tauri_setup`.
+
+```powershell
+pwsh -File scripts/perf-report.ps1
+```
+
+Para registrar tambem cliques/latencia de UI (opcional), ligue em
+Config -> avancado -> Manutencao -> **Registrar cliques e latencia (diagnostico)**
+ou `localStorage.setItem("c2.perf","1")` no DevTools.
+
+Otimizacoes aplicadas:
+- `runtime::status` nao executa mais `llama-server --version` (isso carregava
+  ~100 MB de DLLs no primeiro start); a versao fica em cache no workspace e a
+  validacao roda so ao iniciar o engine;
+- antes do HTTP `/health`, um connect TCP com timeout de 150 ms evita esperar
+  ~2 s por uma porta fechada (gargalo medido: runtime 2037 ms -> ~160 ms);
+- `workspace_status` roda em `spawn_blocking` e nao prende a thread da UI.
+Com isso o status caiu de ~2,1 s para ~217 ms e o boot completo para ~1 s.
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

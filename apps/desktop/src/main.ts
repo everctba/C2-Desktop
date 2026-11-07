@@ -16,6 +16,7 @@ import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
 import { initNews } from "./news";
 import { initLang, t } from "./i18n";
+import { iniciarProbeUI, perfBoot } from "./perf";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
 
@@ -743,7 +744,10 @@ function instalarLogDeErros(): void {
 
 async function boot(): Promise<void> {
   instalarLogDeErros();
-  const logBoot = (etapa: string) => {
+  perfBoot("js_boot_start");
+  iniciarProbeUI();
+  const logBoot = (etapa: string, dados: Record<string, unknown> = {}) => {
+    perfBoot(etapa, dados);
     try {
       void api.frontendLog(`boot: ${etapa}`).catch(() => {});
     } catch {
@@ -752,17 +756,18 @@ async function boot(): Promise<void> {
   };
   logBoot("iniciando");
   await initLang();
-  logBoot("idioma ok");
+  logBoot("idioma_ok");
   // `c2 open --root <dir>` vence o ultimo projeto salvo na janela.
   const fromArgs = await api.initialRoot();
-  logBoot("initialRoot ok");
+  logBoot("initial_root_ok");
   if (fromArgs) {
     state.root = fromArgs.replace(/\\/g, "/");
     localStorage.setItem("c2.root", state.root);
     rememberProject(state.root);
   }
+  const statusInicio = performance.now();
   await loadStatus();
-  logBoot("status ok");
+  logBoot("status_ok", { ms: Math.round(performance.now() - statusInicio) });
   if (fromArgs && state.status?.initialized) {
     // `c2 open --root` abre direto na Engine.
     state.route = "engine";
@@ -773,7 +778,8 @@ async function boot(): Promise<void> {
   subscribeEvents();
   window.addEventListener("c2:lang", () => render());
   render();
-  logBoot("render ok");
+  logBoot("render_ok");
+  requestAnimationFrame(() => perfBoot("first_raf"));
 
   // Primeira execucao sem modelo: abre o assistente de primeiros passos.
   const primeiraVez = localStorage.getItem("c2.onboarded") !== "1";

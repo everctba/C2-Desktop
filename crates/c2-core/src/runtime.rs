@@ -13,6 +13,7 @@
 //! O item 4 existe so para desenvolvimento: o instalador do C2 vai embarcar o
 //! runtime proprio (`c2-e12.1`), e entao o LM Studio deixa de ser necessario.
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -99,6 +100,11 @@ pub fn current_pid(workspace: &Workspace) -> Option<u32> {
 
 /// Verdadeiro quando o servidor responde em `/health`.
 pub fn health(config: &Config) -> bool {
+    // Sem ninguem escutando, nem tenta HTTP: no Windows um connect para porta
+    // fechada pode levar ~2 s (filtro/antivirus), travando o boot.
+    if !porta_em_uso(&config.model.host, config.model.port) {
+        return false;
+    }
     let url = config.model.health_url();
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(3))
@@ -272,6 +278,57 @@ fn path_with_dlls(dll_dirs: &[PathBuf]) -> Option<std::ffi::OsString> {
 }
 
 /// Executa `--version` e devolve a primeira linha util, validando o binario.
+#[derive(Debug, Serialize, Deserialize)]
+struct VersionCache {
+    binary: String,
+    mtime_secs: u64,
+    version: String,
+}
+
+fn version_cache_path(workspace: &Workspace) -> PathBuf {
+    workspace.c2_dir().join("runtime-version.json")
+}
+
+fn binary_mtime_secs(binary: &Path) -> Option<u64> {
+    let mtime = fs::metadata(binary).ok()?.modified().ok()?;
+    mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|duracao| duracao.as_secs())
+}
+
+/// Le a versao do cache sem executar o binario (boot rapido).
+fn cached_version(workspace: &Workspace, resolved: &Resolved) -> Option<String> {
+    let texto = fs::read_to_string(version_cache_path(workspace)).ok()?;
+    let cache: VersionCache = serde_json::from_str(&texto).ok()?;
+    let mtime = binary_mtime_secs(&resolved.binary)?;
+    if cache.binary == resolved.binary.display().to_string() && cache.mtime_secs == mtime {
+        Some(cache.version)
+    } else {
+        None
+    }
+}
+
+/// Executa `--version` uma vez e guarda no workspace para os proximos status.
+fn remember_version(workspace: &Workspace, resolved: &Resolved) {
+    let Ok(version) = validate_binary(resolved) else {
+        return;
+    };
+    let Some(mtime_secs) = binary_mtime_secs(&resolved.binary) else {
+        return;
+    };
+    let cache = VersionCache {
+        binary: resolved.binary.display().to_string(),
+        mtime_secs,
+        version,
+    };
+    let caminho = version_cache_path(workspace);
+    if let Some(pai) = caminho.parent() {
+        let _ = fs::create_dir_all(pai);
+    }
+    let _ = fs::write(caminho, serde_json::to_string(&cache).unwrap_or_default());
+}
+
 pub fn validate_binary(resolved: &Resolved) -> Result<String> {
     let mut command = Command::new(&resolved.binary);
     command.arg("--version");
@@ -330,7 +387,16 @@ fn validar_modelo(model: &str) -> Result<()> {
 
 /// Alguem ja escuta nesta porta? (evita subir e falhar em silencio)
 pub fn porta_em_uso(host: &str, port: u16) -> bool {
-    std::net::TcpStream::connect((host, port)).is_ok()
+    use std::net::{TcpStream, ToSocketAddrs};
+    let Ok(enderecos) = (host, port).to_socket_addrs() else {
+        return false;
+    };
+    for endereco in enderecos {
+        if TcpStream::connect_timeout(&endereco, Duration::from_millis(150)).is_ok() {
+            return true;
+        }
+    }
+    false
 }
 
 /// Pede ao sistema uma porta livre no host (fecha o listener em seguida).
@@ -485,9 +551,10 @@ pub fn ensure(workspace: &Workspace, config: &Config) -> Result<Ensure> {
     for attempt in 0..attempts {
         match start(workspace, config, &resolved) {
             Ok(_) => {
+                remember_version(workspace, &resolved);
                 return Ok(Ensure::Started {
                     attempts: attempt + 1,
-                })
+                });
             }
             Err(err) if attempt + 1 == attempts => return Err(err),
             Err(_) => {
@@ -571,10 +638,30 @@ pub fn status(workspace: &Workspace, config: &Config) -> RuntimeStatus {
             last_error: None,
         };
     }
+    let t = Instant::now();
     let healthy = health(config);
+    let health_ms = t.elapsed().as_millis() as u64;
+    let t = Instant::now();
     let pid = current_pid(workspace);
+    let pid_ms = t.elapsed().as_millis() as u64;
+    let t = Instant::now();
     let resolved = resolve_binary(workspace, config).ok();
-    let version = resolved.as_ref().and_then(|res| validate_binary(res).ok());
+    let resolve_ms = t.elapsed().as_millis() as u64;
+    let t = Instant::now();
+    // Nunca executa --version no status: no cold start isso carrega ~100 MB de
+    // runtime/DLLs e travava o boot. Usa o cache gravado ao iniciar o engine.
+    let version = resolved
+        .as_ref()
+        .and_then(|res| cached_version(workspace, res));
+    let cache_ms = t.elapsed().as_millis() as u64;
+    let t = Instant::now();
+    let ultimo_erro = last_error(workspace);
+    let log_ms = t.elapsed().as_millis() as u64;
+    if std::env::var_os("C2_PERF").is_some() {
+        eprintln!(
+            "[runtime] health={health_ms}ms pid={pid_ms}ms resolve={resolve_ms}ms cache={cache_ms}ms log={log_ms}ms"
+        );
+    }
 
     RuntimeStatus {
         healthy,
@@ -582,7 +669,7 @@ pub fn status(workspace: &Workspace, config: &Config) -> RuntimeStatus {
         binary: resolved.as_ref().map(|res| res.binary.clone()),
         source: resolved.map(|res| res.source),
         version,
-        last_error: last_error(workspace),
+        last_error: ultimo_erro,
     }
 }
 

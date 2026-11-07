@@ -74,15 +74,49 @@ pub struct StatusReport {
     pub state: EngineState,
 }
 
+/// Tempos das fases do status (diagnostico de cold start).
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct StatusTimings {
+    pub config_ms: u64,
+    pub discover_ms: u64,
+    pub metadata_ms: u64,
+    pub state_ms: u64,
+    pub runtime_ms: u64,
+    pub total_ms: u64,
+}
+
 /// Coleta o estado do workspace. Exige workspace inicializado.
 pub fn build(workspace: &Workspace) -> Result<StatusReport> {
-    let config = workspace.load_config()?;
-    let discovery = discover::discover(workspace.root(), &config)?;
-    let metadata = cleaner::metadata_files(workspace.root())?;
-    let state = EngineState::load(&workspace.state_path())?;
-    let runtime_status = runtime::status(workspace, &config);
+    build_timed(workspace).map(|(report, _)| report)
+}
 
-    Ok(StatusReport {
+/// Igual a `build`, mas devolve os tempos de cada fase.
+pub fn build_timed(workspace: &Workspace) -> Result<(StatusReport, StatusTimings)> {
+    let total = std::time::Instant::now();
+    let mut timings = StatusTimings::default();
+
+    let inicio = std::time::Instant::now();
+    let config = workspace.load_config()?;
+    timings.config_ms = inicio.elapsed().as_millis() as u64;
+
+    let inicio = std::time::Instant::now();
+    let discovery = discover::discover(workspace.root(), &config)?;
+    timings.discover_ms = inicio.elapsed().as_millis() as u64;
+
+    let inicio = std::time::Instant::now();
+    let metadata = cleaner::metadata_files(workspace.root())?;
+    timings.metadata_ms = inicio.elapsed().as_millis() as u64;
+
+    let inicio = std::time::Instant::now();
+    let state = EngineState::load(&workspace.state_path())?;
+    timings.state_ms = inicio.elapsed().as_millis() as u64;
+
+    let inicio = std::time::Instant::now();
+    let runtime_status = runtime::status(workspace, &config);
+    timings.runtime_ms = inicio.elapsed().as_millis() as u64;
+    timings.total_ms = total.elapsed().as_millis() as u64;
+
+    let report = StatusReport {
         root: workspace.root().display().to_string(),
         initialized: workspace.is_initialized(),
         config_path: workspace.config_path().display().to_string(),
@@ -122,7 +156,8 @@ pub fn build(workspace: &Workspace) -> Result<StatusReport> {
         metadata: metadata.len(),
         skipped: discovery.skipped,
         state,
-    })
+    };
+    Ok((report, timings))
 }
 
 /// Configuracao efetiva, para telas de ajustes.

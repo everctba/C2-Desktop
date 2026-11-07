@@ -75,6 +75,9 @@ export const api = {
   openProjectFolder: (root: string) => invoke<void>("open_project_folder", { root }),
   cleanerPlan: (root: string) => invoke<{ found: number }>("cleaner_plan", { root }),
   cleanerRun: (root: string) => invoke<{ found: number; removed: number; failed: string[] }>("cleaner_run", { root }),
+  perfLog: (event: string, data?: Record<string, unknown>) =>
+    invoke<void>("perf_log", { event, data }),
+  startupElapsedMs: () => invoke<number>("startup_elapsed_ms"),
   frontendLog: (message: string) => invoke<void>("frontend_log", { message }),
   languageLoad: () => invoke<string | null>("language_load"),
   languageSave: (lang: string) => invoke<void>("language_save", { lang }),
@@ -287,6 +290,10 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return { found: 0 } as T;
     case "cleaner_run":
       return { found: 0, removed: 0, failed: [] } as T;
+    case "perf_log":
+      return undefined as T;
+    case "startup_elapsed_ms":
+      return 0 as T;
     case "frontend_log":
       return undefined as T;
     case "language_load":
