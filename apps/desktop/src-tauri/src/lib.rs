@@ -895,6 +895,40 @@ fn cost_estimate(root: String, full: bool) -> Result<CostEstimate, String> {
     })
 }
 
+#[derive(serde::Serialize)]
+struct CleanupPreview {
+    found: usize,
+}
+
+#[derive(serde::Serialize)]
+struct CleanupResult {
+    found: usize,
+    removed: usize,
+    failed: Vec<String>,
+}
+
+#[tauri::command]
+fn cleaner_plan(root: String) -> Result<CleanupPreview, String> {
+    let workspace = open_workspace(&root)?;
+    let report =
+        c2_core::cleaner::clean(workspace.root(), true).map_err(|err| err.to_string())?;
+    Ok(CleanupPreview {
+        found: report.found.len(),
+    })
+}
+
+#[tauri::command]
+fn cleaner_run(root: String) -> Result<CleanupResult, String> {
+    let workspace = open_workspace(&root)?;
+    let report =
+        c2_core::cleaner::clean(workspace.root(), false).map_err(|err| err.to_string())?;
+    Ok(CleanupResult {
+        found: report.found.len(),
+        removed: report.removed.len(),
+        failed: report.failed,
+    })
+}
+
 #[tauri::command]
 fn open_project_folder(root: String) -> Result<(), String> {
     let workspace = open_workspace(&root)?;
@@ -1035,6 +1069,8 @@ pub fn run() {
             model_inspect,
             model_set,
             prompt_default,
+            cleaner_plan,
+            cleaner_run,
             open_project_folder,
             frontend_log,
             language_load,

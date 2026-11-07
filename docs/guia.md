@@ -338,6 +338,20 @@ pwsh -File scripts/dev.ps1 -UiOnly  # so navegador, mocks, sem Rust
 - `src-tauri/*.rs` → recompila e reinicia a janela (incremental);
 - release/instalador só quando necessário (`scripts/dev.ps1 -Build`).
 
+### Limpar metadados (acao destrutiva)
+
+Na CLI:
+
+```powershell
+c2 cleaner          # dry-run: lista e conta
+c2 cleaner --yes    # remove todos os .c2.json
+```
+
+No desktop: Config -> modo avancado -> **Manutenção** -> Limpar metadados.
+O app mostra a contagem, exige digitar `DELETE` em maiúsculo e só então remove.
+Código e `.c2/config.json` não são alterados; para recriar o contexto, rode
+Reindexar tudo depois. Anotações de agentes são perdidas.
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

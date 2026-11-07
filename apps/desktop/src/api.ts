@@ -73,6 +73,8 @@ export const api = {
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: (lang?: string) => invoke<string>("prompt_default", { lang }),
   openProjectFolder: (root: string) => invoke<void>("open_project_folder", { root }),
+  cleanerPlan: (root: string) => invoke<{ found: number }>("cleaner_plan", { root }),
+  cleanerRun: (root: string) => invoke<{ found: number; removed: number; failed: string[] }>("cleaner_run", { root }),
   frontendLog: (message: string) => invoke<void>("frontend_log", { message }),
   languageLoad: () => invoke<string | null>("language_load"),
   languageSave: (lang: string) => invoke<void>("language_save", { lang }),
@@ -281,6 +283,10 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return "You are a software architect." as T;
     case "open_project_folder":
       return undefined as T;
+    case "cleaner_plan":
+      return { found: 0 } as T;
+    case "cleaner_run":
+      return { found: 0, removed: 0, failed: [] } as T;
     case "frontend_log":
       return undefined as T;
     case "language_load":

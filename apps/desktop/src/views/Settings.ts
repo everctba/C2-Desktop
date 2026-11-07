@@ -2,7 +2,7 @@ import { api } from "../api";
 import type { StatusReport } from "../types";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
-import { dialogField, openDialog } from "../ui/Dialog";
+import { createDialog, dialogField, openDialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
 import { flagBR, flagUS } from "../ui/Flags";
@@ -704,6 +704,106 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   modeloSimplesBody.appendChild(modeloAcoes);
   page.appendChild(modeloSimples);
 
+  // ---- Manutencao: limpar metadados (acao destrutiva, dupla confirmacao) ----
+  const manutencaoCard = Card({ title: t("Manutenção"), accent: 10 });
+  const manutencaoBody = cardBody(manutencaoCard);
+  const textoManutencao = document.createElement("p");
+  textoManutencao.className = "pageHint";
+  textoManutencao.style.maxWidth = "none";
+  textoManutencao.textContent = t(
+    "Remove todos os metadados .c2.json do projeto. O código e o .c2/config.json não são alterados; " +
+      "para recriar o contexto, rode Reindexar tudo depois. Anotações de agentes serão perdidas.",
+  );
+  manutencaoBody.appendChild(textoManutencao);
+
+  const limpar = Button({
+    label: t("Limpar metadados…"),
+    variant: "destructive",
+    size: "xs",
+    disabled: !ctx.root,
+    onClick: () => {
+      void (async () => {
+        if (!ctx.root) return;
+        try {
+          const plano = await api.cleanerPlan(ctx.root);
+          if (plano.found === 0) {
+            status.textContent = t("nenhum metadado para limpar");
+            return;
+          }
+          const handle = createDialog({ title: t("Limpar metadados?") });
+          const corpo = document.createElement("div");
+          corpo.style.display = "grid";
+          corpo.style.gap = "var(--space-s)";
+
+          const contagem = document.createElement("p");
+          contagem.style.margin = "0";
+          contagem.style.color = "var(--warning)";
+          contagem.textContent = `${plano.found} ${t("metadados serão removidos")}`;
+          corpo.appendChild(contagem);
+
+          const aviso = document.createElement("p");
+          aviso.className = "pageHint";
+          aviso.style.margin = "0";
+          aviso.style.maxWidth = "none";
+          aviso.textContent = t(
+            "O código e o .c2/config.json não são alterados. Esta ação não pode ser desfeita; reindexe depois.",
+          );
+          corpo.appendChild(aviso);
+
+          const confirmacao = Input({
+            label: t("Digite DELETE (maiúsculo) para confirmar"),
+            placeholder: "DELETE",
+            mono: true,
+          });
+          corpo.appendChild(confirmacao.root);
+
+          const remover = Button({
+            label: t("Remover metadados"),
+            variant: "destructive",
+            disabled: true,
+            onClick: async () => {
+              if (confirmacao.input.value !== "DELETE") return;
+              handle.close();
+              status.textContent = t("removendo metadados…");
+              try {
+                const resultado = await api.cleanerRun(ctx.root);
+                status.textContent = `${resultado.removed} ${t("metadados removidos")}`;
+                if (resultado.failed.length > 0) {
+                  status.textContent += ` · ${resultado.failed.length} ${t("falhas")}`;
+                }
+                ctx.onSaved();
+              } catch (erro) {
+                status.textContent = `${t("falha ao limpar")}: ${String(erro)}`;
+              }
+            },
+          });
+          confirmacao.input.addEventListener("input", () => {
+            remover.disabled = confirmacao.input.value !== "DELETE";
+          });
+          confirmacao.input.addEventListener("keydown", (evento) => {
+            if (evento.key === "Enter" && confirmacao.input.value === "DELETE") {
+              remover.click();
+            }
+          });
+
+          handle.body.appendChild(corpo);
+          handle.footer.append(
+            Button({
+              label: t("Cancelar"),
+              variant: "ghost",
+              onClick: () => handle.close(),
+            }),
+            remover,
+          );
+        } catch (erro) {
+          status.textContent = `${t("falha ao limpar")}: ${String(erro)}`;
+        }
+      })();
+    },
+  });
+  manutencaoBody.appendChild(limpar);
+  page.appendChild(manutencaoCard);
+
   // ---- Visibilidade condicional: modo x simples/avancado ----
   const aplicarVisibilidade = () => {
     const cloud = seletorProvedor.select.value === "openai_compat";
@@ -711,6 +811,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     workspaceCard.style.display = adv ? "" : "none";
     runtimeCard.style.display = adv ? "" : "none";
     promptCard.style.display = adv ? "" : "none";
+    manutencaoCard.style.display = adv ? "" : "none";
     provedorCard.style.display = cloud || adv ? "" : "none";
     modeloSimples.style.display = !cloud && !adv ? "" : "none";
     seletorProvedor.root.style.display = adv ? "" : "none";
