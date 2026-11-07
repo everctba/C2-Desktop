@@ -108,6 +108,8 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     }),
   );
   let botaoLimpar: HTMLButtonElement | undefined;
+  let progressoReindex: HTMLElement | undefined;
+  let textoProgresso: HTMLElement | undefined;
   if (ctx.root) {
     actions.appendChild(
       Button({
@@ -120,6 +122,25 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         },
       }),
     );
+    progressoReindex = document.createElement("div");
+    progressoReindex.style.display = "none";
+    progressoReindex.style.alignItems = "center";
+    progressoReindex.style.gap = "var(--space-s)";
+    textoProgresso = document.createElement("span");
+    textoProgresso.className = "pageHint";
+    textoProgresso.style.maxWidth = "none";
+    textoProgresso.style.whiteSpace = "nowrap";
+    const abortar = Button({
+      label: t("Abortar reindexação"),
+      size: "xs",
+      variant: "ghost",
+      onClick: () => {
+        void api.reindexCancel().catch(() => {});
+      },
+    });
+    progressoReindex.append(textoProgresso, abortar);
+    actions.appendChild(progressoReindex);
+
     botaoLimpar = Button({
       label: t("Remove all c2.json files"),
       size: "sm",
@@ -302,6 +323,15 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       setActivity(t("aguardando próximo ciclo"));
       void refreshStatus();
       void refreshLista();
+    }),
+    onEngineEvent("reindex://progress", (payload) => {
+      const progresso = payload as { index?: number; total?: number; rel?: string };
+      if (!progressoReindex || !textoProgresso) return;
+      const total = progresso.total ?? 0;
+      const indice = progresso.index ?? 0;
+      const pct = total > 0 ? Math.round((indice / total) * 100) : 0;
+      progressoReindex.style.display = "flex";
+      textoProgresso.textContent = `${t("reindexando")}… ${pct}% (${indice} ${t("de")} ${total})`;
     }),
     onEngineEvent("engine://error", (payload) => {
       appendLog(`erro: ${String(payload)}`);

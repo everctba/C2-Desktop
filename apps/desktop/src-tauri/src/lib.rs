@@ -29,6 +29,12 @@ struct Engine {
     handle: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
+/// Cancelamento do reindex manual (botao Reindexar tudo).
+#[derive(Default)]
+struct Reindex {
+    cancel: Arc<AtomicBool>,
+}
+
 /// Recusa iniciar o engine sem um `.gguf` valido configurado.
 fn require_model(config: &c2_core::Config) -> Result<(), String> {
     match config.model.path.as_deref() {
@@ -211,10 +217,15 @@ fn workspace_init(app: tauri::AppHandle, root: String) -> Result<InitResult, Str
 /// Uma passada completa: sobe runtime, indexa, atualiza estado e para o runtime.
 #[tauri::command]
 async fn workspace_reindex(
+    app: tauri::AppHandle,
     root: String,
     full: Option<bool>,
     limit: Option<usize>,
+    reindex: State<'_, Reindex>,
 ) -> Result<IndexReport, String> {
+    let cancel = Arc::clone(&reindex.cancel);
+    cancel.store(false, Ordering::SeqCst);
+    let app_progresso = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = open_workspace(&root)?;
         let mut config = workspace.load_config().map_err(|err| err.to_string())?;
@@ -231,10 +242,21 @@ async fn workspace_reindex(
             limit,
             only_path: None,
             dry_run: false,
+            stop: Some(Arc::clone(&cancel)),
             ..IndexOptions::default()
         };
-        let report =
-            indexer::run(&workspace, &config, &client, &options, |_| {}).map_err(|err| err.to_string())?;
+        let report = indexer::run(&workspace, &config, &client, &options, |progress| {
+            let _ = app_progresso.emit(
+                "reindex://progress",
+                serde_json::json!({
+                    "index": progress.index,
+                    "total": progress.total,
+                    "rel": progress.rel,
+                    "decision": progress.decision.label(),
+                }),
+            );
+        })
+        .map_err(|err| err.to_string())?;
 
         let mut state = EngineState::load(&workspace.state_path()).map_err(|err| err.to_string())?;
         state.merge_report(&report);
@@ -258,6 +280,11 @@ async fn workspace_reindex(
     })
     .await
     .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
+fn reindex_cancel(reindex: State<'_, Reindex>) {
+    reindex.cancel.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]
@@ -1085,12 +1112,14 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Engine::default())
+        .manage(Reindex::default())
         .manage(InitialRoot(root))
         .invoke_handler(tauri::generate_handler![
             initial_root,
             workspace_status,
             workspace_init,
             workspace_reindex,
+            reindex_cancel,
             engine_start,
             engine_stop,
             engine_running,

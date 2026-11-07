@@ -306,6 +306,9 @@ const EN: Record<string, string> = {
   "falha ao limpar": "failed to clear",
   Cancelar: "Cancel",
   "Registrar cliques e latência (diagnóstico)": "Log clicks and latency (diagnostics)",
+  reindexando: "reindexing",
+  "Abortar reindexação": "Abort reindex",
+  de: "of",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

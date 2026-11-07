@@ -178,6 +178,8 @@ c2 status                                    # estado do índice e do runtime
   e chama o modelo para **todos** os arquivos, mesmo os que não mudaram. Use
   quando trocou o modelo/prompt de indexação, quer regenerar todos os metadados
   ou suspeita que algum está ruim. É caro na nuvem (cobra tokens por arquivo).
+- Durante o reindex a Engine mostra `reindexando… X% (N de TOTAL)` com o botão
+  **Abortar reindexação** ao lado; o abort interrompe entre um arquivo e outro.
 - A CLI mantém `c2 reindex --limit N` para passadas parciais em automação.
 - O engine **Iniciar** já indexa continuamente em background; o botão é uma
   passada única.

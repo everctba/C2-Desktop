@@ -108,6 +108,7 @@ export const api = {
   init: (root: string) => invoke<InitResult>("workspace_init", { root }),
   reindex: (root: string, full = false, limit?: number) =>
     invoke<IndexReport>("workspace_reindex", { root, full, limit }),
+  reindexCancel: () => invoke<void>("reindex_cancel"),
   engineStart: (root: string) => invoke<null>("engine_start", { root }),
   engineStop: (root: string) => invoke<null>("engine_stop", { root }),
   engineRunning: () => invoke<boolean>("engine_running"),
@@ -189,6 +190,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return mockStatus as T;
     case "workspace_init":
       return { created: true, files: 12 } as T;
+    case "reindex_cancel":
+      return undefined as T;
     case "workspace_reindex":
       await delay(1200);
       return {

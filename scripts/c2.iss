@@ -54,9 +54,15 @@ ChangesEnvironment=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 
+[CustomMessages]
+Integration=Integration:
+AddToPath=Add C2 (CLI and MCP) to the system PATH
+brazilianportuguese.Integration=Integração:
+brazilianportuguese.AddToPath=Adicionar C2 (CLI e MCP) ao PATH do sistema
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "addpath"; Description: "Adicionar C2 (CLI e MCP) ao PATH do sistema"; GroupDescription: "Integracao:"; Flags: checkedonce
+Name: "addpath"; Description: "{cm:AddToPath}"; GroupDescription: "{cm:Integration}"; Flags: checkedonce
 
 [Files]
 Source: "{#SourceDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
