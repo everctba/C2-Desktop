@@ -329,8 +329,31 @@ fn validar_modelo(model: &str) -> Result<()> {
 }
 
 /// Alguem ja escuta nesta porta? (evita subir e falhar em silencio)
-fn porta_em_uso(host: &str, port: u16) -> bool {
+pub fn porta_em_uso(host: &str, port: u16) -> bool {
     std::net::TcpStream::connect((host, port)).is_ok()
+}
+
+/// Pede ao sistema uma porta livre no host (fecha o listener em seguida).
+pub fn porta_livre(host: &str) -> Option<u16> {
+    std::net::TcpListener::bind((host, 0))
+        .ok()
+        .and_then(|listener| listener.local_addr().ok())
+        .map(|addr| addr.port())
+}
+
+/// `ensure`, mas troca para uma porta livre se a configurada estiver ocupada.
+/// Atualiza o config do workspace para os clientes usarem a mesma porta.
+pub fn ensure_auto(workspace: &Workspace, config: &mut Config) -> Result<Ensure> {
+    if crate::config::usa_runtime_local(config)
+        && !health(config)
+        && porta_em_uso(&config.model.host, config.model.port)
+    {
+        if let Some(porta) = porta_livre(&config.model.host) {
+            config.model.port = porta;
+            workspace.save_config(config)?;
+        }
+    }
+    ensure(workspace, config)
 }
 
 /// Traduz o log do llama-server em uma mensagem acionavel.

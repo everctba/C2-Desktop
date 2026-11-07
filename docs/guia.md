@@ -162,12 +162,11 @@ c2 status                                    # estado do índice e do runtime
 
 ### Reindexar: passada normal x “Reindexar tudo”
 
-- **Reindexar (10)** (toolbar/Engine) faz uma passada limitada a 10 arquivos
-  pendentes. Repetir o clique continua de onde parou.
-- **Reindexar tudo** usa `--full`: ignora o hash e chama o modelo para **todos**
-  os arquivos, mesmo os que não mudaram. Use quando trocou o modelo/prompt de
-  indexação, quer regenerar todos os metadados ou suspeita que algum está ruim.
-  É caro na nuvem (cobra tokens por arquivo).
+- **Reindexar tudo** (botão na Engine e na toolbar) usa `--full`: ignora o hash
+  e chama o modelo para **todos** os arquivos, mesmo os que não mudaram. Use
+  quando trocou o modelo/prompt de indexação, quer regenerar todos os metadados
+  ou suspeita que algum está ruim. É caro na nuvem (cobra tokens por arquivo).
+- A CLI mantém `c2 reindex --limit N` para passadas parciais em automação.
 - O engine **Iniciar** já indexa continuamente em background; o botão é uma
   passada única.
 - **Não roda o `cleaner` e não apaga os `.c2.json` antes.** Cada arquivo é
@@ -303,6 +302,14 @@ regex de import em `index.link_fallback`:
 
 O grupo 1 é o alvo; o C2 tenta `<dir do arquivo>/<alvo>`, `<alvo>.<ext>` e
 `<alvo>` na raiz. Regex inválida é ignorada com aviso (não derruba a indexação).
+
+### Porta 8080 em uso ao dar play
+
+Se outro processo já escuta a porta do modelo (padrão `8080`), o C2 escolhe
+**automaticamente uma porta livre**, grava em `model.port` e sobe o runtime nela.
+Não precisa fechar o outro programa nem rodar `c2 config set model.port`.
+Se nenhuma porta livre for encontrada, a mensagem antiga ainda orienta a trocar
+manualmente.
 
 ## Tipografia
 

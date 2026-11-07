@@ -99,12 +99,6 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       onClick: ctx.running ? ctx.onStop : ctx.onPlay,
     }),
     Button({
-      label: t("Reindexar (10)"),
-      iconName: "refresh",
-      disabled: ctx.busy,
-      onClick: () => ctx.onReindex(false),
-    }),
-    Button({
       label: t("Reindexar tudo"),
       disabled: ctx.busy,
       title: t("Força reindexar mesmo sem mudanças; consome o modelo em todos os arquivos."),
@@ -214,7 +208,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   if (entries.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = t("nenhum metadado ainda — rode REINDEXAR");
+    empty.textContent = t("nenhum metadado ainda — dê play para começar.");
     list.appendChild(empty);
   } else {
     for (const entry of entries) {

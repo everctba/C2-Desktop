@@ -56,7 +56,7 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
 
   bar.appendChild(
     Button({
-      label: t("Reindexar"),
+      label: t("Reindexar tudo"),
       iconName: "refresh",
       variant: "ghost",
       disabled: !props.projectPath || props.busy,

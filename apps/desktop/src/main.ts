@@ -606,7 +606,7 @@ function shell(content: HTMLElement): void {
       busy: state.busy,
       onPlay: () => void toggleEngine(),
       onStop: () => void toggleEngine(),
-      onReindex: () => void runReindex(false),
+      onReindex: () => void runReindex(true),
       onPickProject: () => void pickProject(),
     }),
   );

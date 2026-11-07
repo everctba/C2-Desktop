@@ -191,14 +191,14 @@ async fn workspace_reindex(
 ) -> Result<IndexReport, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = open_workspace(&root)?;
-        let config = workspace.load_config().map_err(|err| err.to_string())?;
+        let mut config = workspace.load_config().map_err(|err| err.to_string())?;
         require_model(&config)?;
-        let client = LlmClient::from_config(&config);
         let logger = c2_core::log::Logger::for_workspace(&workspace, &config);
         logger.info("desktop", "reindex iniciado");
         if c2_core::config::usa_runtime_local(&config) {
-            runtime::ensure(&workspace, &config).map_err(|err| err.to_string())?;
+            runtime::ensure_auto(&workspace, &mut config).map_err(|err| err.to_string())?;
         }
+        let client = LlmClient::from_config(&config);
 
         let options = IndexOptions {
             full: full.unwrap_or(false),
@@ -245,22 +245,22 @@ fn engine_start(
     }
 
     let workspace = open_workspace(&root)?;
-    let config = workspace.load_config().map_err(|err| err.to_string())?;
+    let mut config = workspace.load_config().map_err(|err| err.to_string())?;
     require_model(&config)?;
-    let client = LlmClient::from_config(&config);
     let logger = c2_core::log::Logger::for_workspace(&workspace, &config);
     let running = Arc::clone(&engine.running);
     running.store(true, Ordering::SeqCst);
 
     let handle = std::thread::spawn(move || {
         if c2_core::config::usa_runtime_local(&config) {
-            if let Err(err) = runtime::ensure(&workspace, &config) {
+            if let Err(err) = runtime::ensure_auto(&workspace, &mut config) {
                 logger.error("engine", format!("falha ao subir o runtime: {err}"));
                 let _ = app.emit("engine://error", err.to_string());
                 running.store(false, Ordering::SeqCst);
                 return;
             }
         }
+        let client = LlmClient::from_config(&config);
         logger.info("engine", "engine iniciado");
 
         let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
