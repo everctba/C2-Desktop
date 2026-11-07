@@ -463,8 +463,8 @@ function modelInstructionsBody(): HTMLElement {
     "border-radius: var(--radius); font-size: var(--text-s); line-height: 1.45; " +
     "color: var(--text-muted);";
   atalho.innerHTML =
-    "Já usa modelos <strong>GGUF</strong> no <strong>LM Studio</strong> (ou em outra " +
-    "pasta)? Você não precisa baixar nada: feche este aviso, clique em " +
+    "Já usa modelos <strong>GGUF</strong> no <strong>LM Studio</strong>? " +
+    "Você não precisa baixar nada: feche este aviso, clique em " +
     "<strong>Selecionar .gguf…</strong> e escolha o modelo que já está na sua máquina.";
   box.appendChild(atalho);
 
