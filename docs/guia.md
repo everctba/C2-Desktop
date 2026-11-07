@@ -118,6 +118,18 @@ c2 --root . mcp          # JSON-RPC: initialize, tools/list, tools/call
 Ferramentas: `c2_grep`, `c2_read`, `c2_related`, `c2_map`. Elas reutilizam a
 mesma lógica do CLI (sem duplicar regra) e limitam a resposta.
 
+### Configuracao automatica (recomendado)
+
+```powershell
+c2 init --mcp      # gera .mcp.json (Claude Code) e .cursor/mcp.json (Cursor)
+c2 init --agent    # AGENTS.md + os dois arquivos MCP
+```
+
+Os arquivos sao project-scoped: o comando e `c2`, sem `--root` — o cliente
+inicia o servidor com o cwd do projeto. O C2 nao sobrescreve uma entrada `c2`
+existente nem apaga outros servidores do arquivo; para clientes globais
+(Claude Desktop) use `--root` na config global.
+
 Configure no seu cliente MCP (Claude Desktop, Cursor, …):
 
 ```json

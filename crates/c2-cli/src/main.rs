@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use c2_core::error::C2Error;
 use c2_core::indexer::{self, IndexOptions, IndexReport};
 use c2_core::log::Logger;
 use c2_core::runtime;
@@ -18,7 +19,7 @@ use c2_core::schema::MetaFile;
 use c2_core::search::{self, SearchOptions};
 use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
 use clap::{Parser, Subcommand};
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -55,6 +56,9 @@ enum Command {
         /// Grava o bloco de regras do agente em AGENTS.md
         #[arg(long)]
         agent: bool,
+        /// Gera .mcp.json e .cursor/mcp.json (MCP project-scoped)
+        #[arg(long)]
+        mcp: bool,
     },
 
     /// Abre a janela do C2 Desktop neste projeto
@@ -213,8 +217,8 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init { force, open, agent } => {
-            cmd_init(cli.root.as_deref(), force, cli.json, agent)?;
+        Command::Init { force, open, agent, mcp } => {
+            cmd_init(cli.root.as_deref(), force, cli.json, agent, mcp)?;
             if open {
                 cmd_open(cli.root.as_deref())?;
             }
@@ -286,13 +290,25 @@ fn require_workspace(root: Option<&Path>) -> Result<Workspace> {
     Ok(workspace)
 }
 
-fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) -> Result<()> {
+fn cmd_init(
+    root: Option<&Path>,
+    force: bool,
+    json_output: bool,
+    agent: bool,
+    mcp: bool,
+) -> Result<()> {
     let workspace = resolve_workspace(root)?;
     let outcome = workspace.init(force)?;
     let agents_path = if agent {
         Some(write_agents_snippet(workspace.root())?)
     } else {
         None
+    };
+    // --agent tambem prepara o MCP project-scoped (c2-gj6).
+    let mcp_paths = if agent || mcp {
+        write_mcp_configs(workspace.root())?
+    } else {
+        Vec::new()
     };
 
     if json_output {
@@ -305,6 +321,7 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
                 "files": outcome.files,
                 "languages": outcome.languages,
                 "agents_path": agents_path.as_ref().map(|caminho| caminho.display().to_string()),
+                "mcp_paths": mcp_paths.iter().map(|caminho| caminho.display().to_string()).collect::<Vec<_>>(),
             }))?
         );
         return Ok(());
@@ -323,7 +340,15 @@ fn cmd_init(root: Option<&Path>, force: bool, json_output: bool, agent: bool) ->
         println!();
         println!("Regras do agente gravadas em {}", caminho.display());
         println!("(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)");
-    } else {
+    }
+    for caminho in &mcp_paths {
+        println!("MCP configurado em {}", caminho.display());
+    }
+    if mcp_paths.is_empty() && !agent {
+        println!();
+        println!("Para configurar o MCP do projeto: `c2 init --mcp` (ou --agent).");
+    }
+    if agents_path.is_none() && !mcp {
         println!();
         println!("Para o seu agente usar os comentarios do C2, cole o bloco abaixo no");
         println!("AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):");
@@ -361,7 +386,77 @@ Ordem de investigacao:
    Nunca anote o obvio (ex.: este arquivo calcula descontos).
 
 Metadado e hipotese; codigo e evidencia. Se divergir, `c2 reindex --path <arquivo>`.
-Nao leia o projeto inteiro: comece com --limit 5.";
+Nao leia o projeto inteiro: comece com --limit 5.
+
+O projeto traz .mcp.json e .cursor/mcp.json (gerados por `c2 init --mcp`): se o
+seu cliente suportar MCP, use as tools c2_grep/c2_read/c2_related/c2_map em vez
+de varrer o codigo com shell.";
+
+/// Gera `.mcp.json` (Claude Code) e `.cursor/mcp.json` (Cursor) com o
+/// servidor C2 project-scoped. Preserva outros servidores e nao sobrescreve
+/// uma entrada `c2` existente (o usuario pode ter customizado args).
+fn write_mcp_configs(root: &Path) -> Result<Vec<PathBuf>> {
+    // Se o c2 esta no PATH (instalador), o config fica portavel entre pastas;
+    // sem PATH (portatil), grava o caminho absoluto do executavel atual.
+    let comando = if c2_core::runtime::which("c2").is_some() {
+        "c2".to_string()
+    } else {
+        std::env::current_exe()
+            .context("nao foi possivel localizar o executavel do c2")?
+            .display()
+            .to_string()
+    };
+    let entrada = json!({
+        "command": comando,
+        "args": ["mcp"]
+    });
+
+    let mut gerados = Vec::new();
+    for relativo in [".mcp.json", ".cursor/mcp.json"] {
+        let caminho = root.join(relativo);
+        if let Some(pai) = caminho.parent() {
+            std::fs::create_dir_all(pai)
+                .with_context(|| format!("nao foi possivel criar {}", pai.display()))?;
+        }
+        let mut documento = if caminho.is_file() {
+            let texto = std::fs::read_to_string(&caminho)
+                .with_context(|| format!("nao foi possivel ler {}", caminho.display()))?;
+            serde_json::from_str::<Value>(&texto).with_context(|| {
+                format!(
+                    "{} nao e JSON valido; nao vou sobrescrever (corrija ou apague)",
+                    caminho.display()
+                )
+            })?
+        } else {
+            json!({})
+        };
+        if !documento.is_object() {
+            return Err(C2Error::InvalidConfig(format!(
+                "{} precisa conter um objeto JSON",
+                caminho.display()
+            ))
+            .into());
+        }
+        let objeto = documento.as_object_mut().expect("objeto verificado");
+        let servidores = objeto
+            .entry("mcpServers")
+            .or_insert_with(|| json!({}));
+        if !servidores.is_object() {
+            return Err(C2Error::InvalidConfig(format!(
+                "{}: mcpServers precisa ser um objeto",
+                caminho.display()
+            ))
+            .into());
+        }
+        let mapa = servidores.as_object_mut().expect("objeto verificado");
+        mapa.entry("c2").or_insert(entrada.clone());
+        let texto = format!("{}\n", serde_json::to_string_pretty(&documento)?);
+        std::fs::write(&caminho, texto)
+            .with_context(|| format!("nao foi possivel gravar {}", caminho.display()))?;
+        gerados.push(caminho);
+    }
+    Ok(gerados)
+}
 
 /// Cria/atualiza AGENTS.md com o bloco de regras, sem duplicar.
 fn write_agents_snippet(root: &Path) -> Result<PathBuf> {
