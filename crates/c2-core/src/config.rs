@@ -203,11 +203,22 @@ impl Default for IndexConfig {
 
 /// Instrucoes padrao enviadas ao modelo para gerar o metadado semantico.
 /// Editavel via `c2 config set index.prompt "<texto>"` ou pela tela Config.
+/// O padrao e em ingles porque os metadados sao consumidos por agentes
+/// (e por humanos de qualquer idioma); o Config oferece a versao PT.
 pub const DEFAULT_PROMPT: &str = "\
+You are a software architect. Analyze the file below and describe its responsibility in the project.
+Respond ONLY with a valid JSON object, no markdown, no code fences and no text outside the JSON.
+Exact format: {\"what\":\"...\",\"why\":\"...\",\"goal\":\"...\",\"summary\":\"...\",\"responsibility\":\"...\"}
+Rules: short sentences; what = what it is about; why = why it exists; goal = what it guarantees; summary = responsibility in one sentence; responsibility = what it owns.
+Write every field value in English.";
+
+/// Versao em portugues do prompt padrao (usada no Config e por projetos pt-BR).
+pub const DEFAULT_PROMPT_PT: &str = "\
 Voce e um arquiteto de software. Analise o arquivo abaixo e descreva a responsabilidade dele no projeto.
 Responda APENAS com um objeto JSON valido, sem markdown, sem cercas de codigo e sem texto fora do JSON.
 Formato exato: {\"what\":\"...\",\"why\":\"...\",\"goal\":\"...\",\"summary\":\"...\",\"responsibility\":\"...\"}
-Regras: frases curtas; what = do que trata; why = por que existe; goal = o que garante; summary = responsabilidade em uma frase; responsibility = o que e de sua propriedade.";
+Regras: frases curtas; what = do que trata; why = por que existe; goal = o que garante; summary = responsabilidade em uma frase; responsibility = o que e de sua propriedade.
+Escreva o valor de todos os campos em portugues.";
 
 fn default_prompt() -> String {
     DEFAULT_PROMPT.to_string()

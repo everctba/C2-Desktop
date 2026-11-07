@@ -580,7 +580,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   promptAcoes.className = styles.actions;
   let padrao = "";
   try {
-    padrao = await api.promptDefault();
+    padrao = await api.promptDefault(idiomaAtual());
   } catch {
     padrao = "";
   }
@@ -597,7 +597,43 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       }),
     );
   }
-  promptBody.appendChild(promptAcoes);
+  // Troca explicita do idioma dos metadados (independente da UI).
+  const trocaIdiomaPrompt = document.createElement("div");
+  trocaIdiomaPrompt.style.display = "flex";
+  trocaIdiomaPrompt.style.gap = "var(--space-s)";
+  trocaIdiomaPrompt.style.marginTop = "var(--space-s)";
+  for (const [rotulo, lang] of [
+    ["English", "en"],
+    ["Português", "pt-BR"],
+  ] as Array<[string, string]>) {
+    trocaIdiomaPrompt.appendChild(
+      Button({
+        label: rotulo,
+        size: "xs",
+        variant: "ghost",
+        onClick: () => {
+          void (async () => {
+            try {
+              area.value = await api.promptDefault(lang);
+              status.textContent = t("prompt trocado (salve para aplicar)");
+            } catch {
+              status.textContent = t("falha ao carregar prompt");
+            }
+          })();
+        },
+      }),
+    );
+  }
+  promptBody.appendChild(trocaIdiomaPrompt);
+
+  const notaPrompt = document.createElement("p");
+  notaPrompt.className = "pageHint";
+  notaPrompt.style.maxWidth = "none";
+  notaPrompt.textContent = t(
+    "O idioma dos metadados é definido por este prompt, não pelo idioma da interface. " +
+      "Use English/Português acima ou edite livremente.",
+  );
+  promptBody.appendChild(notaPrompt);
 
   controles.set("index.prompt", { kind: "text", get: () => area.value });
   page.appendChild(promptCard);

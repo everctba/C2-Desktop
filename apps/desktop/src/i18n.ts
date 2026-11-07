@@ -282,6 +282,10 @@ const EN: Record<string, string> = {
   "Reindexar tudo força reindexar mesmo os arquivos cujo hash não mudou. Use quando: trocou o modelo/prompt de indexação; quer regenerar todos os metadados; suspeita que algum metadado está ruim. É caro: chama o modelo para todos os arquivos (na nuvem, custa tokens).":
     "Reindex all forces reindexing even files whose hash did not change. Use it when: you changed the indexing model/prompt; you want to regenerate all metadata; you suspect some metadata is bad. It is expensive: it calls the model for every file (in the cloud, it costs tokens).",
   "nenhum metadado ainda — dê play para começar.": "no metadata yet — press play to start.",
+  "prompt trocado (salve para aplicar)": "prompt changed (save to apply)",
+  "falha ao carregar prompt": "failed to load prompt",
+  "O idioma dos metadados é definido por este prompt, não pelo idioma da interface. Use English/Português acima ou edite livremente.":
+    "The metadata language is defined by this prompt, not by the interface language. Use English/Português above or edit freely.",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

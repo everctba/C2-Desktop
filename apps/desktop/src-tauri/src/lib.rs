@@ -957,8 +957,12 @@ fn news_state_save(app: tauri::AppHandle, state: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn prompt_default() -> String {
-    c2_core::config::DEFAULT_PROMPT.to_string()
+fn prompt_default(lang: Option<String>) -> String {
+    if lang.as_deref() == Some("pt-BR") {
+        c2_core::config::DEFAULT_PROMPT_PT.to_string()
+    } else {
+        c2_core::config::DEFAULT_PROMPT.to_string()
+    }
 }
 
 #[tauri::command]

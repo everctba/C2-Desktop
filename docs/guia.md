@@ -180,6 +180,10 @@ c2 status                                    # estado do índice e do runtime
 
 - `.env`, chaves privadas (`*.pem`, `id_rsa`…) e credenciais são **pulados
   antes de serem abertos**.
+- O **prompt padrão é em inglês** (metadados em inglês, consumíveis por agentes
+  e devs de qualquer idioma). Projetos existentes mantêm o prompt que já têm.
+  Em Config → Prompt de indexação há botões **English / Português** para trocar
+  o idioma dos metadados; isso é independente do idioma da interface.
 - As instruções enviadas ao modelo ficam em `index.prompt` (editável na tela
   Config ou `c2 config set index.prompt "..."`); a linha que trata o arquivo
   como DADO é fixa e não pode ser removida. As instruções vão como mensagem

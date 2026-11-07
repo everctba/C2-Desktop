@@ -71,7 +71,7 @@ export const api = {
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
-  promptDefault: () => invoke<string>("prompt_default"),
+  promptDefault: (lang?: string) => invoke<string>("prompt_default", { lang }),
   frontendLog: (message: string) => invoke<void>("frontend_log", { message }),
   languageLoad: () => invoke<string | null>("language_load"),
   languageSave: (lang: string) => invoke<void>("language_save", { lang }),
