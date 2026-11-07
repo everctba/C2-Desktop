@@ -166,6 +166,54 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   body.appendChild(detail);
   page.appendChild(listCard);
 
+  let carregandoLista = false;
+  let ultimaContagem = ctx.status?.metadata ?? -1;
+  let timerLista: number | undefined;
+
+  const renderizarLista = (entries: FileEntry[]) => {
+    list.innerHTML = "";
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = t("nenhum metadado ainda — dê play para começar.");
+      list.appendChild(empty);
+      return;
+    }
+    for (const entry of entries) {
+      list.appendChild(
+        TreeRow({
+          label: entry.file,
+          secondary: entry.summary,
+          badge: { text: `${entry.links} links`, tone: entry.links > 0 ? "neutral" : "warning" },
+          onClick: async () => {
+            detail.style.display = "grid";
+            await showDetail(detail, ctx.root, entry.file);
+          },
+        }),
+      );
+    }
+  };
+
+  const refreshLista = async () => {
+    if (!ctx.root || carregandoLista) return;
+    carregandoLista = true;
+    try {
+      renderizarLista(await api.listFiles(ctx.root));
+    } catch {
+      /* mantem a lista atual em caso de leitura parcial */
+    } finally {
+      carregandoLista = false;
+    }
+  };
+
+  const agendarLista = () => {
+    if (timerLista !== undefined) return;
+    timerLista = window.setTimeout(() => {
+      timerLista = undefined;
+      void refreshLista();
+    }, 400);
+  };
+
   const appendLog = (message: string) => {
     const line = document.createElement("div");
     line.className = styles.logLine;
@@ -198,6 +246,10 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       pendingMetric.set(String(Math.max(0, status.files - status.metadata)));
       const tokens = status.state.prompt_tokens + status.state.completion_tokens;
       callsMetric.set(`${status.state.llm_calls}`, `${tokens.toLocaleString("pt-BR")} tokens`);
+      if (status.metadata !== ultimaContagem) {
+        ultimaContagem = status.metadata;
+        agendarLista();
+      }
 
       runtimePill = replacePill(
         runtimePill,
@@ -227,38 +279,15 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     appendLog(`workspace carregado · ${ctx.status.files} arquivos · ${ctx.status.metadata} metadados`);
   }
 
-  let entries: FileEntry[] = [];
-  try {
-    entries = await api.listFiles(ctx.root);
-  } catch {
-    entries = [];
-  }
-  if (entries.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "empty";
-    empty.textContent = t("nenhum metadado ainda — dê play para começar.");
-    list.appendChild(empty);
-  } else {
-    for (const entry of entries) {
-      list.appendChild(
-        TreeRow({
-          label: entry.file,
-          secondary: entry.summary,
-          badge: { text: `${entry.links} links`, tone: entry.links > 0 ? "neutral" : "warning" },
-          onClick: async () => {
-            detail.style.display = "grid";
-            await showDetail(detail, ctx.root, entry.file);
-          },
-        }),
-      );
-    }
-  }
+  await refreshLista();
+  ultimaContagem = ctx.status?.metadata ?? 0;
 
   const unsubscribe = [
     onEngineEvent("engine://progress", (payload) => {
       const progress = payload as ProgressEvent;
       if (!progress?.rel) return;
       setActivity(`indexando ${progress.index}/${progress.total} · ${progress.decision} · ${progress.rel}`);
+      agendarLista();
     }),
     onEngineEvent("engine://cycle", (payload) => {
       const report = payload as IndexReport;
@@ -268,6 +297,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       );
       setActivity(t("aguardando próximo ciclo"));
       void refreshStatus();
+      void refreshLista();
     }),
     onEngineEvent("engine://error", (payload) => {
       appendLog(`erro: ${String(payload)}`);
@@ -287,6 +317,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     element: page,
     dispose: () => {
       window.clearInterval(timer);
+      if (timerLista !== undefined) window.clearTimeout(timerLista);
       for (const off of unsubscribe) off();
     },
   };
