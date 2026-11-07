@@ -721,7 +721,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     label: t("Remove all c2.json files"),
     variant: "destructive",
     size: "xs",
-    disabled: !ctx.root,
+    disabled: !ctx.root || (ctx.status?.metadata ?? 0) === 0,
     onClick: () => {
       if (!ctx.root) return;
       void limparMetadados(ctx.root, {

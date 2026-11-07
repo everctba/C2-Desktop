@@ -107,6 +107,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       onClick: () => ctx.onReindex(true),
     }),
   );
+  let botaoLimpar: HTMLButtonElement | undefined;
   if (ctx.root) {
     actions.appendChild(
       Button({
@@ -119,10 +120,11 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         },
       }),
     );
-    const limpar = Button({
+    botaoLimpar = Button({
       label: t("Remove all c2.json files"),
       size: "sm",
       variant: "destructive",
+      disabled: (ctx.status?.metadata ?? 0) === 0,
       onClick: () => {
         void limparMetadados(ctx.root, {
           setStatus: () => {},
@@ -130,8 +132,8 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         });
       },
     });
-    limpar.style.marginLeft = "auto";
-    actions.appendChild(limpar);
+    botaoLimpar.style.marginLeft = "auto";
+    actions.appendChild(botaoLimpar);
   }
   page.appendChild(actions);
 
@@ -244,6 +246,8 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       filesMetric.set(String(status.files));
       metaMetric.set(String(status.metadata));
       pendingMetric.set(String(Math.max(0, status.files - status.metadata)));
+      // Sem .c2.json nao ha o que limpar; o botao fica cinza.
+      if (botaoLimpar) botaoLimpar.disabled = status.metadata === 0;
       const tokens = status.state.prompt_tokens + status.state.completion_tokens;
       callsMetric.set(`${status.state.llm_calls}`, `${tokens.toLocaleString("pt-BR")} tokens`);
       if (status.metadata !== ultimaContagem) {
