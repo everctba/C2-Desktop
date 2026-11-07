@@ -260,7 +260,7 @@ fn engine_start(
                 return;
             }
         }
-        let client = LlmClient::from_config(&config);
+        let mut client = LlmClient::from_config(&config);
         logger.info("engine", "engine iniciado");
 
         let interval = Duration::from_secs(config.engine.poll_interval_secs.max(1));
@@ -302,7 +302,11 @@ fn engine_start(
 
             // Watchdog: servidor caiu? sobe de novo (com backoff interno).
             if c2_core::config::usa_runtime_local(&config) && !runtime::health(&config) {
-                let _ = runtime::ensure(&workspace, &config);
+                let porta_antes = config.model.port;
+                let _ = runtime::ensure_auto(&workspace, &mut config);
+                if config.model.port != porta_antes {
+                    client = LlmClient::from_config(&config);
+                }
             }
             std::thread::sleep(interval);
         }
@@ -624,7 +628,9 @@ async fn model_load(
             .save_config(&config)
             .map_err(|err| err.to_string())?;
         salvar_modelo_global(&app, &capturar_modelo_global(&config))?;
-        runtime::ensure(&workspace, &config)
+        // O play chama model_load antes do engine_start: a troca de porta
+        // automatica tambem precisa acontecer aqui.
+        runtime::ensure_auto(&workspace, &mut config)
             .map(|_| ())
             .map_err(|err| err.to_string())
     })
