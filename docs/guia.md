@@ -378,6 +378,13 @@ Otimizacoes aplicadas:
 - `workspace_status` roda em `spawn_blocking` e nao prende a thread da UI.
 Com isso o status caiu de ~2,1 s para ~217 ms e o boot completo para ~1 s.
 
+### Carregamento do modelo na GPU
+
+O dialog de carregamento mostra uma barra que cresce com a VRAM ocupada pelo
+runtime (poll de `gpu_info` a cada 500 ms) e uma interpolacao pelo tempo para
+nao ficar parada enquanto o llama-server le os tensores. Sem GPU detectada,
+usa a barra indeterminada. O rotulo mostra `Carregando modelo… N% (usado/total GB)`.
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

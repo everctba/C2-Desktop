@@ -507,6 +507,30 @@ async function ensureModelLoaded(): Promise<boolean> {
     let btnCancelar: HTMLButtonElement;
     let btnCarregar: HTMLButtonElement;
 
+    const criarBarraProgresso = () => {
+      const root = document.createElement("div");
+      root.style.display = "grid";
+      root.style.gap = "var(--space-2xs)";
+      const track = document.createElement("div");
+      track.style.height = "10px";
+      track.style.borderRadius = "999px";
+      track.style.background = "var(--bg-surface-3)";
+      track.style.overflow = "hidden";
+      const fill = document.createElement("div");
+      fill.style.height = "100%";
+      fill.style.width = "0%";
+      fill.style.borderRadius = "999px";
+      fill.style.background = "var(--accent-3)";
+      fill.style.transition = "width 250ms ease";
+      track.appendChild(fill);
+      const texto = document.createElement("span");
+      texto.className = "pageHint";
+      texto.style.maxWidth = "none";
+      texto.textContent = t("Carregando modelo…");
+      root.append(track, texto);
+      return { root, fill, texto };
+    };
+
     const carregar = async () => {
       const ctx = Number.parseInt(ctxField.input.value, 10);
       const camadas = Number.parseInt(layersField.input.value, 10);
@@ -525,14 +549,63 @@ async function ensureModelLoaded(): Promise<boolean> {
       btnCarregar.disabled = true;
       btnCarregar.textContent = t("Carregando…");
       erro.style.display = "none";
-      barra.replaceChildren(loadingBar());
+
+      const progresso = criarBarraProgresso();
+      barra.replaceChildren(progresso.root);
+
+      // Barra cresce com a VRAM efetivamente ocupada pelo runtime. Sem GPU,
+      // mantem a barra indeterminada (loadingBar).
+      const totalMb = Math.max(1, plano.estimate.total_mb);
+      const baseUsada = plano.gpu?.used_mb ?? 0;
+      const inicioCarga = performance.now();
+      let intervalo: number | undefined;
+      let ultimoPct = 0;
+      if (plano.gpu) {
+        let consultando = false;
+        intervalo = window.setInterval(() => {
+          void (async () => {
+            if (consultando) return;
+            consultando = true;
+            try {
+              const gpu = await api.gpuInfo();
+              if (!gpu) return;
+              const delta = Math.max(0, gpu.used_mb - baseUsada);
+              const realPct = Math.min(95, Math.round((delta / totalMb) * 100));
+              // O llama-server aloca a VRAM em blocos; interpola pelo tempo
+              // para a barra nao ficar parada durante a leitura dos tensores.
+              const tempoPct = Math.min(
+                75,
+                Math.round(((performance.now() - inicioCarga) / 20000) * 75),
+              );
+              const pct = Math.min(95, Math.max(ultimoPct, realPct, tempoPct));
+              if (pct > ultimoPct) {
+                ultimoPct = pct;
+                progresso.fill.style.width = `${pct}%`;
+                progresso.texto.textContent =
+                  `${t("Carregando modelo…")} ${pct}% ` +
+                  `(${(delta / 1024).toFixed(1)} / ${(totalMb / 1024).toFixed(1)} GB)`;
+              }
+            } catch {
+              /* mantem o ultimo valor */
+            } finally {
+              consultando = false;
+            }
+          })();
+        }, 500);
+      } else {
+        progresso.root.replaceChildren(loadingBar());
+      }
 
       try {
         await api.modelLoad(state.root, ctx, camadas);
+        if (intervalo !== undefined) window.clearInterval(intervalo);
+        progresso.fill.style.width = "100%";
+        progresso.texto.textContent = t("Modelo carregado");
         await loadStatus();
         log(`modelo carregado na GPU (ctx ${ctx}, ${camadas} camadas)`);
         concluir(true);
       } catch (error) {
+        if (intervalo !== undefined) window.clearInterval(intervalo);
         erro.textContent = String(error);
         erro.style.display = "block";
         btnCancelar.disabled = false;

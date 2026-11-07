@@ -68,7 +68,15 @@ $runtimeDst = Join-Path $out 'runtime'
 if (Test-Path (Join-Path $runtimeSrc 'llama-server.exe')) {
     Write-Host '    incluindo runtime embarcado...'
     if (Test-Path $runtimeDst) { Remove-Item $runtimeDst -Recurse -Force }
+    if (Test-Path $runtimeDst) {
+        throw "nao foi possivel limpar $runtimeDst (runtime/llama-server em uso?)"
+    }
     Copy-Item $runtimeSrc $runtimeDst -Recurse -Force
+    # Blindagem: se destino existisse no momento do copy, o PowerShell cria
+    # runtime\runtime; isso dobrava o pacote para ~186 MB.
+    if (Test-Path (Join-Path $runtimeDst 'runtime')) {
+        throw "copia aninhada em $runtimeDst\runtime; feche runtime/llama-server e gere de novo"
+    }
     Copy-Item (Join-Path $root 'scripts\instalar.ps1') (Join-Path $out 'instalar.ps1') -Force
     Copy-Item (Join-Path $root 'scripts\desinstalar.ps1') (Join-Path $out 'desinstalar.ps1') -Force
 } else {

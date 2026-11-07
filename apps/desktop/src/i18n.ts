@@ -309,6 +309,8 @@ const EN: Record<string, string> = {
   reindexando: "reindexing",
   "Abortar reindexação": "Abort reindex",
   de: "of",
+  "Carregando modelo…": "Loading model…",
+  "Modelo carregado": "Model loaded",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",
