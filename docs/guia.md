@@ -359,6 +359,14 @@ O app mostra a contagem, exige digitar `DELETE` em maiúsculo e só então remov
 Código e `.c2/config.json` não são alterados; para recriar o contexto, rode
 Reindexar tudo depois. Anotações de agentes são perdidas.
 
+### `c2 mcp` não é um comando interativo
+
+`c2 mcp` é um servidor **STDIO JSON-RPC**: quem conversa com ele é o cliente MCP
+(Claude Desktop, Cursor, etc.). Se você abrir num terminal e digitar `c2 start`,
+essa linha vira JSON inválido e o servidor responde `-32700`. O banner
+`c2-mcp: pronto` vai para **stderr**; o stdout fica reservado ao protocolo.
+Para iniciar o engine, use outro terminal/desktop.
+
 ## Diagnóstico de cold start
 
 O desktop grava marcas de boot em `%APPDATA%/dev.c2.desktop/perf.log` (JSONL):

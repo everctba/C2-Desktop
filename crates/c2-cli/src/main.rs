@@ -1798,6 +1798,14 @@ fn cmd_mcp(root: Option<&Path>) -> Result<()> {
         c2_core::mcp::PROTOCOL_VERSION,
         c2_core::mcp::tool_names().join(", ")
     );
+    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        eprintln!(
+            "c2-mcp: aviso: este e um servidor STDIO para clientes MCP; nao digite comandos aqui."
+        );
+        eprintln!(
+            "        para iniciar o engine, abra outro terminal e rode `c2 start` (Ctrl+C encerra o servidor)."
+        );
+    }
 
     let entrada = std::io::stdin();
     for linha in entrada.lock().lines() {
