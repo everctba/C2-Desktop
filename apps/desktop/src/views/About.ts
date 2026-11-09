@@ -163,7 +163,6 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
     }),
   );
   perfilBody.appendChild(acoes);
-  page.appendChild(perfilCard);
 
   // ----- AVIFnim (outro software do autor) -----
   const avifnim = document.createElement("section");
@@ -194,7 +193,12 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   });
   avifnimBotao.classList.add(styles.avifnimBotao);
   avifnim.append(avifnimIcon, avifnimTexto, avifnimBotao);
-  page.appendChild(avifnim);
+
+  // Autor e AVIFnim lado a lado; cada card fica com seu conteúdo vertical.
+  const topo = document.createElement("div");
+  topo.className = styles.topo;
+  topo.append(perfilCard, avifnim);
+  page.appendChild(topo);
 
   // ----- apoio -----
   const apoio = document.createElement("section");
