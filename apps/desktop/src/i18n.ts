@@ -383,6 +383,11 @@ const EN: Record<string, string> = {
     "The Original prompt follows the interface language. Custom lets you edit it and does not change when the interface language changes.",
   "Trocar o idioma não traduz metadados antigos. Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.":
     "Changing the language does not translate old metadata. To regenerate everything in the new language, run Reindex all in the Engine.",
+  "Outro software do autor": "Another app by the author",
+  "Conheça o AVIFnim": "Meet AVIFnim",
+  "Crie animações AVIF e WebP profissionais no desktop — leve, local e feito para designers.":
+    "Create professional AVIF and WebP animations on the desktop — lightweight, local and made for designers.",
+  Conhecer: "Learn more",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

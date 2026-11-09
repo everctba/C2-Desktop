@@ -1,4 +1,5 @@
 import avatarUrl from "../assets/avatar.webp";
+import avifnimIconUrl from "../assets/avifnim-icon.png";
 import paypalQrUrl from "../assets/paypal-qr.png";
 import pixQrUrl from "../assets/pix-qr.png";
 import { api, openExternal } from "../api";
@@ -7,6 +8,8 @@ import styles from "./About.module.css";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
 import { Pill } from "../ui/Pill";
+
+const AVIFNIM_URL = "https://avifnim.com";
 
 const PERFIL = {
   nome: "Everson Mayer",
@@ -161,6 +164,37 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   );
   perfilBody.appendChild(acoes);
   page.appendChild(perfilCard);
+
+  // ----- AVIFnim (outro software do autor) -----
+  const avifnim = document.createElement("section");
+  avifnim.className = styles.avifnim;
+  const avifnimIcon = document.createElement("img");
+  avifnimIcon.src = avifnimIconUrl;
+  avifnimIcon.alt = "AVIFnim";
+  avifnimIcon.className = styles.avifnimIcon;
+  const avifnimTexto = document.createElement("div");
+  avifnimTexto.className = styles.avifnimTexto;
+  const avifnimKicker = document.createElement("span");
+  avifnimKicker.className = styles.avifnimKicker;
+  avifnimKicker.textContent = t("Outro software do autor");
+  const avifnimTitulo = document.createElement("strong");
+  avifnimTitulo.className = styles.avifnimTitulo;
+  avifnimTitulo.textContent = t("Conheça o AVIFnim");
+  const avifnimDesc = document.createElement("span");
+  avifnimDesc.className = styles.avifnimDesc;
+  avifnimDesc.textContent = t(
+    "Crie animações AVIF e WebP profissionais no desktop — leve, local e feito para designers.",
+  );
+  avifnimTexto.append(avifnimKicker, avifnimTitulo, avifnimDesc);
+  const avifnimBotao = Button({
+    label: t("Conhecer"),
+    variant: "primary",
+    size: "sm",
+    onClick: () => void openExternal(AVIFNIM_URL),
+  });
+  avifnimBotao.classList.add(styles.avifnimBotao);
+  avifnim.append(avifnimIcon, avifnimTexto, avifnimBotao);
+  page.appendChild(avifnim);
 
   // ----- apoio -----
   const apoio = document.createElement("section");
