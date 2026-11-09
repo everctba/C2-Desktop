@@ -37,7 +37,8 @@ pub fn tools() -> Value {
                 "type": "object",
                 "properties": {
                     "query": { "type": "string", "description": "O que procurar (por significado)" },
-                    "limit": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 }
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 10, "default": 5 },
+                    "hybrid": { "type": "boolean", "default": false, "description": "Adiciona cosine de embeddings ao grep lexical" }
                 },
                 "required": ["query"]
             }
@@ -197,10 +198,14 @@ fn chamar_ferramenta(
                 .and_then(Value::as_u64)
                 .unwrap_or(5)
                 .clamp(1, 10) as usize;
+            let hibrido = argumentos
+                .get("hybrid")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             let opcoes = SearchOptions {
                 limit: limite,
                 include_snippets: true,
-                hybrid: false,
+                hybrid: hibrido,
             };
             let hits = search::search(workspace, config, consulta, &opcoes)?;
             if hits.is_empty() {

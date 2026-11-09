@@ -291,6 +291,33 @@ enum EmbeddingAction {
         #[arg(long)]
         full: bool,
     },
+    /// Arquivos similares a um arquivo (por cosine)
+    Similar {
+        file: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Agrupa os vizinhos por domínio
+        #[arg(long)]
+        domains: bool,
+    },
+    /// Pares de metadados duplicados e metadados genéricos
+    Duplicates {
+        #[arg(long, default_value_t = 0.90)]
+        threshold: f32,
+    },
+    /// Sugere links de grafo entre arquivos similares
+    Links {
+        #[arg(long, default_value_t = 0.90)]
+        threshold: f32,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Arquivos que mudam nos mesmos commits
+    Cochange {
+        file: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -980,6 +1007,76 @@ fn cmd_embeddings(
                 );
                 if let Some(erro) = &report.last_error {
                     println!("ultimo erro: {erro}");
+                }
+            }
+        }
+        EmbeddingAction::Similar {
+            file,
+            limit,
+            domains,
+        } => {
+            let vizinhos = c2_core::embedding_insights::similar(&workspace, &config, &file, limit)?;
+            if json_output {
+                if domains {
+                    let grupos = c2_core::embedding_insights::domains(&vizinhos);
+                    println!("{}", serde_json::to_string_pretty(&grupos)?);
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&vizinhos)?);
+                }
+            } else if vizinhos.is_empty() {
+                println!("nenhum similar para {file}");
+            } else {
+                for vizinho in &vizinhos {
+                    println!("{:.3}  {}", vizinho.score, vizinho.file);
+                }
+                if domains {
+                    for (dominio, arquivos) in c2_core::embedding_insights::domains(&vizinhos) {
+                        println!("[{dominio}] {}", arquivos.join(", "));
+                    }
+                }
+            }
+        }
+        EmbeddingAction::Duplicates { threshold } => {
+            let report =
+                c2_core::embedding_insights::duplicates(&workspace, &config, threshold)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "duplicados: {} pares; genericos: {} arquivos",
+                    report.pairs.len(),
+                    report.generic.len()
+                );
+                for pair in report.pairs.iter().take(20) {
+                    println!(
+                        "{:.3}  {} <> {}{}",
+                        pair.score,
+                        pair.a,
+                        pair.b,
+                        if pair.linked { " (ligado)" } else { "" }
+                    );
+                }
+            }
+        }
+        EmbeddingAction::Links { threshold, limit } => {
+            let sugestoes = c2_core::embedding_insights::link_suggestions(
+                &workspace, &config, threshold, limit,
+            )?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&sugestoes)?);
+            } else {
+                for sugestao in &sugestoes {
+                    println!("{:.3}  {} -> {}", sugestao.score, sugestao.from, sugestao.to);
+                }
+            }
+        }
+        EmbeddingAction::Cochange { file, limit } => {
+            let arquivos = c2_core::embedding_insights::cochange(&workspace, &file, limit)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&arquivos)?);
+            } else {
+                for item in &arquivos {
+                    println!("{} commits  {}", item.commits, item.file);
                 }
             }
         }

@@ -9,6 +9,7 @@ pub mod discover;
 pub mod embedding;
 pub mod embedding_runtime;
 pub mod embedding_index;
+pub mod embedding_insights;
 pub mod error;
 pub mod gguf;
 pub mod gpu;
