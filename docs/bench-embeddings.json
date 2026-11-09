@@ -44,5 +44,25 @@
   ],
   "recall_at_5_lexical": 0.8,
   "recall_at_5_hybrid": 1.0,
-  "observacao": "conjunto pequeno e deliberadamente dificil; o ganho de recall vem de consultas sem sobreposicao lexical. Nao usar como claim de marketing sem o benchmark ampliado da c2-kga.11."
+  "observacao": "conjunto pequeno e deliberadamente dificil; o ganho de recall vem de consultas sem sobreposicao lexical. Nao usar como claim de marketing sem o benchmark ampliado da c2-kga.11.",
+  "latency_ms_lexical_p50": 109,
+  "latency_ms_hybrid_p50": 328,
+  "latency_ms_lexical_samples": [
+    64,
+    139,
+    133,
+    109,
+    99
+  ],
+  "latency_ms_hybrid_samples": [
+    335,
+    354,
+    328,
+    327,
+    320
+  ],
+  "latency_nota": "CLI c2.exe em CPU, sem cold start; hibrido inclui embedding da query + leitura dos vetores.",
+  "token_ratio_meta_por_fonte_media": 0.068,
+  "token_reduction_media_percent": 93.2,
+  "token_nota": "estimativa chars/4 em 5 arquivos do topo; nao e contagem do tokenizer do modelo."
 }
