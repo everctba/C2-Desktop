@@ -209,10 +209,27 @@ begin
   end;
 end;
 
+procedure SalvarIdioma;
+var
+  Dir, Arquivo, Json: string;
+begin
+  Dir := ExpandConstant('{userappdata}\dev.c2.desktop');
+  ForceDirectories(Dir);
+  Arquivo := Dir + '\language.json';
+  if ActiveLanguage = 'brazilianportuguese' then
+    Json := '{"lang":"pt-BR"}'
+  else
+    Json := '{"lang":"en"}';
+  SaveStringToFile(Arquivo, Json, False);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
+  begin
     AddToSystemPath;
+    SalvarIdioma;
+  end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

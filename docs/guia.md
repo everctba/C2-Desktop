@@ -367,6 +367,21 @@ essa linha vira JSON inválido e o servidor responde `-32700`. O banner
 `c2-mcp: pronto` vai para **stderr**; o stdout fica reservado ao protocolo.
 Para iniciar o engine, use outro terminal/desktop.
 
+## Idioma do CLI
+
+O instalador grava o idioma escolhido em `%APPDATA%/dev.c2.desktop/language.json`;
+o CLI usa esse arquivo como default.
+
+```bash
+c2 lang            # mostra o idioma atual
+c2 lang en         # salva inglês
+c2 lang pt-BR      # salva português
+c2 --lang en status  # só nesta execução
+```
+
+O `c2 init` imprime as instruções e o bloco do agente no idioma escolhido.
+O desktop lê o mesmo arquivo, então o idioma fica consistente entre app e CLI.
+
 ## Bandeja do sistema
 
 - Fechar a janela (**X**) **não encerra** o C2: ele esconde para a bandeja e o

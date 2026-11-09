@@ -3,6 +3,8 @@
 //! Superficie do MVP (`c2-e7`): inicializar, indexar, inspecionar, configurar e
 //! limpar. Busca e leitura (`c2 grep/read/related`) chegam nas fases seguintes.
 
+mod i18n;
+
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -86,6 +88,10 @@ struct Cli {
     #[arg(long, global = true)]
     json: bool,
 
+    /// Idioma da execucao: en ou pt-BR (default: language.json)
+    #[arg(long, global = true, value_name = "LANG")]
+    lang: Option<String>,
+
     /// Mostra versao
     #[arg(short = 'v', visible_short_alias = 'V', long = "version", action = clap::ArgAction::Version)]
     #[allow(dead_code)]
@@ -97,6 +103,12 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Mostra ou altera o idioma do CLI/desktop (en ou pt-BR)
+    Lang {
+        /// Idioma a salvar; sem valor, mostra o atual
+        lang: Option<String>,
+    },
+
     /// Inicializa o workspace criando .c2/config.json
     Init {
         /// Sobrescreve a configuracao existente
@@ -271,7 +283,9 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<()> {
+    i18n::iniciar(cli.lang.as_deref());
     match cli.command {
+        Command::Lang { lang } => cmd_lang(lang.as_deref()),
         Command::Init {
             force,
             open,
@@ -288,11 +302,11 @@ fn run(cli: Cli) -> Result<()> {
                     println!();
                     println!(
                         "{}",
-                        cor(VERDE, "✓ C2 Desktop aberto. Pode fechar este terminal: o app continua rodando.")
+                        cor(VERDE, i18n::t("✓ C2 Desktop opened. You can close this terminal: the app keeps running.", "✓ C2 Desktop aberto. Pode fechar este terminal: o app continua rodando."))
                     );
                     println!(
                         "{}",
-                        cor(CINZA, "  Configure modelo, modo de uso e prompt no C2 Desktop. A CLI fica para os agentes.")
+                        cor(CINZA, i18n::t("  Configure model, usage mode and prompt in C2 Desktop. The CLI is for agents.", "  Configure modelo, modo de uso e prompt no C2 Desktop. A CLI fica para os agentes."))
                     );
                 }
             }
@@ -383,6 +397,39 @@ fn negrito(texto: &str) -> String {
 
 const ASCII_INTRO: &str = include_str!("../../../site/assets/ascii/logo-ascii.txt");
 
+fn cmd_lang(lang: Option<&str>) -> Result<()> {
+    match lang {
+        None => {
+            let atual = i18n::atual().unwrap_or(i18n::Lang::PtBr);
+            println!("{}: {}", i18n::t("language", "idioma"), i18n::nome(atual));
+            if let Some(caminho) = i18n::caminho() {
+                println!("{}: {}", i18n::t("file", "arquivo"), caminho.display());
+            }
+            println!(
+                "{}",
+                i18n::t(
+                    "change with: c2 lang en | c2 lang pt-BR (or --lang en on a command)",
+                    "troque com: c2 lang en | c2 lang pt-BR (ou --lang en em um comando)"
+                )
+            );
+            Ok(())
+        }
+        Some(valor) => {
+            let lang = i18n::parse(valor).ok_or_else(|| {
+                anyhow::anyhow!("{}: {valor} ({})", i18n::t("invalid language", "idioma invalido"), i18n::t("use en or pt-BR", "use en ou pt-BR"))
+            })?;
+            i18n::salvar(lang).map_err(|erro| anyhow::anyhow!(erro))?;
+            i18n::set(lang);
+            if i18n::en() {
+                println!("language: {} (saved)", i18n::nome(lang));
+            } else {
+                println!("idioma: {} (salvo)", i18n::nome(lang));
+            }
+            Ok(())
+        }
+    }
+}
+
 fn cmd_init(
     root: Option<&Path>,
     force: bool,
@@ -427,7 +474,7 @@ fn cmd_init(
     if outcome.created {
         println!(
             "{}",
-            cor(VERDE_CLARO, &format!("Workspace C2 criado em {}", outcome.root.display()))
+            cor(VERDE_CLARO, &format!("{} {}", i18n::t("C2 workspace created at", "Workspace C2 criado em"), outcome.root.display()))
         );
     } else {
         println!(
@@ -435,8 +482,10 @@ fn cmd_init(
             cor(
                 AMARELO,
                 &format!(
-                    "Workspace C2 ja existia em {} (nada foi sobrescrito; use --force)",
-                    outcome.root.display()
+                    "{} {} ({})",
+                    i18n::t("C2 workspace already existed at", "Workspace C2 ja existia em"),
+                    outcome.root.display(),
+                    i18n::t("nothing was overwritten; use --force", "nada foi sobrescrito; use --force")
                 )
             )
         );
@@ -444,28 +493,28 @@ fn cmd_init(
 
     if let Some(caminho) = &agents_path {
         println!();
-        println!("{}", cor(CIANO, &format!("Regras do agente gravadas em {}", caminho.display())));
-        println!("{}", cor(CINZA, "(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)"));
+        println!("{}", cor(CIANO, &format!("{} {}", i18n::t("Agent rules written to", "Regras do agente gravadas em"), caminho.display())));
+        println!("{}", cor(CINZA, i18n::t("(block between the `c2:agent:begin` and `c2:agent:end` markers)", "(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)")));
     }
     for caminho in &mcp_paths {
-        println!("{}", cor(CIANO, &format!("MCP configurado em {}", caminho.display())));
+        println!("{}", cor(CIANO, &format!("{} {}", i18n::t("MCP configured at", "MCP configurado em"), caminho.display())));
     }
     if mcp_paths.is_empty() && !agent {
         println!();
-        println!("{}", cor(CINZA, "Para configurar o MCP do projeto: `c2 init --mcp` (ou --agent)."));
+        println!("{}", cor(CINZA, i18n::t("To configure project MCP: `c2 init --mcp` (or --agent).", "Para configurar o MCP do projeto: `c2 init --mcp` (ou --agent).")));
     }
     if agents_path.is_none() && !mcp {
         println!();
-        println!("{}", cor(CIANO, "Para o seu agente usar os comentarios do C2, cole o bloco abaixo no"));
-        println!("{}", cor(CIANO, "AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):"));
+        println!("{}", cor(CIANO, i18n::t("For your agent to use C2 comments, paste the block below into", "Para o seu agente usar os comentarios do C2, cole o bloco abaixo no")));
+        println!("{}", cor(CIANO, i18n::t("AGENTS.md / CLAUDE.md / .cursor/rules (or run `c2 init --agent`):", "AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):")));
         println!();
         println!("{}", cor(CINZA, "--- BEGIN AGENTS.MD CONTENT ---"));
-        for linha in AGENT_SNIPPET.lines() {
+        for linha in agent_snippet().lines() {
             if linha.is_empty() {
                 println!();
             } else if linha.starts_with("## ") || linha.starts_with("<EXTREMELY") || linha.starts_with("</EXTREMELY") {
                 println!("  {}", cor(CIANO, linha));
-            } else if linha.starts_with("Metadado é hipótese") {
+            } else if linha.starts_with("Metadado é hipótese") || linha.starts_with("Metadata is a hypothesis") {
                 println!("  {}", cor(AMARELO, linha));
             } else {
                 println!("  {linha}");
@@ -474,32 +523,32 @@ fn cmd_init(
         println!("{}", cor(CINZA, "--- END AGENTS.MD CONTENT ---"));
     }
     println!();
-    println!("{}", negrito(&cor(CIANO, "Comandos para o seu agente:")));
-    println!("  {}{}", cor(VERDE, "c2 status"), cor(CINZA, "                         # indice atualizado?"));
+    println!("{}", negrito(&cor(CIANO, i18n::t("Commands for your agent:", "Comandos para o seu agente:"))));
+    println!("  {}{}", cor(VERDE, "c2 status"), cor(CINZA, i18n::t("                         # index up to date?", "                         # indice atualizado?")));
     println!(
         "  {}{}",
         cor(VERDE, "c2 grep \"<tarefa>\" --limit 5"),
-        cor(CINZA, "       # candidatos por significado")
+        cor(CINZA, i18n::t("       # candidates by meaning", "       # candidatos por significado"))
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 related <arquivo>"),
-        cor(CINZA, "               # dependencias no grafo")
+        cor(CINZA, i18n::t("               # graph dependencies", "               # dependencias no grafo"))
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 read <arquivo> --lines A:B"),
-        cor(CINZA, "      # so o trecho necessario")
+        cor(CINZA, i18n::t("      # only the needed range", "      # so o trecho necessario"))
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 mcp"),
-        cor(CINZA, "                             # servidor MCP (STDIO)")
+        cor(CINZA, i18n::t("                             # MCP server (STDIO)", "                             # servidor MCP (STDIO)"))
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 note add <arquivo> --text ..."),
-        cor(CINZA, "   # anotacao teleologica")
+        cor(CINZA, i18n::t("   # teleological annotation", "   # anotacao teleologica"))
     );
     Ok(())
 }
@@ -602,6 +651,103 @@ Use `c2 <comando> --help` para as opções completas.
 ################################################################################
 "#;
 
+/// English version of the agent rules block.
+const AGENT_SNIPPET_EN: &str = r#"# C2 Usage Guide for Agents
+
+Copy and paste this block into your agent rules file:
+`AGENTS.md`, `CLAUDE.md`, `rules.md` (or `.cursor/rules/` and
+`.github/copilot-instructions.md`).
+
+################################################################################
+<EXTREMELY_IMPORTANT>
+
+This project uses C2. Every code file has an `<file>.c2.json` next to it
+(same directory, same basename) with the file's semantic context:
+what, why, goal, summary, responsibility and links[].
+
+1. BEFORE reading a code file, read the `<file>.c2.json` next to it.
+   This is the most important rule of the project: context before code.
+2. `c2 status` — are the comments up to date?
+3. Use `c2 grep` to discover candidates by meaning and `c2 read` to read only
+   the necessary range.
+4. Metadata is a hypothesis; code is evidence. If the `.c2.json` diverges from
+   the code, the code wins — and the metadata must be reindexed.
+5. Never edit `.c2.json` by hand. Use `c2_annotate` (MCP) or `c2 reindex`.
+6. Think teleologically before any annotation: why does this file exist? What
+   breaks if I remove it? What does the code NOT reveal? If the answer is not
+   obvious, record it with the `c2_annotate` MCP tool (file, text, kind) —
+   at most 1–2 per task, short (max 2000 chars). Use `correction` if you
+   thought A and it was B; `pending` if it depends on a human decision.
+   Never annotate the obvious (e.g. "this file calculates discounts").
+   Only annotate what is not derivable from the code.
+
+## Implementation flow
+
+BEFORE:
+
+1. `c2 status` — is the index up to date? Is a runtime/model configured?
+2. `c2 grep "<task>" --limit 5` — candidates by meaning.
+3. Read the `.c2.json` of each candidate.
+4. `c2 related <file>` — see what it uses and what uses it.
+5. `c2 read <file> --lines A:B` — only the relevant range.
+
+DURING:
+
+- prefer the smallest possible ranges;
+- if you need to create something new, first find the existing pattern via C2;
+- do not treat metadata as absolute truth: confirm in the code.
+
+WHEN DONE:
+
+- validate what the project itself provides (tests, lint, typecheck, build)
+  using the commands documented in the README/CI; do not assume they exist and
+  do not install tools just to satisfy this;
+- when the engine is running, it reindexes changed files automatically on each
+  cycle. If it is stopped or you need updated metadata now, run
+  `c2 reindex --path <file>`;
+- if the prompt or model changed (not the code), use `c2 reindex --full`:
+  the hash does not change, but the generated content must be regenerated.
+
+The project includes `.mcp.json` and `.cursor/mcp.json` (generated by
+`c2 init --mcp`): if your client supports MCP, use the `c2_grep`, `c2_read`,
+`c2_related` and `c2_map` tools instead of scanning code with the shell.
+
+## Useful commands
+
+```bash
+# Workspace, index and runtime overview
+c2 status
+c2 status --json
+
+# Semantic search: describe the responsibility, not the file name
+c2 grep "where the system validates user permission" --limit 5
+c2 grep "reindex queue" --limit 5 --json
+
+# Dependencies in the static graph (uses / used by)
+c2 related src/order/service.rs
+c2 related src/order/service.rs --json
+
+# Read only the necessary range
+c2 read src/order/service.rs --lines 120:180
+c2 read src/order/service.rs --lines 120:180 --json
+
+# Flat project map (one line per indexable file)
+c2 map
+
+# Reindex one file or the whole project
+c2 reindex --path src/order/service.rs
+c2 reindex --full
+
+# Project MCP server (STDIO)
+c2 mcp
+```
+
+Use `c2 <command> --help` for the full options.
+
+</EXTREMELY_IMPORTANT>
+################################################################################
+"#;
+
 /// Gera `.mcp.json` (Claude Code) e `.cursor/mcp.json` (Cursor) com o
 /// servidor C2 project-scoped. Preserva outros servidores e nao sobrescreve
 /// uma entrada `c2` existente (o usuario pode ter customizado args).
@@ -669,6 +815,14 @@ fn write_mcp_configs(root: &Path) -> Result<Vec<PathBuf>> {
 }
 
 /// Cria/atualiza AGENTS.md com o bloco de regras, sem duplicar.
+fn agent_snippet() -> &'static str {
+    if i18n::en() {
+        AGENT_SNIPPET_EN
+    } else {
+        AGENT_SNIPPET
+    }
+}
+
 fn write_agents_snippet(root: &Path) -> Result<PathBuf> {
     const INICIO: &str = "<!-- c2:agent:begin -->";
     const FIM: &str = "<!-- c2:agent:end -->";
@@ -677,7 +831,7 @@ fn write_agents_snippet(root: &Path) -> Result<PathBuf> {
     if atual.contains(INICIO) {
         return Ok(caminho);
     }
-    let bloco = format!("{INICIO}\n{AGENT_SNIPPET}\n{FIM}");
+    let bloco = format!("{INICIO}\n{}\n{FIM}", agent_snippet());
     let novo = if atual.trim().is_empty() {
         format!("# AGENTS.md\n\n{bloco}\n")
     } else {
@@ -742,7 +896,7 @@ fn cmd_open(root: Option<&Path>) -> Result<()> {
             .with_context(|| format!("falha ao abrir {}", app.display()))?;
     }
 
-    println!("C2 Desktop aberto em {}", workspace.root().display());
+    println!("{} {}", i18n::t("C2 Desktop opened at", "C2 Desktop aberto em"), workspace.root().display());
     Ok(())
 }
 
@@ -802,46 +956,54 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!("Workspace:   {}", workspace.root().display());
-    println!("Config:      {}", workspace.config_path().display());
+    println!("{:<12} {}", i18n::t("Workspace:", "Workspace:"), workspace.root().display());
+    println!("{:<12} {}", i18n::t("Config:", "Config:"), workspace.config_path().display());
     println!(
-        "Modelo:      {} ({}:{})",
-        config.model.name, config.model.host, config.model.port
+        "{:<12} {} ({}:{})",
+        i18n::t("Model:", "Modelo:"),
+        config.model.name,
+        config.model.host,
+        config.model.port
     );
     if let Some(path) = &config.model.path {
         println!("GGUF:        {path}");
     }
     println!(
-        "Indice:      max {} KiB por arquivo, {} extensoes, polling {}s",
+        "{:<12} max {} KiB/file, {} extensions, polling {}s",
+        i18n::t("Index:", "Indice:"),
         config.index.max_file_bytes / 1024,
         config.index.extensions.len(),
         config.engine.poll_interval_secs
     );
-    println!("Arquivos:    {}", discovery.files.len());
-    println!("Metadados:   {}", metadata.len());
+    println!("{:<12} {}", i18n::t("Files:", "Arquivos:"), discovery.files.len());
+    println!("{:<12} {}", i18n::t("Metadata:", "Metadados:"), metadata.len());
     println!(
-        "Pulados:     {} binarios, {} grandes, {} extensao nao suportada, {} sensiveis",
+        "{:<12} {} binary, {} large, {} unsupported extension, {} sensitive",
+        i18n::t("Skipped:", "Pulados:"),
         discovery.skipped.binary,
         discovery.skipped.too_large,
         discovery.skipped.unsupported_extension,
         discovery.skipped.sensitive
     );
     println!(
-        "Segredos:    politica {:?} (c2 config set index.secret_policy mask|skip)",
+        "{:<12} policy {:?} (c2 config set index.secret_policy mask|skip)",
+        i18n::t("Secrets:", "Segredos:"),
         config.index.secret_policy
     );
     match engine_pid {
-        Some(pid) => println!("Engine:      rodando (pid {pid})"),
-        None => println!("Engine:      parado"),
+        Some(pid) => println!("{:<12} {} (pid {pid})", i18n::t("Engine:", "Engine:"), i18n::t("running", "rodando")),
+        None => println!("{:<12} {}", i18n::t("Engine:", "Engine:"), i18n::t("stopped", "parado")),
     }
     print_runtime_status(&workspace, &config);
     println!(
-        "Pendentes:   {} (arquivos sem metadado)",
+        "{:<12} {} (files without metadata)",
+        i18n::t("Pending:", "Pendentes:"),
         discovery.files.len().saturating_sub(metadata.len())
     );
     let log_path = workspace.logs_dir().join("c2.log");
     println!(
-        "Log:         {} ({} KiB, nivel {})",
+        "{:<12} {} ({} KiB, level {})",
+        i18n::t("Log:", "Log:"),
         log_path.display(),
         std::fs::metadata(&log_path).map(|m| m.len()).unwrap_or(0) / 1024,
         config.log.level
@@ -855,7 +1017,7 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         );
     }
     if !state.history.is_empty() {
-        println!("Operacoes:");
+        println!("{}", i18n::t("Operations:", "Operacoes:"));
         for operacao in state.history.iter().take(3) {
             println!(
                 "  {} {:<10} {}",
@@ -1603,22 +1765,26 @@ fn runtime_json(workspace: &Workspace, config: &c2_core::Config) -> serde_json::
 
 fn print_runtime_status(workspace: &Workspace, config: &c2_core::Config) {
     let status = runtime::status(workspace, config);
-    let state = if status.healthy { "saudavel" } else { "parado" };
+    let state = if status.healthy {
+        i18n::t("healthy", "saudavel")
+    } else {
+        i18n::t("stopped", "parado")
+    };
     match (&status.binary, &status.pid) {
         (Some(binary), Some(pid)) => {
-            println!("Runtime:     {state} (pid {pid}) {}", binary.display())
+            println!("{:<12} {state} (pid {pid}) {}", i18n::t("Runtime:", "Runtime:"), binary.display())
         }
-        (Some(binary), None) => println!("Runtime:     {state} ({})", binary.display()),
-        (None, _) => println!("Runtime:     nao localizado"),
+        (Some(binary), None) => println!("{:<12} {state} ({})", i18n::t("Runtime:", "Runtime:"), binary.display()),
+        (None, _) => println!("{:<12} {}", i18n::t("Runtime:", "Runtime:"), i18n::t("not found", "nao localizado")),
     }
     if let Some(source) = &status.source {
-        println!("Origem:      {source}");
+        println!("{:<12} {source}", i18n::t("Source:", "Origem:"));
     }
     if let Some(version) = &status.version {
-        println!("Versao:      {version}");
+        println!("{:<12} {version}", i18n::t("Version:", "Versao:"));
     }
     if let Some(erro) = &status.last_error {
-        println!("Erro:        {erro}");
+        println!("{:<12} {erro}", i18n::t("Error:", "Erro:"));
     }
 }
 
@@ -1760,20 +1926,24 @@ fn cmd_mcp(root: Option<&Path>) -> Result<()> {
     let workspace = require_workspace(root)?;
     let config = workspace.load_config()?;
     eprintln!(
-        "c2-mcp: pronto (workspace {}, protocolo {}, ferramentas: {})",
+        "{} (workspace {}, protocol {}, tools: {})",
+        i18n::t("c2-mcp: ready", "c2-mcp: pronto"),
         workspace.root().display(),
         c2_core::mcp::PROTOCOL_VERSION,
         c2_core::mcp::tool_names().join(", ")
     );
     if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         eprintln!(
-            "c2-mcp: aviso: este e um servidor STDIO para clientes MCP; nao digite comandos aqui."
+            "{}",
+            i18n::t("c2-mcp: warning: this is an STDIO server for MCP clients; do not type commands here.", "c2-mcp: aviso: este e um servidor STDIO para clientes MCP; nao digite comandos aqui.")
         );
         eprintln!(
-            "        para iniciar o engine, abra o C2 Desktop (ou outro terminal com `c2 start`); Ctrl+C encerra o servidor."
+            "{}",
+            i18n::t("        to start the engine, open C2 Desktop (or another terminal with `c2 start`); Ctrl+C stops the server.", "        para iniciar o engine, abra o C2 Desktop (ou outro terminal com `c2 start`); Ctrl+C encerra o servidor.")
         );
         eprintln!(
-            "        a indexacao automatica depende do C2 Desktop aberto; este servidor e somente leitura."
+            "{}",
+            i18n::t("        automatic indexing depends on C2 Desktop being open; this server is read-only.", "        a indexacao automatica depende do C2 Desktop aberto; este servidor e somente leitura.")
         );
     }
 
