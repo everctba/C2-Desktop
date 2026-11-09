@@ -179,6 +179,7 @@ export interface Hit {
   path_score: number;
   symbol_score: number;
   semantic_score: number;
+  embedding_score?: number;
   evidence: Evidence[];
   summary: string;
   snippet: Snippet | null;

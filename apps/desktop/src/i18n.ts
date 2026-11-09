@@ -436,6 +436,8 @@ const EN: Record<string, string> = {
   "Baixar do Hugging Face": "Download from Hugging Face",
   "modelo de embeddings configurado": "embedding model configured",
   "Indexar embeddings": "Index embeddings",
+  Híbrida: "Hybrid",
+  semântico: "semantic",
   "indexando embeddings…": "indexing embeddings…",
 };
 

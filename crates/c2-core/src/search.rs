@@ -17,6 +17,8 @@ use std::fs;
 use serde::Serialize;
 
 use crate::config::Config;
+use crate::embedding::EmbeddingCache;
+use crate::embedding_runtime;
 use crate::error::Result;
 use crate::schema::MetaFile;
 use crate::workspace::Workspace;
@@ -29,12 +31,16 @@ const W_SYMBOL: f32 = 2.0;
 const W_SEMANTIC: f32 = 1.5;
 /// Fator aplicado quando o casamento e parcial (substring).
 const PARTIAL: f32 = 0.4;
+/// Peso do sinal de embedding no ranking hibrido.
+const W_EMBEDDING: f32 = 2.0;
 
 /// Opcoes da busca.
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
     pub limit: usize,
     pub include_snippets: bool,
+    /// Adiciona cosine de embeddings ao grep lexical.
+    pub hybrid: bool,
 }
 
 impl Default for SearchOptions {
@@ -42,6 +48,7 @@ impl Default for SearchOptions {
         Self {
             limit: 5,
             include_snippets: true,
+            hybrid: false,
         }
     }
 }
@@ -74,6 +81,9 @@ pub struct Hit {
     pub path_score: f32,
     pub symbol_score: f32,
     pub semantic_score: f32,
+    /// Cosine (0..1) quando `--hybrid`; `None` no grep lexical.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding_score: Option<f32>,
     pub evidence: Vec<Evidence>,
     pub summary: String,
     pub snippet: Option<Snippet>,
@@ -113,6 +123,7 @@ struct Candidate {
     summary: String,
     path_score: f32,
     semantic_score: f32,
+    embedding_score: f32,
     evidence: Vec<Evidence>,
 }
 
@@ -135,6 +146,15 @@ pub fn search(
     }
 
     /* ---------- fase 1: metadados ---------- */
+    let embedding_cfg = &config.index.embeddings;
+    let consulta_vetor = if options.hybrid && embedding_cfg.enabled {
+        embedding_runtime::embed(config, query).ok()
+    } else {
+        None
+    };
+    let cache = consulta_vetor
+        .as_ref()
+        .map(|_| EmbeddingCache::new(workspace, &embedding_cfg.model_id, embedding_cfg.dim));
     let mut candidatos: Vec<Candidate> = Vec::new();
     for meta_path in crate::cleaner::metadata_files(workspace.root())? {
         let Ok(meta) = MetaFile::read(&meta_path) else {
@@ -170,7 +190,18 @@ pub fn search(
             }
         }
 
-        if path_score + semantic_score <= 0.0 {
+        let mut embedding_score = 0.0;
+        if let (Some(vetor), Some(cache)) = (&consulta_vetor, &cache) {
+            if let Some(vetor_meta) = cache.load(&meta.file, &meta.hash) {
+                if let Some(cos) = crate::embedding::cosine(vetor, &vetor_meta) {
+                    if cos >= embedding_cfg.min_score {
+                        embedding_score = cos;
+                        push_evidence(&mut evidence, "embedding", &format!("{cos:.3}"));
+                    }
+                }
+            }
+        }
+        if path_score + semantic_score + embedding_score <= 0.0 {
             continue;
         }
         candidatos.push(Candidate {
@@ -178,13 +209,14 @@ pub fn search(
             summary: meta.semantic.summary,
             path_score,
             semantic_score,
+            embedding_score,
             evidence,
         });
     }
 
     candidatos.sort_by(|a, b| {
-        let score_a = a.path_score + a.semantic_score;
-        let score_b = b.path_score + b.semantic_score;
+        let score_a = a.path_score + a.semantic_score + W_EMBEDDING * a.embedding_score;
+        let score_b = b.path_score + b.semantic_score + W_EMBEDDING * b.embedding_score;
         score_b
             .partial_cmp(&score_a)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -222,10 +254,18 @@ pub fn search(
 
         hits.push(Hit {
             file: candidato.file,
-            score: candidato.path_score + symbol_score + candidato.semantic_score,
+            score: candidato.path_score
+                + symbol_score
+                + candidato.semantic_score
+                + W_EMBEDDING * candidato.embedding_score,
             path_score: candidato.path_score,
             symbol_score,
             semantic_score: candidato.semantic_score,
+            embedding_score: if candidato.embedding_score > 0.0 {
+                Some(candidato.embedding_score)
+            } else {
+                None
+            },
             evidence,
             summary: candidato.summary,
             snippet,
@@ -577,6 +617,7 @@ mod tests {
             &SearchOptions {
                 limit: 1,
                 include_snippets: false,
+                hybrid: false,
             },
         )
         .unwrap();

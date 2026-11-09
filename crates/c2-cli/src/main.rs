@@ -209,6 +209,12 @@ enum Command {
         /// Mostra a composicao do score e a evidencia
         #[arg(long)]
         explain: bool,
+        /// Adiciona cosine de embeddings ao grep lexical
+        #[arg(long)]
+        hybrid: bool,
+        /// Alias de --hybrid (busca semantica)
+        #[arg(long)]
+        semantic: bool,
     },
 
     /// Le um arquivo ou trecho (a partir de c2-e7t7)
@@ -365,12 +371,15 @@ fn run(cli: Cli) -> Result<()> {
             limit,
             files_only,
             explain,
+            hybrid,
+            semantic,
         } => cmd_grep(
             cli.root.as_deref(),
             &query,
             limit,
             files_only,
             explain,
+            hybrid || semantic,
             cli.json,
         ),
         Command::Read { file, lines } => cmd_read(cli.root.as_deref(), file, lines, cli.json),
@@ -1447,6 +1456,7 @@ fn cmd_grep(
     limit: usize,
     files_only: bool,
     explain: bool,
+    hybrid: bool,
     json_output: bool,
 ) -> Result<()> {
     let workspace = require_workspace(root)?;
@@ -1454,6 +1464,7 @@ fn cmd_grep(
     let options = SearchOptions {
         limit,
         include_snippets: !files_only,
+        hybrid,
     };
     let hits = search::search(&workspace, &config, query, &options)?;
 

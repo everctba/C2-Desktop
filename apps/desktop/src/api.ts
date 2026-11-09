@@ -129,8 +129,8 @@ export const api = {
   engineStart: (root: string) => invoke<null>("engine_start", { root }),
   engineStop: (root: string) => invoke<null>("engine_stop", { root }),
   engineRunning: () => invoke<boolean>("engine_running"),
-  grep: (root: string, query: string, limit = 10) =>
-    invoke<Hit[]>("search_grep", { root, query, limit }),
+  grep: (root: string, query: string, limit = 10, hybrid = false) =>
+    invoke<Hit[]>("search_grep", { root, query, limit, hybrid }),
   read: (root: string, file: string, start?: number, end?: number) =>
     invoke<ReadResult>("file_read", { root, file, start, end }),
   related: (root: string, file: string) => invoke<RelatedResult>("file_related", { root, file }),

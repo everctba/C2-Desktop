@@ -200,6 +200,7 @@ fn chamar_ferramenta(
             let opcoes = SearchOptions {
                 limit: limite,
                 include_snippets: true,
+                hybrid: false,
             };
             let hits = search::search(workspace, config, consulta, &opcoes)?;
             if hits.is_empty() {

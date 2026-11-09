@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
+import { Toggle } from "../ui/Toggle";
 import type { View } from "./view";
 import styles from "./views.module.css";
 
@@ -72,6 +73,8 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     results.appendChild(empty);
   };
 
+  let hibrida = false;
+
   const run = async (query: string) => {
     const termo = query.trim();
     if (termo.length < 2) {
@@ -83,7 +86,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     results.innerHTML = "";
     summary.textContent = t("buscando");
     try {
-      const hits = await api.grep(ctx.root, termo, 10);
+      const hits = await api.grep(ctx.root, termo, 10, hibrida);
       const ms = Math.round(performance.now() - inicio);
       results.innerHTML = "";
       summary.textContent = `${hits.length} resultado(s) em ${ms} ms · "${termo}"`;
@@ -144,6 +147,15 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
         field.input.focus();
       },
     }),
+    Toggle({
+      label: t("Híbrida"),
+      checked: false,
+      tone: "brand",
+      onChange: (ligado) => {
+        hibrida = ligado;
+        if (field.input.value.trim().length >= 2) void run(field.input.value);
+      },
+    }).root,
     summary,
   );
   page.appendChild(actions);
@@ -230,7 +242,11 @@ function resultRow(
   barra.appendChild(preenchimento);
   const detalhe = document.createElement("span");
   detalhe.className = styles.breakdown;
-  detalhe.textContent = `path ${hit.path_score.toFixed(1)} · símbolo ${hit.symbol_score.toFixed(1)} · meta ${hit.semantic_score.toFixed(1)}`;
+  detalhe.textContent =
+    `path ${hit.path_score.toFixed(1)} · símbolo ${hit.symbol_score.toFixed(1)} · meta ${hit.semantic_score.toFixed(1)}` +
+    (hit.embedding_score !== undefined
+      ? ` · sem ${hit.embedding_score.toFixed(2)}`
+      : "");
   scoreRow.append(barra, detalhe);
   row.appendChild(scoreRow);
 
@@ -244,7 +260,17 @@ function resultRow(
   /* evidencias por campo */
   const evidence = document.createElement("div");
   evidence.className = styles.evidence;
-  evidence.appendChild(Pill(hit.symbol_score > 0 ? "símbolo" : "metadado", "neutral", "xs"));
+  evidence.appendChild(
+    Pill(
+      hit.embedding_score !== undefined
+        ? "semântico"
+        : hit.symbol_score > 0
+          ? "símbolo"
+          : "metadado",
+      "neutral",
+      "xs",
+    ),
+  );
   for (const item of hit.evidence.slice(0, 4)) {
     evidence.appendChild(Pill(`${item.field}: ${item.terms.join(", ")}`, "neutral", "xs"));
   }

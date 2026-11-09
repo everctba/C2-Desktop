@@ -567,12 +567,14 @@ fn search_grep(
     root: String,
     query: String,
     limit: Option<usize>,
+    hybrid: Option<bool>,
 ) -> Result<Vec<search::Hit>, String> {
     let workspace = open_workspace(&root)?;
     let config = workspace.load_config().map_err(|err| err.to_string())?;
     let options = SearchOptions {
         limit: limit.unwrap_or(10),
         include_snippets: true,
+        hybrid: hybrid.unwrap_or(false),
     };
     search::search(&workspace, &config, &query, &options).map_err(|err| err.to_string())
 }
