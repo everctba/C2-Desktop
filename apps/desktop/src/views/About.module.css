@@ -54,6 +54,7 @@
 .apoio {
   display: grid;
   gap: var(--space-2xs);
+  margin-top: var(--space-xl);
 }
 
 .apoio h2 {
@@ -150,6 +151,65 @@
   }
 
   .grade {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-s);
+  margin-top: var(--space-m);
+}
+
+.tier {
+  display: grid;
+  gap: var(--space-3xs);
+  padding: var(--space-m);
+  text-align: left;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-muted);
+  background: var(--bg-surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.tier strong {
+  font-family: var(--font-mono);
+  font-size: var(--text-l);
+  color: var(--text-bright);
+}
+
+.tier span {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+}
+
+.tier:hover {
+  border-color: var(--accent-1);
+}
+
+.tierSelected {
+  border-color: var(--accent-1);
+  background: var(--accent-1-10);
+}
+
+.paypalAcao {
+  display: grid;
+  gap: var(--space-2xs);
+  margin-top: var(--space-m);
+}
+
+.paypalAviso {
+  margin: 0;
+  color: var(--text-subtle);
+  font-size: var(--text-2xs);
+}
+
+@media (max-width: 720px) {
+  .tiers {
     grid-template-columns: 1fr;
   }
 }

@@ -360,6 +360,16 @@ const EN: Record<string, string> = {
   metadados: "metadata items",
   "Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor é somente leitura, exceto `c2_annotate` (anotações no .c2.json do arquivo). Nada é enviado para fora da máquina.":
     "Paste into your MCP client (Claude Desktop, Cursor, etc.). The server is read-only except `c2_annotate` (notes in the file's .c2.json). Nothing leaves your machine.",
+  "O software é gratuito. A ajuda é opcional.": "The software is free. Help is optional.",
+  "O C2 é open source e continuará gratuito: nenhuma funcionalidade fica bloqueada por trás de doação. Se ele te economizou tempo, você pode contribuir com qualquer valor para manter o desenvolvimento.":
+    "C2 is open source and will stay free: no feature is locked behind a donation. If it saved you time, you can contribute any amount to keep development going.",
+  "um café": "a coffee",
+  "uma hora de trabalho": "an hour of work",
+  "ajuda de verdade": "real help",
+  Doar: "Donate",
+  "com PayPal": "with PayPal",
+  "Você será levado ao PayPal; informe o valor de US$":
+    "You will be taken to PayPal; enter the amount of US$",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

@@ -58,6 +58,7 @@ function cartaoDoacao(
   qr: string,
   chave: string,
   legenda: string,
+  acao?: HTMLElement,
 ): HTMLElement {
   const card = Card({ title: titulo, accent: 6 });
   const body = cardBody(card);
@@ -92,6 +93,8 @@ function cartaoDoacao(
   chaveEl.textContent = chave;
   linha.append(chaveEl, botaoCopiar(chave));
   body.appendChild(linha);
+
+  if (acao) body.appendChild(acao);
 
   return card;
 }
@@ -163,13 +166,69 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   const apoio = document.createElement("section");
   apoio.className = styles.apoio;
   const apoioTitulo = document.createElement("h2");
-  apoioTitulo.textContent = t("Apoie o projeto");
+  apoioTitulo.textContent = t("O software é gratuito. A ajuda é opcional.");
   const apoioTexto = document.createElement("p");
   apoioTexto.textContent = t(
-    "O C2 é gratuito e continua gratuito: nenhuma funcionalidade fica atrás de doação. " +
-      "Se ele te economizou tempo, qualquer valor ajuda a manter o desenvolvimento. Doação opcional.",
+    "O C2 é open source e continuará gratuito: nenhuma funcionalidade fica bloqueada " +
+      "por trás de doação. Se ele te economizou tempo, você pode contribuir com qualquer " +
+      "valor para manter o desenvolvimento.",
   );
   apoio.append(apoioTitulo, apoioTexto);
+
+  // Valores sugeridos: clicar atualiza o valor do botao do PayPal.
+  let valorPaypal = 10;
+  const linkPaypal = `https://www.paypal.com/donate/?business=${encodeURIComponent(
+    PERFIL.paypalEmail,
+  )}&currency_code=USD`;
+  const botaoPaypal = Button({
+    label: "",
+    variant: "primary",
+    size: "xs",
+    onClick: () => void openExternal(linkPaypal),
+  });
+  const avisoPaypal = document.createElement("p");
+  avisoPaypal.className = styles.paypalAviso;
+
+  const atualizarPaypal = () => {
+    botaoPaypal.textContent = `${t("Doar")} US$ ${valorPaypal} ${t("com PayPal")}`;
+    avisoPaypal.textContent =
+      t("Você será levado ao PayPal; informe o valor de US$") + ` ${valorPaypal}.`;
+    for (const botao of tiers.querySelectorAll<HTMLButtonElement>("button[data-valor]")) {
+      botao.classList.toggle(
+        styles.tierSelected,
+        Number(botao.dataset.valor) === valorPaypal,
+      );
+    }
+  };
+
+  const tiers = document.createElement("div");
+  tiers.className = styles.tiers;
+  for (const [valor, rotulo] of [
+    [5, t("um café")],
+    [10, t("uma hora de trabalho")],
+    [15, t("ajuda de verdade")],
+  ] as Array<[number, string]>) {
+    const tier = document.createElement("button");
+    tier.type = "button";
+    tier.className = styles.tier;
+    tier.dataset.valor = String(valor);
+    const valorEl = document.createElement("strong");
+    valorEl.textContent = `US$ ${valor}`;
+    const rotuloEl = document.createElement("span");
+    rotuloEl.textContent = rotulo;
+    tier.append(valorEl, rotuloEl);
+    tier.addEventListener("click", () => {
+      valorPaypal = valor;
+      atualizarPaypal();
+      botaoPaypal.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    tiers.appendChild(tier);
+  }
+  apoio.appendChild(tiers);
+
+  const acaoPaypal = document.createElement("div");
+  acaoPaypal.className = styles.paypalAcao;
+  acaoPaypal.append(botaoPaypal, avisoPaypal);
 
   const grade = document.createElement("div");
   grade.className = styles.grade;
@@ -181,6 +240,7 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
       paypalQrUrl,
       PERFIL.paypalEmail,
       t("escaneie com o app do PayPal"),
+      acaoPaypal,
     ),
     cartaoDoacao(
       "PIX",
@@ -193,6 +253,7 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   );
   apoio.appendChild(grade);
   page.appendChild(apoio);
+  atualizarPaypal();
 
   // ----- programa -----
   const programa = Card({ title: t("Programa"), accent: 3 });
