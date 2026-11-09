@@ -70,6 +70,7 @@ fn abrir_desktop(app: &Path, root: &Path) -> Result<()> {
 #[command(
     name = "c2",
     version,
+    disable_version_flag = true,
     about = "C2 â€” contexto semantico de projetos para agentes de IA",
     long_about = "Indexa semanticamente um projeto e permite que agentes consultem \
                   o contexto antes de ler o codigo.\n\n\
@@ -83,6 +84,11 @@ struct Cli {
     /// Saida em JSON
     #[arg(long, global = true)]
     json: bool,
+
+    /// Mostra versao
+    #[arg(short = 'v', visible_short_alias = 'V', long = "version", action = clap::ArgAction::Version)]
+    #[allow(dead_code)]
+    version_info: bool,
 
     #[command(subcommand)]
     command: Command,
