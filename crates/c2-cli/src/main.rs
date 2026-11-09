@@ -544,7 +544,9 @@ DURANTE a implementação:
 
 AO TERMINAR:
 
-- rode os testes/lint do projeto;
+- valide o que o próprio projeto já oferece (testes, lint, typecheck, build),
+  usando os comandos documentados no README/CI; não presuma que existem e não
+  instale ferramentas só para cumprir isso;
 - se o código mudou de forma relevante, reindexe o arquivo:
   `c2 reindex --path <arquivo>`;
 - só anote o que não é derivável do código (veja abaixo).
