@@ -105,10 +105,7 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   const titulo = document.createElement("h1");
   titulo.className = "pageTitle";
   titulo.textContent = t("Sobre");
-  const hint = document.createElement("p");
-  hint.className = "pageHint";
-  hint.textContent = t("Quem faz o C2, versão do programa e como apoiar o projeto.");
-  header.append(titulo, hint);
+  header.append(titulo);
   page.appendChild(header);
 
   // ----- perfil -----
