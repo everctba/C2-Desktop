@@ -932,6 +932,22 @@ async function boot(): Promise<void> {
     }, 350);
   }
 
+  // O banner "Model on GPU" depende do runtime real, nao do Play. Monitora a
+  // transicao runtime parado -> saudavel para aparecer assim que carregar.
+  let ultimoModeloCarregado = Boolean(state.status?.runtime.healthy);
+  const monitorarModelo = async () => {
+    if (!state.root || state.busy) return;
+    await loadStatus();
+    const carregado =
+      Boolean(state.status?.runtime.healthy) &&
+      state.status?.model.provider !== "openai_compat";
+    if (carregado !== ultimoModeloCarregado) {
+      ultimoModeloCarregado = carregado;
+      render();
+    }
+  };
+  window.setInterval(() => void monitorarModelo(), 5000);
+
   // Atualiza a VRAM do banner sem re-renderizar a tela.
   const atualizarVram = () => {
     const alvo = document.querySelector<HTMLElement>("[data-model-vram]");

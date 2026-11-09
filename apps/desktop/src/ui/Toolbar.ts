@@ -41,10 +41,11 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
 
   if (props.modelLoaded) {
     const banner = document.createElement("div");
-    banner.className = `${styles.modelBanner} ${props.running ? styles.modelBannerOn : styles.modelBannerIdle}`;
+    banner.className = `${styles.modelBanner} ${styles.modelBannerOn}`;
     banner.setAttribute("data-model-banner", "1");
+    banner.title = t("Modelo carregado na VRAM");
     const titulo = document.createElement("span");
-    titulo.textContent = t(props.running ? "Model on GPU" : "Model on GPU loaded");
+    titulo.textContent = t("Model on GPU");
     const vram = document.createElement("span");
     vram.setAttribute("data-model-vram", "1");
     vram.textContent =

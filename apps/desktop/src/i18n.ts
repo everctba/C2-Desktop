@@ -408,6 +408,8 @@ const EN: Record<string, string> = {
     "PLAY continuously indexes and supervises llama-server.",
   "O botão Reindexar tudo faz uma passada só e para o runtime.":
     "The Reindex all button runs one pass and stops the runtime.",
+  "Modelo carregado na VRAM": "Model loaded in VRAM",
+  "Model on GPU": "Model on GPU",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",
