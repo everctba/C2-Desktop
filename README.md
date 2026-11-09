@@ -93,21 +93,17 @@ Instruções completas — instalação, modelo, GPU, MCP, troubleshooting e bui
 
 <table>
   <tr>
-    <td width="25%" valign="top">
+    <td width="33%" valign="top">
       <h3>📉 Menos tokens</h3>
       O agente encontra o arquivo certo pelo significado, sem abrir o repositório inteiro. Um resumo pequeno substitui milhares de tokens de código.
     </td>
-    <td width="25%" valign="top">
+    <td width="33%" valign="top">
       <h3>🎯 Menos erro</h3>
       Contexto explícito com <code>what</code>, <code>why</code>, <code>goal</code>, <code>summary</code> e <code>responsibility</code>. O agente chega no arquivo certo antes de improvisar.
     </td>
-    <td width="25%" valign="top">
+    <td width="33%" valign="top">
       <h3>🔄 Sempre atualizado</h3>
       O engine detecta arquivos novos e alterados por hash e reescreve só o metadado afetado. Uma passada incremental de 501 arquivos: <b>0,4 s · 0 chamadas</b>.
-    </td>
-    <td width="25%" valign="top">
-      <h3>🔒 Local por padrão</h3>
-      Modelo local via <code>llama-server</code>. Sem telemetria, sem upload, sem conta. Segredos são detectados antes de chegar ao modelo.
     </td>
   </tr>
 </table>
