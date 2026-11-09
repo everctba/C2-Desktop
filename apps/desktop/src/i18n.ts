@@ -404,6 +404,10 @@ const EN: Record<string, string> = {
   "não detectada": "not detected",
   "consultando…": "checking…",
   "0 (CPU)": "0 (CPU)",
+  "PLAY indexa continuamente e supervisiona o llama-server.":
+    "PLAY continuously indexes and supervises llama-server.",
+  "O botão Reindexar tudo faz uma passada só e para o runtime.":
+    "The Reindex all button runs one pass and stops the runtime.",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

@@ -54,8 +54,14 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   title.textContent = t("Engine");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent = t(
-    "PLAY indexa continuamente e supervisiona o llama-server. REINDEX faz uma passada só e para o runtime.",
+  hint.append(
+    document.createTextNode(
+      t("PLAY indexa continuamente e supervisiona o llama-server."),
+    ),
+    document.createElement("br"),
+    document.createTextNode(
+      t("O botão Reindexar tudo faz uma passada só e para o runtime."),
+    ),
   );
   header.append(title, hint);
   page.appendChild(header);
