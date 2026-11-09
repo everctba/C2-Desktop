@@ -181,6 +181,42 @@ Mudou o arquivo? Só ele é reindexado. O engine roda no desktop e continua na b
 
 <br>
 
+## Busca semântica local
+
+O grep lexical continua sendo a precisão. Quando você ativa os embeddings, o C2
+adiciona um sinal de **cosine** sobre os resumos `.c2.json` — local, opcional e
+sem banco vetorial.
+
+| Recurso | O que faz |
+|---|---|
+| similares + domínios | “quais arquivos parecem com este?” e agrupamento por módulo |
+| duplicados/genéricos | encontra metadados repetidos ou vagos |
+| links sugeridos | arestas de grafo que ainda não existem |
+| co-mudança | arquivos que aparecem nos mesmos commits (`git log`) |
+
+Benchmark real, corpus do C2:
+
+```text
+recall@5 lexical   0.80
+recall@5 híbrido   1.00
+p50 lexical        109 ms
+p50 híbrido        328 ms
+metadata           ~6,8% dos tokens da fonte (~93% menos)
+```
+
+Consulta que prova o caminho: `"criptografia"` devolve **0** no lexical e
+encontra `crates/c2-core/src/security.rs` no híbrido.
+
+> Conjunto pequeno (5 consultas, 173 metadados). Números brutos em
+> [`docs/bench-embeddings.json`](docs/bench-embeddings.json); não é um benchmark
+> geral nem claim de marketing.
+
+Modelo: **bge-m3 Q8_0 (~600 MB)**, CPU por padrão, GPU opcional, na pasta de
+dados/modelos escolhida. O instalador não baixa nada; o app mostra o link e
+valida o `.gguf`.
+
+<br>
+
 ## Demo
 
 <p align="center">
@@ -249,6 +285,7 @@ Projeto de benchmark com 501 arquivos:
 | Segunda passada | **0,4 s · 0 chamadas** · 501 hashes em cache |
 | `c2 grep` | **p50 60 ms · p95 82 ms** |
 | `c2 related` | **49 ms** |
+| Busca híbrida (embeddings) | **p50 328 ms** · recall@5 1.00 em 5 consultas |
 | Pacote Windows | **~120 MB** (app + CLI + runtime llama.cpp) |
 
 Metodologia: [`docs/bench-500.json`](docs/bench-500.json).
@@ -294,11 +331,12 @@ O servidor MCP é somente leitura, exceto `c2_annotate` (notas no `.c2.json`). N
 
 ## Roadmap
 
-- busca híbrida com **embeddings locais** sobre os resumos `.c2.json`;
-- arquivos similares, domínios, metadados duplicados e links sugeridos;
-- “quais arquivos mudam junto com este?”.
+- ampliar o benchmark de recall para um corpus maior;
+- UI dedicada para duplicados/links/co-mudança;
+- calibração automática de threshold por projeto.
 
-O grep lexical continua sendo a precisão; embeddings entram como recall semântico adicional. Acompanhe no [`bd`](AGENTS.md) — épico `c2-kga`.
+O grep lexical continua sendo a precisão; embeddings entram como recall semântico
+adicional. Épico `c2-kga` no [`bd`](AGENTS.md).
 
 <br>
 
@@ -309,7 +347,8 @@ O grep lexical continua sendo a precisão; embeddings entram como recall semânt
 - [Protocolo para agentes](docs/agent-protocol.md) — contexto antes de código
 - [Regras para colar no agente](docs/agent-snippet.md)
 - [Schema do metadado](docs/schema.md)
-- [Benchmark](docs/bench-500.json)
+- [Benchmark lexical](docs/bench-500.json)
+- [Benchmark embeddings](docs/bench-embeddings.json)
 - [Landing page](https://everctba.github.io/C2-Desktop/)
 
 ## Desenvolvimento
