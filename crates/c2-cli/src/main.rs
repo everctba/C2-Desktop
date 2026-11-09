@@ -88,7 +88,7 @@ struct Cli {
     /// Mostra versao
     #[arg(short = 'v', visible_short_alias = 'V', long = "version", action = clap::ArgAction::Version)]
     #[allow(dead_code)]
-    version_info: bool,
+    version_info: Option<bool>,
 
     #[command(subcommand)]
     command: Command,
