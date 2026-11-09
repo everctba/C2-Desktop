@@ -151,6 +151,12 @@ enum Command {
     /// Mostra o estado do workspace
     Status,
 
+    /// Runtime de embeddings (busca semantica opcional)
+    Embeddings {
+        #[command(subcommand)]
+        action: EmbeddingAction,
+    },
+
     /// Le e altera a configuracao do workspace
     Config {
         #[command(subcommand)]
@@ -262,6 +268,20 @@ enum NoteAction {
 }
 
 #[derive(Subcommand, Debug)]
+enum EmbeddingAction {
+    /// Mostra o estado do runtime de embeddings
+    Status,
+    /// Sobe o runtime de embeddings
+    Start,
+    /// Para o runtime de embeddings
+    Stop,
+    /// Gera o vetor de um texto (diagnostico)
+    Embed {
+        text: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum ConfigAction {
     /// Mostra o valor de uma chave (ex.: model.port)
     Get { key: String },
@@ -317,6 +337,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Mcp => cmd_mcp(cli.root.as_deref()),
         Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
+        Command::Embeddings { action } => cmd_embeddings(cli.root.as_deref(), action, cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
             ConfigAction::Set { key, value } => {
@@ -897,6 +918,54 @@ fn cmd_open(root: Option<&Path>) -> Result<()> {
     }
 
     println!("{} {}", i18n::t("C2 Desktop opened at", "C2 Desktop aberto em"), workspace.root().display());
+    Ok(())
+}
+
+fn cmd_embeddings(
+    root: Option<&Path>,
+    action: EmbeddingAction,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let mut config = workspace.load_config()?;
+    match action {
+        EmbeddingAction::Status => {
+            let status = c2_core::embedding_runtime::status(&workspace, &config);
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&status)?);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&status)?);
+            }
+        }
+        EmbeddingAction::Start => {
+            c2_core::embedding_runtime::ensure(&workspace, &config)?;
+            println!("runtime de embeddings pronto");
+        }
+        EmbeddingAction::Stop => {
+            let parou = c2_core::embedding_runtime::stop(&workspace)?;
+            println!("{}", if parou { "runtime de embeddings parado" } else { "runtime de embeddings nao estava rodando" });
+        }
+        EmbeddingAction::Embed { text } => {
+            if !config.index.embeddings.enabled {
+                config.index.embeddings.enabled = true;
+            }
+            c2_core::embedding_runtime::ensure(&workspace, &config)?;
+            let vetor = c2_core::embedding_runtime::embed(&config, &text)?;
+            let norma = vetor.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "dim": vetor.len(),
+                        "norm": norma,
+                        "vector": vetor,
+                    }))?
+                );
+            } else {
+                println!("embedding: {} dimensoes, norma {:.4}", vetor.len(), norma);
+            }
+        }
+    }
     Ok(())
 }
 

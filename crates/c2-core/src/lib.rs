@@ -7,6 +7,7 @@ pub mod cleaner;
 pub mod config;
 pub mod discover;
 pub mod embedding;
+pub mod embedding_runtime;
 pub mod error;
 pub mod gguf;
 pub mod gpu;

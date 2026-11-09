@@ -155,6 +155,81 @@ pub fn default_api_key_env() -> String {
     "C2_API_KEY".to_string()
 }
 
+/// Configuracao da busca semantica por embeddings (opcional).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EmbeddingConfig {
+    pub enabled: bool,
+    /// Caminho do GGUF bge-m3; o arquivo nao e copiado.
+    #[serde(default)]
+    pub model_path: Option<String>,
+    #[serde(default = "default_embedding_model")]
+    pub model_id: String,
+    #[serde(default = "default_embedding_dim")]
+    pub dim: usize,
+    #[serde(default = "default_embedding_pooling")]
+    pub pooling: String,
+    /// `cpu` ou `gpu`.
+    #[serde(default = "default_embedding_device")]
+    pub device: String,
+    #[serde(default = "default_embedding_port")]
+    pub port: u16,
+    #[serde(default = "default_embedding_ctx")]
+    pub ctx_size: u32,
+    #[serde(default = "default_embedding_threads")]
+    pub threads: u32,
+    #[serde(default = "default_embedding_gpu_layers")]
+    pub gpu_layers: u32,
+    /// Score minimo sugerido para aceitar um resultado so-semantico.
+    #[serde(default = "default_embedding_min_score")]
+    pub min_score: f32,
+}
+
+fn default_embedding_model() -> String {
+    "lm-kit/bge-m3-gguf".to_string()
+}
+fn default_embedding_dim() -> usize {
+    1024
+}
+fn default_embedding_pooling() -> String {
+    "cls".to_string()
+}
+fn default_embedding_device() -> String {
+    "cpu".to_string()
+}
+fn default_embedding_port() -> u16 {
+    8199
+}
+fn default_embedding_ctx() -> u32 {
+    8192
+}
+fn default_embedding_threads() -> u32 {
+    8
+}
+fn default_embedding_gpu_layers() -> u32 {
+    99
+}
+fn default_embedding_min_score() -> f32 {
+    0.35
+}
+
+impl Default for EmbeddingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            model_path: None,
+            model_id: default_embedding_model(),
+            dim: default_embedding_dim(),
+            pooling: default_embedding_pooling(),
+            device: default_embedding_device(),
+            port: default_embedding_port(),
+            ctx_size: default_embedding_ctx(),
+            threads: default_embedding_threads(),
+            gpu_layers: default_embedding_gpu_layers(),
+            min_score: default_embedding_min_score(),
+        }
+    }
+}
+
 /// Regras de descoberta e indexacao.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -182,6 +257,9 @@ pub struct IndexConfig {
     pub max_total_bytes_per_run: u64,
     /// Regras de import por regex para linguagens sem extrator nativo.
     pub link_fallback: Vec<FallbackRule>,
+    /// Busca semantica por embeddings (opcional). Desligado por padrao.
+    #[serde(default)]
+    pub embeddings: EmbeddingConfig,
 }
 
 impl Default for IndexConfig {
@@ -197,6 +275,7 @@ impl Default for IndexConfig {
             secret_allow: Vec::new(),
             max_total_bytes_per_run: 64 * 1024 * 1024,
             link_fallback: Vec::new(),
+            embeddings: EmbeddingConfig::default(),
         }
     }
 }
