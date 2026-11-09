@@ -131,18 +131,6 @@
             <p class="hero-note" id="pix-aviso"></p>
           </article>
         </div>
-
-        <div class="callout" style="margin-top: var(--space-2xl)">
-          <h3>Transparência</h3>
-          <ul>
-            <li>Doação <strong>não</strong> compra licença, suporte prioritário ou feature exclusiva.</li>
-            <li>O código continua aberto; o dinheiro vai para tempo de desenvolvimento e infraestrutura.</li>
-            <li>Doação é voluntária e não é reembolsável; obrigado por considerar.</li>
-            <li id="sponsors-linha" style="display: none">
-              Prefere recorrente? <a id="sponsors-link" href="#" rel="noreferrer">GitHub Sponsors</a>.
-            </li>
-          </ul>
-        </div>
       </section>
 
       <!-- O QUE FINANCIA -->
@@ -260,12 +248,6 @@
           pixCopiar.style.opacity = "0.5";
           document.getElementById("pix-aviso").textContent =
             "Chave PIX ainda não configurada (site/config.js).";
-        }
-
-        // Sponsors
-        if (cfg.githubSponsors) {
-          document.getElementById("sponsors-linha").style.display = "block";
-          document.getElementById("sponsors-link").href = cfg.githubSponsors;
         }
 
         // valores: monta o link do PayPal com o valor escolhido
