@@ -58,12 +58,16 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Integration=Integration:
 AddToPath=Add C2 (CLI and MCP) to the system PATH
 CleanUserData=Also remove C2 settings, the GGUF path, language and cache from this PC?
+OpenApp=Open C2
+UninstallC2=Uninstall C2
 brazilianportuguese.Integration=Integração:
 brazilianportuguese.AddToPath=Adicionar C2 (CLI e MCP) ao PATH do sistema
 brazilianportuguese.CleanUserData=Remover também configurações do C2, caminho do GGUF, idioma e cache deste PC?
+brazilianportuguese.OpenApp=Abrir o C2
+brazilianportuguese.UninstallC2=Desinstalar C2
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "addpath"; Description: "{cm:AddToPath}"; GroupDescription: "{cm:Integration}"; Flags: checkedonce
 
 [Files]
@@ -76,11 +80,11 @@ Source: "{#SourceDir}\CHECKSUMS.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\C2"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Desinstalar C2"; Filename: "{uninstallexe}"
+Name: "{group}\{cm:UninstallC2}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\C2"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Abrir o C2"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:OpenApp}"; Flags: nowait postinstall skipifsilent
 
 [Registry]
 ; Guarda os caminhos e dispara a notificacao de ambiente do Windows.
