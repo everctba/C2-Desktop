@@ -191,10 +191,6 @@
   border-color: var(--accent-1);
 }
 
-.tierSelected {
-  border-color: var(--accent-1);
-  background: var(--accent-1-10);
-}
 
 .paypalAcao {
   display: grid;

@@ -193,12 +193,6 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
     botaoPaypal.textContent = `${t("Doar")} US$ ${valorPaypal} ${t("com PayPal")}`;
     avisoPaypal.textContent =
       t("Você será levado ao PayPal; informe o valor de US$") + ` ${valorPaypal}.`;
-    for (const botao of tiers.querySelectorAll<HTMLButtonElement>("button[data-valor]")) {
-      botao.classList.toggle(
-        styles.tierSelected,
-        Number(botao.dataset.valor) === valorPaypal,
-      );
-    }
   };
 
   const tiers = document.createElement("div");

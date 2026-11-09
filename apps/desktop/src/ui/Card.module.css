@@ -6,6 +6,8 @@
   padding: var(--space-3xl) var(--space-3xl) var(--space-2xl);
   display: grid;
   gap: var(--space-xs);
+  align-items: start;
+  align-content: start;
   transition: background 150ms ease;
   min-width: 0;
   min-height: max-content;
