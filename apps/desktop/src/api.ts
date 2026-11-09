@@ -15,6 +15,10 @@ import type {
   CostEstimate,
   RuntimePlan,
   EmbeddingStatus,
+  Neighbor,
+  DuplicateReport,
+  LinkSuggestion,
+  CoChange,
   IndexReport,
   InitResult,
   MetaFile,
@@ -80,6 +84,14 @@ export const api = {
   embeddingStart: (root: string) => invoke<EmbeddingStatus>("embedding_start", { root }),
   embeddingStop: (root: string) => invoke<boolean>("embedding_stop", { root }),
   embeddingPickModel: () => invoke<string | null>("embedding_pick_model"),
+  embeddingSimilar: (root: string, file: string, limit = 10) =>
+    invoke<Neighbor[]>("embedding_similar", { root, file, limit }),
+  embeddingDuplicates: (root: string, threshold = 0.90) =>
+    invoke<DuplicateReport>("embedding_duplicates", { root, threshold }),
+  embeddingLinks: (root: string, threshold = 0.90, limit = 20) =>
+    invoke<LinkSuggestion[]>("embedding_links", { root, threshold, limit }),
+  embeddingCochange: (root: string, file: string, limit = 10) =>
+    invoke<CoChange[]>("embedding_cochange", { root, file, limit }),
   embeddingIndex: (root: string, full = false) =>
     invoke<{ files: number; embedded: number; cached: number; skipped: number; errors: number; last_error: string | null; model_id: string; dim: number }>("embedding_index", { root, full }),
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
@@ -410,6 +422,12 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return true as T;
     case "embedding_pick_model":
       return null as T;
+    case "embedding_similar":
+    case "embedding_links":
+    case "embedding_cochange":
+      return [] as T;
+    case "embedding_duplicates":
+      return { pairs: [], generic: [] } as T;
     case "embedding_index":
       return { files: 0, embedded: 0, cached: 0, skipped: 0, errors: 0, last_error: null, model_id: "lm-kit/bge-m3-gguf", dim: 1024 } as T;
     case "model_load":

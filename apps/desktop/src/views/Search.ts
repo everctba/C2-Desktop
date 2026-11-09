@@ -336,8 +336,42 @@ function resultRow(
       relacionados.appendChild(falha);
     }
   });
-  acoes.appendChild(btnRelacionados);
-  row.append(acoes, relacionados);
+  const semelhantes = document.createElement("div");
+  const btnSemelhantes = document.createElement("button");
+  btnSemelhantes.type = "button";
+  btnSemelhantes.textContent = t("semelhantes");
+  btnSemelhantes.style.cssText = btnRelacionados.style.cssText;
+  btnSemelhantes.addEventListener("click", async (evento) => {
+    evento.stopPropagation();
+    if (semelhantes.childElementCount > 0) {
+      semelhantes.replaceChildren();
+      btnSemelhantes.textContent = t("semelhantes");
+      return;
+    }
+    try {
+      const vizinhos = await api.embeddingSimilar(root, hit.file, 5);
+      const caixa = document.createElement("div");
+      caixa.className = styles.relatedBox;
+      const texto = document.createElement("span");
+      texto.className = styles.breakdown;
+      texto.textContent =
+        vizinhos.length > 0
+          ? vizinhos.map((item) => `${item.score.toFixed(2)} ${item.file}`).join(" · ")
+          : t("sem similares (indexe os embeddings)");
+      caixa.appendChild(texto);
+      semelhantes.appendChild(caixa);
+      btnSemelhantes.textContent = t("ocultar semelhantes");
+    } catch (erro) {
+      semelhantes.replaceChildren();
+      const falha = document.createElement("span");
+      falha.className = styles.breakdown;
+      falha.textContent = String(erro);
+      semelhantes.appendChild(falha);
+    }
+  });
+
+  acoes.append(btnRelacionados, btnSemelhantes);
+  row.append(acoes, relacionados, semelhantes);
 
   row.addEventListener("click", () => void abrirMetadado(root, hit.file));
   return row;

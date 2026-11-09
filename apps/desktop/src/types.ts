@@ -254,3 +254,38 @@ export interface EmbeddingStatus {
   binary: string | null;
   last_error: string | null;
 }
+
+export interface Neighbor {
+  file: string;
+  summary: string;
+  score: number;
+}
+
+export interface DuplicatePair {
+  a: string;
+  b: string;
+  score: number;
+  linked: boolean;
+}
+
+export interface GenericFile {
+  file: string;
+  summary: string;
+  what: string;
+}
+
+export interface DuplicateReport {
+  pairs: DuplicatePair[];
+  generic: GenericFile[];
+}
+
+export interface LinkSuggestion {
+  from: string;
+  to: string;
+  score: number;
+}
+
+export interface CoChange {
+  file: string;
+  commits: number;
+}

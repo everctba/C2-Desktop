@@ -304,6 +304,66 @@ async fn embedding_index(
 }
 
 #[tauri::command]
+fn embedding_similar(
+    root: String,
+    file: String,
+    limit: Option<usize>,
+) -> Result<Vec<c2_core::embedding_insights::Neighbor>, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    c2_core::embedding_insights::similar(
+        &workspace,
+        &config,
+        &file,
+        limit.unwrap_or(10),
+    )
+    .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn embedding_duplicates(
+    root: String,
+    threshold: Option<f32>,
+) -> Result<c2_core::embedding_insights::DuplicateReport, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    c2_core::embedding_insights::duplicates(
+        &workspace,
+        &config,
+        threshold.unwrap_or(0.90),
+    )
+    .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn embedding_links(
+    root: String,
+    threshold: Option<f32>,
+    limit: Option<usize>,
+) -> Result<Vec<c2_core::embedding_insights::LinkSuggestion>, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    c2_core::embedding_insights::link_suggestions(
+        &workspace,
+        &config,
+        threshold.unwrap_or(0.90),
+        limit.unwrap_or(20),
+    )
+    .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn embedding_cochange(
+    root: String,
+    file: String,
+    limit: Option<usize>,
+) -> Result<Vec<c2_core::embedding_insights::CoChange>, String> {
+    let workspace = open_workspace(&root)?;
+    c2_core::embedding_insights::cochange(&workspace, &file, limit.unwrap_or(10))
+        .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
 fn embedding_pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
         .file()
@@ -1353,7 +1413,17 @@ pub fn run() {
             provider_test,
             cost_estimate,
             runtime_plan,
-            model_load
+            model_load,
+            embedding_status,
+            embedding_save,
+            embedding_start,
+            embedding_stop,
+            embedding_pick_model,
+            embedding_index,
+            embedding_similar,
+            embedding_duplicates,
+            embedding_links,
+            embedding_cochange
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

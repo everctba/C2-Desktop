@@ -438,6 +438,9 @@ const EN: Record<string, string> = {
   "Indexar embeddings": "Index embeddings",
   Híbrida: "Hybrid",
   semântico: "semantic",
+  semelhantes: "similar",
+  "ocultar semelhantes": "hide similar",
+  "sem similares (indexe os embeddings)": "no similar files (index embeddings first)",
   "indexando embeddings…": "indexing embeddings…",
 };
 
