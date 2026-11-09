@@ -659,6 +659,24 @@ async function ensureModelLoaded(): Promise<boolean> {
   });
 }
 
+async function unloadModel(): Promise<void> {
+  if (!state.root) return;
+  autoEngineBloqueado = true;
+  state.busy = true;
+  render();
+  try {
+    await api.modelUnload(state.root);
+    state.running = false;
+    log("modelo descarregado da VRAM");
+  } catch (error) {
+    log(`erro ao descarregar modelo: ${String(error)}`);
+  } finally {
+    state.busy = false;
+    await loadStatus();
+    render();
+  }
+}
+
 async function toggleEngine(): Promise<void> {
   if (!state.root) return;
   state.busy = true;
@@ -768,6 +786,7 @@ function render(): void {
           onPlay: () => void toggleEngine(),
           onStop: () => void toggleEngine(),
           onReindex: (full: boolean) => void runReindex(full),
+          onUnloadModel: () => void unloadModel(),
           onCleanupDone: () =>
             void (async () => {
               await loadStatus();

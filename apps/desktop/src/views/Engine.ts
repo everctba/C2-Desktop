@@ -17,6 +17,7 @@ export interface EngineContext {
   onStop: () => void;
   onReindex: (full: boolean) => void;
   onCleanupDone: () => void;
+  onUnloadModel: () => void;
 }
 
 import type { View } from "./view";
@@ -135,7 +136,16 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     gpuContexto,
     gpuCamadas,
   );
-  gpuCard.append(gpuTitle, gpuStatus, gpuRows);
+  const btnDescarregar = Button({
+    label: t("Descarregar modelo"),
+    iconName: "stop",
+    size: "xs",
+    variant: "warning",
+    disabled: !ctx.status?.runtime.healthy,
+    onClick: ctx.onUnloadModel,
+  });
+  btnDescarregar.style.marginTop = "var(--space-s)";
+  gpuCard.append(gpuTitle, gpuStatus, gpuRows, btnDescarregar);
   infoRow.appendChild(gpuCard);
   page.appendChild(infoRow);
 
@@ -347,6 +357,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       ? t("modelo carregado")
       : t("modelo não carregado");
     gpuStatus.style.color = carregado ? "var(--accent-1)" : "var(--text-subtle)";
+    btnDescarregar.disabled = !carregado;
     if (status?.model) {
       (gpuContexto.lastElementChild as HTMLElement).textContent =
         `${status.model.ctx_size.toLocaleString("pt-BR")} tokens`;

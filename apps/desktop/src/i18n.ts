@@ -410,6 +410,7 @@ const EN: Record<string, string> = {
     "The Reindex all button runs one pass and stops the runtime.",
   "Modelo carregado na VRAM": "Model loaded in VRAM",
   "Model on GPU": "Model on GPU",
+  "Descarregar modelo": "Unload model",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

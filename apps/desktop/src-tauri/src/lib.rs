@@ -364,7 +364,10 @@ fn engine_start(
             }
 
             // Watchdog: servidor caiu? sobe de novo (com backoff interno).
-            if c2_core::config::usa_runtime_local(&config) && !runtime::health(&config) {
+            if running.load(Ordering::SeqCst)
+                && c2_core::config::usa_runtime_local(&config)
+                && !runtime::health(&config)
+            {
                 let porta_antes = config.model.port;
                 let _ = runtime::ensure_auto(&workspace, &mut config);
                 if config.model.port != porta_antes {
@@ -389,6 +392,14 @@ fn engine_stop(_root: String, engine: State<'_, Engine>) -> Result<(), String> {
     engine.running.store(false, Ordering::SeqCst);
     // O runtime/modelo permanece na GPU; o banner fica em "Model on GPU loaded"
     // (estado idle) e um novo Start reaproveita o runtime saudavel.
+    Ok(())
+}
+
+#[tauri::command]
+fn model_unload(root: String, engine: State<'_, Engine>) -> Result<(), String> {
+    engine.running.store(false, Ordering::SeqCst);
+    let workspace = open_workspace(&root)?;
+    runtime::stop(&workspace).map_err(|err| err.to_string())?;
     Ok(())
 }
 
@@ -1152,6 +1163,7 @@ pub fn run() {
             engine_start,
             engine_stop,
             engine_running,
+            model_unload,
             search_grep,
             file_read,
             file_related,

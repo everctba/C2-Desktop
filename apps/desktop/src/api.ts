@@ -70,6 +70,7 @@ export const api = {
     invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
+  modelUnload: (root: string) => invoke<void>("model_unload", { root }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: (lang?: string) => invoke<string>("prompt_default", { lang }),
   promptSync: (root: string, lang: string) =>
@@ -362,6 +363,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
         },
         loaded: false,
       } as T;
+    case "model_unload":
+      return undefined as T;
     case "model_load":
       await delay(1500);
       return null as T;
