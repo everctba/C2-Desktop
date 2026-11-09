@@ -26,8 +26,9 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
   title.textContent = t("MCP");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent =
-    "Servidor MCP por STDIO para agentes de IA. Somente leitura: grep, read, related e map sobre o Core, com resposta limitada.";
+  hint.textContent = t(
+    "Servidor MCP por STDIO para agentes de IA. Somente leitura: grep, read, related e map sobre o Core, com resposta limitada.",
+  );
   header.append(title, hint);
   page.appendChild(header);
 
@@ -72,18 +73,18 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
   const desenhar = (status: McpStatus) => {
     const disponivel = status.available;
     const atual = Pill(
-      disponivel ? "servidor pronto" : "indisponível",
+      t(disponivel ? "servidor pronto" : "indisponível"),
       disponivel ? "success" : "danger",
     );
     estado.replaceChild(atual, estado.firstElementChild ?? atual);
     servidorCorpo.replaceChildren();
     servidorCorpo.appendChild(
-      campo("protocolo", status.protocol_version ?? "—", true),
+      campo(t("protocolo"), status.protocol_version ?? "—", true),
     );
-    servidorCorpo.appendChild(campo("servidor", status.server_name ?? "—"));
-    servidorCorpo.appendChild(campo("binário", status.binary ?? "não encontrado", true));
+    servidorCorpo.appendChild(campo(t("servidor"), status.server_name ?? "—"));
+    servidorCorpo.appendChild(campo(t("binário"), status.binary ?? t("não encontrado"), true));
     if (status.error) {
-      servidorCorpo.appendChild(campo("erro", status.error));
+      servidorCorpo.appendChild(campo(t("erro"), status.error));
     }
 
     ferramentasCorpo.replaceChildren();
@@ -101,7 +102,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
       nome.textContent = ferramenta.name;
       const descricao = document.createElement("span");
       descricao.className = styles.fieldValue;
-      descricao.textContent = ferramenta.description;
+      descricao.textContent = t(ferramenta.description);
       linha.append(nome, descricao);
       ferramentasCorpo.appendChild(linha);
     }
@@ -169,7 +170,7 @@ export async function renderMcp(ctx: McpContext): Promise<View> {
     const nota = document.createElement("p");
     nota.className = "pageHint";
     nota.textContent =
-      "Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor é somente leitura, exceto `c2_annotate` (anotações no .c2.json do arquivo). Nada é enviado para fora da máquina.";
+      t("Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor é somente leitura, exceto `c2_annotate` (anotações no .c2.json do arquivo). Nada é enviado para fora da máquina.");
     conectarCorpo.appendChild(nota);
   };
 

@@ -33,8 +33,9 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
   title.textContent = t("Busca");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent =
-    "Descreva a responsabilidade que procura. O resultado mostra o motivo (campo e termos) e um trecho; clique para abrir o metadado completo.";
+  hint.textContent = t(
+    "Descreva a responsabilidade que procura. O resultado mostra o motivo (campo e termos) e um trecho; clique para abrir o metadado completo.",
+  );
   header.append(title, hint);
   page.appendChild(header);
 
@@ -57,7 +58,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     for (const exemplo of EXEMPLOS) {
       exemplos.appendChild(
         Button({
-          label: exemplo,
+          label: t(exemplo),
           size: "xs",
           variant: "secondary",
           onClick: () => {

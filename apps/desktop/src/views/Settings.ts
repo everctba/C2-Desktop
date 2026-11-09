@@ -277,7 +277,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
 
   gradeIdioma.append(
     opcaoIdioma("en", "English", flagUS(22)),
-    opcaoIdioma("pt-BR", "Português (Brasil)", flagBR(22)),
+    opcaoIdioma("pt-BR", t("Português (Brasil)"), flagBR(22)),
   );
   idiomaBody.appendChild(gradeIdioma);
   page.appendChild(idiomaCard);
@@ -397,13 +397,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   const avisoProvedor = document.createElement("p");
   avisoProvedor.className = "pageHint";
   avisoProvedor.style.maxWidth = "none";
-  avisoProvedor.textContent = t(
-    "Local é o padrão: o modelo roda na sua máquina e nada sai dela. " +
-      "Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor " +
-      "configurado e os tokens são cobrados na sua conta — só ative se for aceitável. " +
-      "No modo API/BYO, os indicadores locais (runtime, VRAM, .gguf) não se aplicam: " +
-      "quem gerencia o servidor é o provedor ou software externo.",
-  );
+  avisoProvedor.textContent =
+    t("Local é o padrão: o modelo roda na sua máquina e nada sai dela. ") +
+    t("Ao usar um provedor de nuvem, o conteúdo dos arquivos é enviado ao provedor ") +
+    t("configurado e os tokens são cobrados na sua conta — só ative se for aceitável. ") +
+    t("No modo API/BYO, os indicadores locais (runtime, VRAM, .gguf) não se aplicam: ") +
+    t("quem gerencia o servidor é o provedor ou software externo.");
   provedorBody.appendChild(avisoProvedor);
 
   const gradeProvedor = document.createElement("div");
@@ -606,7 +605,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   trocaIdiomaPrompt.style.marginTop = "var(--space-s)";
   for (const [rotulo, lang] of [
     ["English", "en"],
-    ["Português", "pt-BR"],
+    [t("Português"), "pt-BR"],
   ] as Array<[string, string]>) {
     trocaIdiomaPrompt.appendChild(
       Button({

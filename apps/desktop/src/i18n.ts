@@ -285,7 +285,7 @@ const EN: Record<string, string> = {
   "prompt trocado (salve para aplicar)": "prompt changed (save to apply)",
   "falha ao carregar prompt": "failed to load prompt",
   "O idioma dos metadados é definido por este prompt, não pelo idioma da interface. Use English/Português acima ou edite livremente.":
-    "The metadata language is defined by this prompt, not by the interface language. Use English/Português above or edit freely.",
+    "The metadata language is defined by this prompt, not by the interface language. Use English/Portuguese above or edit freely.",
   "Trocar o idioma do prompt não traduz metadados antigos. Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.":
     "Changing the prompt language does not translate old metadata. To regenerate everything in the new language, run Reindex all in the Engine.",
   "Abrir pasta no Explorer": "Open folder in Explorer",
@@ -311,11 +311,59 @@ const EN: Record<string, string> = {
   de: "of",
   "Carregando modelo…": "Loading model…",
   "Modelo carregado": "Model loaded",
+
+  "PLAY indexa continuamente e supervisiona o llama-server. REINDEX faz uma passada só e para o runtime.":
+    "PLAY continuously indexes and supervises llama-server. REINDEX runs one pass and stops the runtime.",
+  Arquivos: "Files",
+  descobertos: "discovered",
+  indexados: "indexed",
+  Pendentes: "Pending",
+  "sem metadado": "without metadata",
+  "Chamadas LLM": "LLM calls",
+  "nesta máquina": "on this machine",
+  "parado — clique em Iniciar para indexar": "stopped — click Start to index",
+  "runtime saudável": "runtime healthy",
+  "engine iniciado, aguardando atividade": "engine started, waiting for activity",
+  "engine encerrado": "engine stopped",
+  "Reindexar tudo": "Reindex all",
+  "Descreva a responsabilidade que procura. O resultado mostra o motivo (campo e termos) e um trecho; clique para abrir o metadado completo.":
+    "Describe the responsibility you are looking for. Results show the reason (field and terms) and a snippet; click to open the full metadata.",
+  "onde calcula o hash dos arquivos": "where it computes file hashes",
+  "cliente que fala com o modelo local": "client that talks to the local model",
+  "busca semântica por significado": "semantic search by meaning",
+  "buscando...": "searching...",
+  "Servidor MCP por STDIO para agentes de IA. Somente leitura: grep, read, related e map sobre o Core, com resposta limitada.":
+    "MCP server over STDIO for AI agents. Read-only: grep, read, related and map over the Core, with bounded responses.",
+  "servidor pronto": "server ready",
+  indisponível: "unavailable",
+  protocolo: "protocol",
+  servidor: "server",
+  binário: "binary",
+  "não encontrado": "not found",
+  erro: "error",
+  "Busca semantica nos metadados do projeto. Retorna arquivo, score, resumo e trecho.":
+    "Semantic search over project metadata. Returns file, score, summary and snippet.",
+  "Le um arquivo do projeto com numero de linha (faixa opcional).":
+    "Reads a project file with line numbers (optional range).",
+  "Dependencias de um arquivo pelo grafo estatico (usa / usado por).":
+    "File dependencies from the static graph (uses / used by).",
+  "Arvore plana do projeto: uma linha por arquivo indexavel.":
+    "Flat project tree: one line per indexable file.",
+  "Anexa uma anotacao de agente ao .c2.json do arquivo (campo agent_notes; nao altera codigo, semantic nem links). Use SOMENTE apos pensamento teleologico: por que existe, o que quebra se remover, o que o codigo nao revela — e apenas se isso nao for derivavel do codigo. Max 1-2 por tarefa; nunca anote o obvio.":
+    "Appends an agent note to the file's .c2.json (agent_notes; does not change code, semantic fields or links). Use ONLY after teleological thinking: why it exists, what breaks if removed, what the code does not reveal — and only if that is not derivable from the code. Max 1-2 per task; never note the obvious.",
+  "Português (Brasil)": "Portuguese (Brazil)",
+  Português: "Portuguese",
+  Brasil: "Brazil",
+  Licença: "License",
+  "workspace carregado": "workspace loaded",
+  arquivos: "files",
+  metadados: "metadata items",
+  "Cole no seu cliente MCP (Claude Desktop, Cursor, etc.). O servidor é somente leitura, exceto `c2_annotate` (anotações no .c2.json do arquivo). Nada é enviado para fora da máquina.":
+    "Paste into your MCP client (Claude Desktop, Cursor, etc.). The server is read-only except `c2_annotate` (notes in the file's .c2.json). Nothing leaves your machine.",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",
   English: "English",
-  "Português (Brasil)": "Português (Brasil)",
   "Escolha o idioma da interface. A CLI e as ferramentas MCP continuam em inglês.":
     "Choose the interface language. The CLI and MCP tools stay in English.",
   "idioma atualizado": "language updated",

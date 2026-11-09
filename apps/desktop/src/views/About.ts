@@ -176,16 +176,16 @@ export async function renderAbout(): Promise<{ element: HTMLElement }> {
   grade.append(
     cartaoDoacao(
       "PayPal",
-      "internacional",
-      "Cartão ou saldo PayPal, em dólar. Funciona fora do Brasil.",
+      t("internacional"),
+      t("Cartão ou saldo PayPal, em dólar. Funciona fora do Brasil."),
       paypalQrUrl,
       PERFIL.paypalEmail,
-      "escaneie com o app do PayPal",
+      t("escaneie com o app do PayPal"),
     ),
     cartaoDoacao(
       "PIX",
-      "Brasil",
-      "Pagamento instantâneo em reais, direto do seu banco.",
+      t("Brasil"),
+      t("Pagamento instantâneo em reais, direto do seu banco."),
       pixQrUrl,
       PERFIL.pixChave,
       `PIX · ${PERFIL.pixNome}`,

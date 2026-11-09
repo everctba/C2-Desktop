@@ -54,26 +54,27 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   title.textContent = t("Engine");
   const hint = document.createElement("p");
   hint.className = "pageHint";
-  hint.textContent =
-    "PLAY indexa continuamente e supervisiona o llama-server. REINDEX faz uma passada só e para o runtime.";
+  hint.textContent = t(
+    "PLAY indexa continuamente e supervisiona o llama-server. REINDEX faz uma passada só e para o runtime.",
+  );
   header.append(title, hint);
   page.appendChild(header);
 
   /* estado atual */
   const stateRow = document.createElement("div");
   stateRow.className = styles.actions;
-  let enginePill = Pill(ctx.running ? "engine rodando" : "engine parado", ctx.running ? "success" : "neutral");
-  let runtimePill = Pill("runtime —", "neutral");
+  let enginePill = Pill(t(ctx.running ? "engine rodando" : "engine parado"), ctx.running ? "success" : "neutral");
+  let runtimePill = Pill(t("runtime —"), "neutral");
   stateRow.append(enginePill, runtimePill);
   page.appendChild(stateRow);
 
   /* contadores */
   const metrics = document.createElement("div");
   metrics.className = "cardGrid";
-  const filesMetric = metricCard("Arquivos", "descobertos");
-  const metaMetric = metricCard("Metadados", "indexados");
-  const pendingMetric = metricCard("Pendentes", "sem metadado");
-  const callsMetric = metricCard("Chamadas LLM", "nesta máquina");
+  const filesMetric = metricCard(t("Arquivos"), t("descobertos"));
+  const metaMetric = metricCard(t("Metadados"), t("indexados"));
+  const pendingMetric = metricCard(t("Pendentes"), t("sem metadado"));
+  const callsMetric = metricCard(t("Chamadas LLM"), t("nesta máquina"));
   metrics.append(filesMetric.card, metaMetric.card, pendingMetric.card, callsMetric.card);
   page.appendChild(metrics);
 
@@ -300,8 +301,14 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       runtimePill,
       runtimePillFor(ctx.status),
     );
-    setActivity(ctx.running ? "engine iniciado, aguardando atividade" : "parado — clique em Iniciar para indexar");
-    appendLog(`workspace carregado · ${ctx.status.files} arquivos · ${ctx.status.metadata} metadados`);
+    setActivity(
+      ctx.running
+        ? t("engine iniciado, aguardando atividade")
+        : t("parado — clique em Iniciar para indexar"),
+    );
+    appendLog(
+      `${t("workspace carregado")} · ${ctx.status.files} ${t("arquivos")} · ${ctx.status.metadata} ${t("metadados")}`,
+    );
   }
 
   await refreshLista();
