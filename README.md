@@ -57,6 +57,23 @@ what · why · goal · summary · responsibility · links[]
 
 O agente consulta esse contexto por significado antes de abrir o código. Resultado: **menos tokens, menos leitura, menos erro** — e o repositório continua sendo a fonte da verdade.
 
+### O que o agente recebe
+
+```json
+{
+  "what": "valida o pagamento do pedido",
+  "why": "impede cobrança sem confirmação do provedor",
+  "goal": "garantir que o pedido só avance após aprovação",
+  "summary": "consulta o provedor e atualiza o status do pagamento",
+  "responsibility": "regras de confirmação e estorno",
+  "links": ["src/pagamento/provedor.rs", "src/pedido/status.rs"]
+}
+```
+
+Metadado é **hipótese**; código é evidência. O C2 deixa isso explícito — e o agente confirma no código antes de editar.
+
+<br>
+
 ## Começar
 
 ```powershell
@@ -221,23 +238,6 @@ Mudou o arquivo? Só ele é reindexado. O engine roda no desktop e continua na b
     </td>
   </tr>
 </table>
-
-### O que o agente recebe
-
-```json
-{
-  "what": "valida o pagamento do pedido",
-  "why": "impede cobrança sem confirmação do provedor",
-  "goal": "garantir que o pedido só avance após aprovação",
-  "summary": "consulta o provedor e atualiza o status do pagamento",
-  "responsibility": "regras de confirmação e estorno",
-  "links": ["src/pagamento/provedor.rs", "src/pedido/status.rs"]
-}
-```
-
-Metadado é **hipótese**; código é evidência. O C2 deixa isso explícito — e o agente confirma no código antes de editar.
-
-<br>
 
 ## Números medidos
 
