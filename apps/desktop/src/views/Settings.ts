@@ -549,7 +549,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
 
   page.appendChild(provedorCard);
 
-  // ---- Prompt de indexacao (personalizavel) ----
+  // ---- Prompt de indexacao (Original ou Custom) ----
   const promptInicial = String(lerConfig(config, "index.prompt") ?? "");
   iniciais.set("index.prompt", promptInicial);
 
@@ -570,69 +570,105 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   );
   promptBody.appendChild(explicacao);
 
+  const padraoPt = await api.promptDefault("pt-BR").catch(() => "");
+  const padraoEn = await api.promptDefault("en").catch(() => "");
+  const padraoAtual = await api.promptDefault(idiomaAtual()).catch(() => "");
+  const ehPadrao = (texto: string) => {
+    const atual = texto.trim();
+    return [padraoPt, padraoEn].some((padrao) => {
+      const p = padrao.trim();
+      return p.length > 0 && (atual === p || (atual.length > 300 && p.startsWith(atual)));
+    });
+  };
+  let personalizado = promptInicial.trim().length > 0 && !ehPadrao(promptInicial);
+
   const area = document.createElement("textarea");
   area.className = styles.promptArea;
   area.rows = 12;
   area.spellcheck = false;
-  area.value = promptInicial;
+  area.value = personalizado ? promptInicial : padraoAtual || padraoEn || padraoPt;
+  area.readOnly = !personalizado;
+  area.style.opacity = personalizado ? "1" : "0.78";
   promptBody.appendChild(area);
 
   const promptAcoes = document.createElement("div");
   promptAcoes.className = styles.actions;
-  let padrao = "";
-  try {
-    padrao = await api.promptDefault(idiomaAtual());
-  } catch {
-    padrao = "";
-  }
-  if (padrao) {
-    promptAcoes.appendChild(
-      Button({
-        label: t("Restaurar padrão"),
-        size: "xs",
-        variant: "secondary",
-        onClick: () => {
+
+  const btnOriginal = Button({
+    label: t("Original"),
+    size: "xs",
+    variant: "secondary",
+    onClick: () => {
+      void (async () => {
+        try {
+          const padrao = await api.promptDefault(idiomaAtual());
           area.value = padrao;
-          status.textContent = t("prompt restaurado (salve para aplicar)");
-        },
-      }),
-    );
-  }
-  // Troca explicita do idioma dos metadados (independente da UI).
-  const trocaIdiomaPrompt = document.createElement("div");
-  trocaIdiomaPrompt.style.display = "flex";
-  trocaIdiomaPrompt.style.gap = "var(--space-s)";
-  trocaIdiomaPrompt.style.marginTop = "var(--space-s)";
-  for (const [rotulo, lang] of [
-    ["English", "en"],
-    [t("Português"), "pt-BR"],
-  ] as Array<[string, string]>) {
-    trocaIdiomaPrompt.appendChild(
-      Button({
-        label: rotulo,
-        size: "xs",
-        variant: "ghost",
-        onClick: () => {
-          void (async () => {
-            try {
-              area.value = await api.promptDefault(lang);
-              status.textContent = t("prompt trocado (salve para aplicar)");
-            } catch {
-              status.textContent = t("falha ao carregar prompt");
-            }
-          })();
-        },
-      }),
-    );
-  }
-  promptBody.appendChild(trocaIdiomaPrompt);
+          personalizado = false;
+          area.readOnly = true;
+          area.style.opacity = "0.78";
+          atualizarModoPrompt();
+          status.textContent = t("prompt original restaurado (salve para aplicar)");
+        } catch {
+          status.textContent = t("falha ao carregar prompt");
+        }
+      })();
+    },
+  });
+
+  const btnCustom = Button({
+    label: t("Personalizar"),
+    size: "xs",
+    variant: "secondary",
+    onClick: () => ativarCustom(),
+  });
+
+  promptAcoes.append(btnOriginal, btnCustom);
+  promptBody.appendChild(promptAcoes);
+
+  const atualizarModoPrompt = () => {
+    btnOriginal.style.borderColor = personalizado ? "" : "var(--accent-1)";
+    btnOriginal.style.background = personalizado ? "" : "var(--accent-1-10)";
+    btnCustom.style.borderColor = personalizado ? "var(--accent-1)" : "";
+    btnCustom.style.background = personalizado ? "var(--accent-1-10)" : "";
+    area.readOnly = !personalizado;
+    area.style.opacity = personalizado ? "1" : "0.78";
+  };
+
+  const ativarCustom = () => {
+    personalizado = true;
+    area.readOnly = false;
+    area.focus();
+    atualizarModoPrompt();
+    status.textContent = t("prompt personalizado: edite e salve para aplicar");
+  };
+
+  // No modo Original, clicar no texto explica como ativar o Custom.
+  area.addEventListener("click", () => {
+    if (personalizado) return;
+    void (async () => {
+      const corpo = document.createElement("p");
+      corpo.className = "pageHint";
+      corpo.style.maxWidth = "none";
+      corpo.textContent = t(
+        "Para editar, ative a opção Personalizar. No modo Original o prompt acompanha o idioma da interface.",
+      );
+      const editar = await openDialog({
+        title: t("Editar prompt?"),
+        body: corpo,
+        confirmLabel: t("Personalizar"),
+        cancelLabel: t("Cancelar"),
+      });
+      if (editar) ativarCustom();
+    })();
+  });
+  atualizarModoPrompt();
 
   const notaPrompt = document.createElement("p");
   notaPrompt.className = "pageHint";
   notaPrompt.style.maxWidth = "none";
   notaPrompt.textContent = t(
-    "O idioma dos metadados é definido por este prompt, não pelo idioma da interface. " +
-      "Use English/Português acima ou edite livremente.",
+    "O prompt Original acompanha o idioma da interface. Personalizar permite editar " +
+      "e não muda quando o idioma da interface muda.",
   );
   promptBody.appendChild(notaPrompt);
 
@@ -641,8 +677,8 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   avisoTraducao.style.maxWidth = "none";
   avisoTraducao.style.color = "var(--warning)";
   avisoTraducao.textContent = t(
-    "Trocar o idioma do prompt não traduz metadados antigos. " +
-      "Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.",
+    "Trocar o idioma não traduz metadados antigos. Para regenerar tudo no novo idioma, " +
+      "rode Reindexar tudo na Engine.",
   );
   promptBody.appendChild(avisoTraducao);
 

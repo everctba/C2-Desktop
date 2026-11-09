@@ -15,7 +15,7 @@ import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
 import { initNews } from "./news";
-import { initLang, t } from "./i18n";
+import { idiomaAtual, initLang, t } from "./i18n";
 import { iniciarProbeUI, perfBoot } from "./perf";
 import { openWelcome } from "./views/Welcome";
 import type { View } from "./views/view";
@@ -60,6 +60,7 @@ async function openRecent(path: string): Promise<void> {
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
   rememberProject(state.root);
+  await sincronizarPromptIdioma();
   await loadStatus();
   state.route = state.status?.initialized ? "engine" : "projects";
   render();
@@ -91,6 +92,15 @@ function log(message: string): void {
   const time = new Date().toLocaleTimeString("pt-BR");
   state.logs.unshift(`${time} ${message}`);
   state.logs = state.logs.slice(0, 40);
+}
+
+async function sincronizarPromptIdioma(): Promise<void> {
+  if (!state.root) return;
+  try {
+    await api.promptSync(state.root, idiomaAtual());
+  } catch {
+    /* config antiga/sem workspace: segue */
+  }
 }
 
 async function loadStatus(): Promise<void> {
@@ -128,6 +138,7 @@ async function pickProject(): Promise<string | null> {
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
   rememberProject(state.root);
+  await sincronizarPromptIdioma();
   await loadStatus();
   // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
   state.route = state.status?.initialized ? "engine" : "projects";
@@ -856,6 +867,7 @@ async function boot(): Promise<void> {
     localStorage.setItem("c2.root", state.root);
     rememberProject(state.root);
   }
+  await sincronizarPromptIdioma();
   const statusInicio = performance.now();
   await loadStatus();
   logBoot("status_ok", { ms: Math.round(performance.now() - statusInicio) });
@@ -867,7 +879,12 @@ async function boot(): Promise<void> {
   }
   if (state.status) log("workspace carregado");
   subscribeEvents();
-  window.addEventListener("c2:lang", () => render());
+  window.addEventListener("c2:lang", () => {
+    void (async () => {
+      await sincronizarPromptIdioma();
+      render();
+    })();
+  });
   render();
   logBoot("render_ok");
   requestAnimationFrame(() => perfBoot("first_raf"));

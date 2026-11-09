@@ -1077,6 +1077,24 @@ fn news_state_save(app: tauri::AppHandle, state: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn prompt_sync(root: String, lang: String) -> Result<bool, String> {
+    let workspace = open_workspace(&root)?;
+    let mut config = workspace.load_config().map_err(|err| err.to_string())?;
+    if !c2_core::config::is_builtin_prompt(&config.index.prompt) {
+        return Ok(false);
+    }
+    let alvo = c2_core::config::default_prompt_for(&lang).to_string();
+    if config.index.prompt == alvo {
+        return Ok(false);
+    }
+    config.index.prompt = alvo;
+    workspace
+        .save_config(&config)
+        .map_err(|err| err.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
 fn prompt_default(lang: Option<String>) -> String {
     if lang.as_deref() == Some("pt-BR") {
         c2_core::config::DEFAULT_PROMPT_PT.to_string()
@@ -1134,6 +1152,7 @@ pub fn run() {
             pick_model,
             model_inspect,
             model_set,
+            prompt_sync,
             prompt_default,
             perf_log,
             startup_elapsed_ms,

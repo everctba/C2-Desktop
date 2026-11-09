@@ -370,6 +370,19 @@ const EN: Record<string, string> = {
   "com PayPal": "with PayPal",
   "Você será levado ao PayPal; informe o valor de US$":
     "You will be taken to PayPal; enter the amount of US$",
+  Original: "Original",
+  Personalizar: "Custom",
+  "Editar prompt?": "Edit prompt?",
+  "Para editar, ative a opção Personalizar. No modo Original o prompt acompanha o idioma da interface.":
+    "To edit, enable Custom. In Original mode the prompt follows the interface language.",
+  "prompt personalizado: edite e salve para aplicar":
+    "custom prompt: edit and save to apply",
+  "prompt original restaurado (salve para aplicar)":
+    "original prompt restored (save to apply)",
+  "O prompt Original acompanha o idioma da interface. Personalizar permite editar e não muda quando o idioma da interface muda.":
+    "The Original prompt follows the interface language. Custom lets you edit it and does not change when the interface language changes.",
+  "Trocar o idioma não traduz metadados antigos. Para regenerar tudo no novo idioma, rode Reindexar tudo na Engine.":
+    "Changing the language does not translate old metadata. To regenerate everything in the new language, run Reindex all in the Engine.",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",

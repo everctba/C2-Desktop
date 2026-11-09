@@ -72,6 +72,8 @@ export const api = {
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   mcpSmoke: (root: string) => invoke<McpStatus>("mcp_smoke", { root }),
   promptDefault: (lang?: string) => invoke<string>("prompt_default", { lang }),
+  promptSync: (root: string, lang: string) =>
+    invoke<boolean>("prompt_sync", { root, lang }),
   openProjectFolder: (root: string) => invoke<void>("open_project_folder", { root }),
   cleanerPlan: (root: string) => invoke<{ found: number }>("cleaner_plan", { root }),
   cleanerRun: (root: string) => invoke<{ found: number; removed: number; failed: string[] }>("cleaner_run", { root }),
@@ -284,6 +286,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
     case "api_key_delete":
       return undefined as T;
     case "api_key_status":
+      return false as T;
+    case "prompt_sync":
       return false as T;
     case "prompt_default":
       return "You are a software architect." as T;

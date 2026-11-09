@@ -224,6 +224,29 @@ fn default_prompt() -> String {
     DEFAULT_PROMPT.to_string()
 }
 
+/// Prompt padrao do idioma da interface (`en` ou `pt-BR`).
+pub fn default_prompt_for(lang: &str) -> &'static str {
+    if lang == "pt-BR" {
+        DEFAULT_PROMPT_PT
+    } else {
+        DEFAULT_PROMPT
+    }
+}
+
+/// Verdadeiro quando o prompt e um dos textos de fabrica (EN ou PT).
+pub fn is_builtin_prompt(prompt: &str) -> bool {
+    let atual = prompt.trim();
+    if atual.is_empty() {
+        return true;
+    }
+    // Versoes antigas gravavam o prompt padrao sem a ultima linha (idioma).
+    // Prefixo longo de um default tambem conta como "Original".
+    [DEFAULT_PROMPT, DEFAULT_PROMPT_PT].iter().any(|padrao| {
+        let padrao = padrao.trim();
+        atual == padrao || (atual.len() > 300 && padrao.starts_with(atual))
+    })
+}
+
 /// Extensoes de texto indexaveis por padrao.
 pub fn default_extensions() -> Vec<String> {
     [
