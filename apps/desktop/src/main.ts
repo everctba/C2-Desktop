@@ -206,6 +206,7 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
 
     const corpo = document.createElement("div");
     corpo.style.display = "grid";
+    corpo.style.gridTemplateColumns = "1fr";
     corpo.style.gap = "var(--space-s)";
     const intro = document.createElement("p");
     intro.textContent =
@@ -228,17 +229,11 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
     ): HTMLButtonElement => {
       const box = document.createElement("button");
       box.type = "button";
-      box.style.cssText =
-        "display: grid; gap: var(--space-2xs); text-align: left; " +
-        "padding: var(--space-m); border-radius: var(--radius); cursor: pointer; " +
-        "background: var(--bg-surface); border: 1px solid var(--border-muted);";
+      box.className = "modoInicialCard";
       const tituloEl = document.createElement("strong");
       tituloEl.textContent = titulo;
-      tituloEl.style.color = "var(--text-bright)";
       const descEl = document.createElement("span");
       descEl.textContent = descricao;
-      descEl.style.fontSize = "var(--text-s)";
-      descEl.style.color = "var(--text-muted)";
       box.append(tituloEl, descEl);
       box.addEventListener("click", () => finalizar(modo));
       return box;

@@ -223,3 +223,43 @@ input {
     display: none;
   }
 }
+
+/* Cards de escolha do primeiro uso (local x nuvem), empilhados. */
+.modoInicialCard {
+  display: grid;
+  gap: var(--space-2xs);
+  width: 100%;
+  text-align: left;
+  padding: var(--space-m);
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.modoInicialCard:hover,
+.modoInicialCard:focus-visible {
+  border-color: var(--accent-1);
+  box-shadow:
+    0 0 0 1px var(--accent-1),
+    0 10px 30px var(--accent-1-10);
+  box-shadow:
+    0 0 0 1px var(--accent-1),
+    0 10px 30px color-mix(in srgb, var(--accent-1) 32%, transparent);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.modoInicialCard strong {
+  color: var(--text-bright);
+  font-size: var(--text-m);
+}
+
+.modoInicialCard span {
+  color: var(--text-muted);
+  font-size: var(--text-s);
+  line-height: 1.45;
+}
