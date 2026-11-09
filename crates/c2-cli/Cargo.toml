@@ -11,6 +11,7 @@ name = "c2"
 path = "src/main.rs"
 
 [dependencies]
+anstream = "1"
 anyhow.workspace = true
 c2-core = { path = "../c2-core" }
 clap.workspace = true

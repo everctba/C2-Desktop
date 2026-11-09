@@ -345,7 +345,7 @@ fn init_agent_grava_bloco_de_regras_idempotente() {
     let agents = fs::read_to_string(base.join("AGENTS.md")).unwrap();
     assert!(agents.contains("c2:agent:begin"));
     assert!(agents.contains("c2 grep"));
-    assert!(agents.contains("Metadado e hipotese"));
+    assert!(agents.contains("Metadado é hipótese"));
 
     // segunda execucao nao duplica o bloco
     let out2 = c2()
