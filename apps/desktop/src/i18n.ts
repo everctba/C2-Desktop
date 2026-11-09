@@ -435,6 +435,8 @@ const EN: Record<string, string> = {
   "Abrir pasta": "Open folder",
   "Baixar do Hugging Face": "Download from Hugging Face",
   "modelo de embeddings configurado": "embedding model configured",
+  "Indexar embeddings": "Index embeddings",
+  "indexando embeddings…": "indexing embeddings…",
 };
 
 export function idiomaAtual(): Lang {

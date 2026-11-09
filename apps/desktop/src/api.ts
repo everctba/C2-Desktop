@@ -80,6 +80,8 @@ export const api = {
   embeddingStart: (root: string) => invoke<EmbeddingStatus>("embedding_start", { root }),
   embeddingStop: (root: string) => invoke<boolean>("embedding_stop", { root }),
   embeddingPickModel: () => invoke<string | null>("embedding_pick_model"),
+  embeddingIndex: (root: string, full = false) =>
+    invoke<{ files: number; embedded: number; cached: number; skipped: number; errors: number; last_error: string | null; model_id: string; dim: number }>("embedding_index", { root, full }),
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   modelUnload: (root: string) => invoke<void>("model_unload", { root }),
@@ -408,6 +410,8 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       return true as T;
     case "embedding_pick_model":
       return null as T;
+    case "embedding_index":
+      return { files: 0, embedded: 0, cached: 0, skipped: 0, errors: 0, last_error: null, model_id: "lm-kit/bge-m3-gguf", dim: 1024 } as T;
     case "model_load":
       await delay(1500);
       return null as T;

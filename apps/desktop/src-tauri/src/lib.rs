@@ -289,6 +289,21 @@ fn embedding_stop(root: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn embedding_index(
+    root: String,
+    full: Option<bool>,
+) -> Result<c2_core::embedding_index::EmbeddingIndexReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = open_workspace(&root)?;
+        let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+        c2_core::embedding_index::run(&workspace, &config, full.unwrap_or(false), |_, _, _| {})
+            .map_err(|erro| erro.to_string())
+    })
+    .await
+    .map_err(|erro| erro.to_string())?
+}
+
+#[tauri::command]
 fn embedding_pick_model(app: tauri::AppHandle) -> Option<String> {
     app.dialog()
         .file()

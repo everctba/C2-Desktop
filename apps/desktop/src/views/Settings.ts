@@ -864,6 +864,23 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       onClick: () => void abrirModalEmbedding(),
     }),
     Button({
+      label: t("Indexar embeddings"),
+      size: "xs",
+      variant: "secondary",
+      disabled: !embedStatus?.enabled || !embedStatus?.model_path,
+      onClick: () => {
+        void (async () => {
+          try {
+            embedInfoValor.textContent = t("indexando embeddings…");
+            const report = await api.embeddingIndex(ctx.root, false);
+            embedInfoValor.textContent = `${report.embedded} gerados · ${report.cached} em cache · ${report.errors} erros`;
+          } catch (erro) {
+            embedInfoValor.textContent = `erro: ${String(erro)}`;
+          }
+        })();
+      },
+    }),
+    Button({
       label: t("Abrir pasta de modelos"),
       size: "xs",
       variant: "ghost",

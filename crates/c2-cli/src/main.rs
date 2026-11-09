@@ -279,6 +279,12 @@ enum EmbeddingAction {
     Embed {
         text: String,
     },
+    /// Indexa os resumos .c2.json em vetores
+    Index {
+        /// Ignora o cache e re-embedda todos
+        #[arg(long)]
+        full: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -944,6 +950,29 @@ fn cmd_embeddings(
         EmbeddingAction::Stop => {
             let parou = c2_core::embedding_runtime::stop(&workspace)?;
             println!("{}", if parou { "runtime de embeddings parado" } else { "runtime de embeddings nao estava rodando" });
+        }
+        EmbeddingAction::Index { full } => {
+            let report = c2_core::embedding_index::run(
+                &workspace,
+                &config,
+                full,
+                |_, idx, total| {
+                    if total > 0 && (idx == total || idx % 25 == 0) {
+                        eprintln!("embeddings: {idx}/{total}");
+                    }
+                },
+            )?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "embeddings: {} arquivos, {} gerados, {} em cache, {} pulados, {} erros",
+                    report.files, report.embedded, report.cached, report.skipped, report.errors
+                );
+                if let Some(erro) = &report.last_error {
+                    println!("ultimo erro: {erro}");
+                }
+            }
         }
         EmbeddingAction::Embed { text } => {
             if !config.index.embeddings.enabled {
