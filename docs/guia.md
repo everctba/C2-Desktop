@@ -367,6 +367,15 @@ essa linha vira JSON inválido e o servidor responde `-32700`. O banner
 `c2-mcp: pronto` vai para **stderr**; o stdout fica reservado ao protocolo.
 Para iniciar o engine, use outro terminal/desktop.
 
+## Bandeja do sistema
+
+- Fechar a janela (**X**) **não encerra** o C2: ele esconde para a bandeja e o
+  engine continua indexando.
+- Clique esquerdo no ícone: mostra/esconde a janela.
+- Clique direito: menu com **Abrir C2** e **Sair**.
+- **Sair** para o runtime/modelo antes de encerrar o processo.
+- Para parar de indexar sem sair, use **Parar engine** na interface.
+
 ## O desktop é o modo normal
 
 - `c2 init` cria o workspace **e abre o C2 Desktop**.

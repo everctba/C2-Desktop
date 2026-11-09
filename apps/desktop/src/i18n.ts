@@ -389,8 +389,8 @@ const EN: Record<string, string> = {
     "Create professional AVIF and WebP animations on the desktop — lightweight, local and made for designers.",
   Conhecer: "Learn more",
   "Execução automática": "Automatic indexing",
-  "Mantenha o C2 Desktop aberto: ele indexa em segundo plano automaticamente. A CLI e o MCP apenas leem; não mantêm o índice atualizado sozinhos.":
-    "Keep C2 Desktop open: it indexes in the background automatically. The CLI and MCP only read; they do not keep the index updated on their own.",
+  "Mantenha o C2 Desktop aberto ou na bandeja: ele indexa em segundo plano automaticamente. A CLI e o MCP apenas leem; não mantêm o índice atualizado sozinhos.":
+    "Keep C2 Desktop open or in the tray: it indexes in the background automatically. The CLI and MCP only read; they do not keep the index updated on their own.",
   "Iniciar engine automaticamente ao abrir o projeto":
     "Start engine automatically when opening the project",
   "engine será iniciado automaticamente ao abrir o projeto":

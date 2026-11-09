@@ -14,7 +14,9 @@ use c2_core::search::{self, SearchOptions};
 use c2_core::status::{self, StatusReport};
 use c2_core::{cleaner, runtime, EngineState, MetaFile, Workspace};
 use serde::Serialize;
-use tauri::{Emitter, Manager, State};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
 mod perf;
@@ -34,6 +36,10 @@ struct Engine {
 struct Reindex {
     cancel: Arc<AtomicBool>,
 }
+
+/// Ultimo workspace aberto, para limpar o runtime ao sair pelo tray.
+#[derive(Default)]
+struct LastWorkspace(Mutex<Option<String>>);
 
 /// Recusa iniciar o engine sem um `.gguf` valido configurado.
 fn require_model(config: &c2_core::Config) -> Result<(), String> {
@@ -163,7 +169,11 @@ fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
 async fn workspace_status(
     app: tauri::AppHandle,
     root: String,
+    ultimo: State<'_, LastWorkspace>,
 ) -> Result<Option<StatusReport>, String> {
+    if let Ok(mut guard) = ultimo.0.lock() {
+        *guard = Some(root.clone());
+    }
     let inicio = std::time::Instant::now();
     let app_dentro = app.clone();
     let root_dentro = root.clone();
@@ -1131,6 +1141,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(Engine::default())
         .manage(Reindex::default())
+        .manage(LastWorkspace::default())
         .manage(InitialRoot(root))
         .invoke_handler(tauri::generate_handler![
             initial_root,
@@ -1176,9 +1187,85 @@ pub fn run() {
             runtime_plan,
             model_load
         ])
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // Fechar a janela nao encerra o app: esconde para a bandeja e
+                // mantem o engine/indexacao vivos. Para sair, use o menu Sair.
+                let _ = window.hide();
+                api.prevent_close();
+            }
+        })
         .setup(|app| {
             perf::registrar(app.handle(), "tauri_setup", serde_json::json!({}));
-            eprintln!("[c2] setup: janela pronta");
+
+            let pt = app
+                .path()
+                .app_data_dir()
+                .ok()
+                .map(|dir| dir.join("language.json"))
+                .and_then(|path| std::fs::read_to_string(path).ok())
+                .and_then(|texto| serde_json::from_str::<serde_json::Value>(&texto).ok())
+                .and_then(|json| json.get("lang").and_then(|v| v.as_str()).map(|s| s == "pt-BR"))
+                .unwrap_or(false);
+            let (abrir_label, sair_label) = if pt {
+                ("Abrir C2", "Sair")
+            } else {
+                ("Open C2", "Quit")
+            };
+            let abrir = MenuItem::with_id(app, "mostrar", abrir_label, true, None::<&str>)?;
+            let sair = MenuItem::with_id(app, "sair", sair_label, true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&abrir, &sair])?;
+
+            if let Some(icone) = app.default_window_icon().cloned() {
+                TrayIconBuilder::new()
+                    .icon(icone)
+                    .tooltip("C2 — Comments 2.0 for AI")
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "mostrar" => {
+                            if let Some(janela) = app.get_webview_window("main") {
+                                let _ = janela.show();
+                                let _ = janela.set_focus();
+                            }
+                        }
+                        "sair" => {
+                            if let Some(raiz) = app
+                                .state::<LastWorkspace>()
+                                .0
+                                .lock()
+                                .ok()
+                                .and_then(|guard| guard.clone())
+                            {
+                                if let Ok(workspace) = open_workspace(&raiz) {
+                                    let _ = runtime::stop(&workspace);
+                                }
+                            }
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            if let Some(janela) = tray.app_handle().get_webview_window("main") {
+                                if janela.is_visible().unwrap_or(false) {
+                                    let _ = janela.hide();
+                                } else {
+                                    let _ = janela.show();
+                                    let _ = janela.set_focus();
+                                }
+                            }
+                        }
+                    })
+                    .build(app)?;
+            }
+
+            eprintln!("[c2] setup: janela e bandeja prontas");
             Ok(())
         })
         .run(tauri::generate_context!())

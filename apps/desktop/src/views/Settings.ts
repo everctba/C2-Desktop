@@ -753,7 +753,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   execucaoTexto.className = "pageHint";
   execucaoTexto.style.maxWidth = "none";
   execucaoTexto.textContent = t(
-    "Mantenha o C2 Desktop aberto: ele indexa em segundo plano automaticamente. " +
+    "Mantenha o C2 Desktop aberto ou na bandeja: ele indexa em segundo plano automaticamente. " +
       "A CLI e o MCP apenas leem; não mantêm o índice atualizado sozinhos.",
   );
   execucaoBody.appendChild(execucaoTexto);
