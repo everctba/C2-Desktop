@@ -290,6 +290,8 @@ fn require_workspace(root: Option<&Path>) -> Result<Workspace> {
     Ok(workspace)
 }
 
+const ASCII_INTRO: &str = include_str!("../../../site/assets/ascii/logo-ascii.txt");
+
 fn cmd_init(
     root: Option<&Path>,
     force: bool,
@@ -297,6 +299,9 @@ fn cmd_init(
     agent: bool,
     mcp: bool,
 ) -> Result<()> {
+    if !json_output {
+        println!("{ASCII_INTRO}\n");
+    }
     let workspace = resolve_workspace(root)?;
     let outcome = workspace.init(force)?;
     let agents_path = if agent {

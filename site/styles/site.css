@@ -767,6 +767,12 @@ code.inline {
   margin-bottom: calc(-1 * var(--space-2xl));
 }
 
+.hero-logo-img {
+  display: block;
+  width: min(560px, 100%);
+  height: auto;
+}
+
 .ascii-logo {
   margin: 0;
   font-family: var(--font-mono);
