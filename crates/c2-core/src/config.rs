@@ -182,6 +182,9 @@ pub struct EmbeddingConfig {
     /// Score minimo sugerido para aceitar um resultado so-semantico.
     #[serde(default = "default_embedding_min_score")]
     pub min_score: f32,
+    /// Peso do cosine no ranking hibrido.
+    #[serde(default = "default_embedding_weight")]
+    pub weight: f32,
 }
 
 fn default_embedding_model() -> String {
@@ -211,6 +214,9 @@ fn default_embedding_gpu_layers() -> u32 {
 fn default_embedding_min_score() -> f32 {
     0.35
 }
+fn default_embedding_weight() -> f32 {
+    2.0
+}
 
 impl Default for EmbeddingConfig {
     fn default() -> Self {
@@ -226,6 +232,7 @@ impl Default for EmbeddingConfig {
             threads: default_embedding_threads(),
             gpu_layers: default_embedding_gpu_layers(),
             min_score: default_embedding_min_score(),
+            weight: default_embedding_weight(),
         }
     }
 }

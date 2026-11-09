@@ -31,8 +31,6 @@ const W_SYMBOL: f32 = 2.0;
 const W_SEMANTIC: f32 = 1.5;
 /// Fator aplicado quando o casamento e parcial (substring).
 const PARTIAL: f32 = 0.4;
-/// Peso do sinal de embedding no ranking hibrido.
-const W_EMBEDDING: f32 = 2.0;
 
 /// Opcoes da busca.
 #[derive(Debug, Clone)]
@@ -147,6 +145,7 @@ pub fn search(
 
     /* ---------- fase 1: metadados ---------- */
     let embedding_cfg = &config.index.embeddings;
+    let peso_embedding = embedding_cfg.weight.max(0.0);
     let consulta_vetor = if options.hybrid && embedding_cfg.enabled {
         embedding_runtime::embed(config, query).ok()
     } else {
@@ -215,8 +214,8 @@ pub fn search(
     }
 
     candidatos.sort_by(|a, b| {
-        let score_a = a.path_score + a.semantic_score + W_EMBEDDING * a.embedding_score;
-        let score_b = b.path_score + b.semantic_score + W_EMBEDDING * b.embedding_score;
+        let score_a = a.path_score + a.semantic_score + peso_embedding * a.embedding_score;
+        let score_b = b.path_score + b.semantic_score + peso_embedding * b.embedding_score;
         score_b
             .partial_cmp(&score_a)
             .unwrap_or(std::cmp::Ordering::Equal)
@@ -257,7 +256,7 @@ pub fn search(
             score: candidato.path_score
                 + symbol_score
                 + candidato.semantic_score
-                + W_EMBEDDING * candidato.embedding_score,
+                + peso_embedding * candidato.embedding_score,
             path_score: candidato.path_score,
             symbol_score,
             semantic_score: candidato.semantic_score,
