@@ -235,10 +235,11 @@ pub fn cochange(workspace: &Workspace, file: &str, limit: usize) -> Result<Vec<C
                 }
             }
             commit.clear();
-        } else if !linha.is_empty() {
-            if !linha.starts_with("--") && Path::new(linha).extension().is_some() {
-                commit.insert(linha.replace('\\', "/"));
-            }
+        } else if !linha.is_empty()
+            && !linha.starts_with("--")
+            && Path::new(linha).extension().is_some()
+        {
+            commit.insert(linha.replace('\\', "/"));
         }
     }
     if commit.contains(file) {
