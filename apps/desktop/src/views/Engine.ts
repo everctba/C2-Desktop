@@ -358,6 +358,10 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   };
 
   let cargaInicio: number | null = null;
+  let cargaBaseMb: number | null = null;
+  let cargaTotalMb: number | null = null;
+  let cargaPlanoPedido = false;
+  let cargaPct = 0;
   const atualizarGpu = async (status: StatusReport | null) => {
     const carregado = Boolean(status?.runtime.healthy);
     const carregando = Boolean(ctx.running) && !carregado;
@@ -366,12 +370,32 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       gpuStatus.style.color = "var(--accent-1)";
       cargaTrack.style.display = "none";
       cargaInicio = null;
+      cargaBaseMb = null;
+      cargaTotalMb = null;
+      cargaPlanoPedido = false;
+      cargaPct = 0;
     } else if (carregando) {
-      if (cargaInicio === null) cargaInicio = performance.now();
-      const pct = Math.min(
-        90,
+      if (cargaInicio === null) {
+        cargaInicio = performance.now();
+        cargaBaseMb = null;
+        cargaTotalMb = null;
+        cargaPlanoPedido = false;
+      }
+      if (!cargaPlanoPedido && ctx.root) {
+        cargaPlanoPedido = true;
+        void api
+          .runtimePlan(ctx.root)
+          .then((plano) => {
+            cargaTotalMb = Math.max(1, plano.estimate.total_mb);
+          })
+          .catch(() => {});
+      }
+      const tempoPct = Math.min(
+        85,
         Math.round(((performance.now() - cargaInicio) / 20000) * 80),
       );
+      const pct = Math.max(cargaPct, tempoPct);
+      cargaPct = pct;
       gpuStatus.textContent = `${t("carregando modelo…")} ${pct}%`;
       gpuStatus.style.color = "var(--warning)";
       cargaTrack.style.display = "block";
@@ -381,6 +405,10 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       gpuStatus.style.color = "var(--text-subtle)";
       cargaTrack.style.display = "none";
       cargaInicio = null;
+      cargaBaseMb = null;
+      cargaTotalMb = null;
+      cargaPlanoPedido = false;
+      cargaPct = 0;
     }
     btnDescarregar.disabled = !carregado;
     if (status?.model) {
@@ -399,6 +427,18 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       (gpuVram.lastElementChild as HTMLElement).textContent = gpu
         ? `${(gpu.used_mb / 1024).toFixed(1)} / ${(gpu.total_mb / 1024).toFixed(1)} GB`
         : "—";
+      if (carregando && gpu) {
+        if (cargaBaseMb === null) cargaBaseMb = gpu.used_mb;
+        if (cargaTotalMb) {
+          const delta = Math.max(0, gpu.used_mb - cargaBaseMb);
+          const realPct = Math.min(90, Math.round((delta / cargaTotalMb) * 100));
+          if (realPct > cargaPct) {
+            cargaPct = realPct;
+            gpuStatus.textContent = `${t("carregando modelo…")} ${cargaPct}%`;
+            cargaFill.style.width = `${cargaPct}%`;
+          }
+        }
+      }
     } catch {
       (gpuNome.lastElementChild as HTMLElement).textContent = t("não detectada");
       (gpuVram.lastElementChild as HTMLElement).textContent = "—";
