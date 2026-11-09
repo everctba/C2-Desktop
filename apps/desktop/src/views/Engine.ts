@@ -88,7 +88,50 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   activityValue.className = styles.fieldValue;
   activityValue.textContent = t("ocioso");
   activity.append(activityTitle, activityValue);
-  page.appendChild(activity);
+
+  const infoRow = document.createElement("div");
+  infoRow.className = styles.infoRow;
+  infoRow.appendChild(activity);
+
+  // Card de GPU/modelo/config efetiva do runtime.
+  const gpuCard = document.createElement("div");
+  gpuCard.className = styles.detail;
+  const gpuTitle = document.createElement("span");
+  gpuTitle.className = styles.fieldLabel;
+  gpuTitle.textContent = t("GPU e modelo");
+  const gpuStatus = document.createElement("span");
+  gpuStatus.className = styles.fieldValue;
+  gpuStatus.textContent = t("consultando…");
+  const gpuRows = document.createElement("div");
+  gpuRows.style.display = "grid";
+  gpuRows.style.gap = "var(--space-2xs)";
+  gpuRows.style.marginTop = "var(--space-s)";
+
+  const linhaGpu = (rotulo: string, valor: string): HTMLElement => {
+    const linha = document.createElement("div");
+    linha.className = styles.field;
+    const label = document.createElement("span");
+    label.className = styles.fieldLabel;
+    label.textContent = rotulo;
+    const texto = document.createElement("span");
+    texto.className = styles.mono;
+    texto.textContent = valor;
+    linha.append(label, texto);
+    return linha;
+  };
+  const gpuNome = linhaGpu(t("GPU"), "—");
+  const gpuVram = linhaGpu(t("VRAM"), "—");
+  const gpuContexto = linhaGpu(t("Contexto"), "—");
+  const gpuCamadas = linhaGpu(t("Camadas GPU"), "—");
+  gpuRows.append(
+    gpuNome,
+    gpuVram,
+    gpuContexto,
+    gpuCamadas,
+  );
+  gpuCard.append(gpuTitle, gpuStatus, gpuRows);
+  infoRow.appendChild(gpuCard);
+  page.appendChild(infoRow);
 
   /* ações */
   const actions = document.createElement("div");
@@ -281,6 +324,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
         runtimePill,
         runtimePillFor(status),
       );
+      void atualizarGpu(status);
       const running = await api.engineRunning();
       enginePill = replacePill(
         enginePill,
@@ -288,6 +332,34 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       );
     } catch (error) {
       appendLog(`erro ao atualizar estado: ${String(error)}`);
+    }
+  };
+
+  const atualizarGpu = async (status: StatusReport | null) => {
+    const carregado = Boolean(status?.runtime.healthy);
+    gpuStatus.textContent = carregado
+      ? t("modelo carregado")
+      : t("modelo não carregado");
+    gpuStatus.style.color = carregado ? "var(--accent-1)" : "var(--text-subtle)";
+    if (status?.model) {
+      (gpuContexto.lastElementChild as HTMLElement).textContent =
+        `${status.model.ctx_size.toLocaleString("pt-BR")} tokens`;
+      (gpuCamadas.lastElementChild as HTMLElement).textContent =
+        status.model.gpu_layers === 0
+          ? t("0 (CPU)")
+          : `${status.model.gpu_layers}`;
+    }
+    try {
+      const gpu = await api.gpuInfo();
+      (gpuNome.lastElementChild as HTMLElement).textContent = gpu
+        ? gpu.name
+        : t("não detectada");
+      (gpuVram.lastElementChild as HTMLElement).textContent = gpu
+        ? `${(gpu.used_mb / 1024).toFixed(1)} / ${(gpu.total_mb / 1024).toFixed(1)} GB`
+        : "—";
+    } catch {
+      (gpuNome.lastElementChild as HTMLElement).textContent = t("não detectada");
+      (gpuVram.lastElementChild as HTMLElement).textContent = "—";
     }
   };
 
@@ -351,6 +423,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     }),
   ];
 
+  void atualizarGpu(ctx.status);
   const timer = window.setInterval(() => void refreshStatus(), 2500);
   if (ctx.running) appendLog("engine em execução — acompanhando eventos");
 

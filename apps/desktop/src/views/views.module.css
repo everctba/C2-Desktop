@@ -350,3 +350,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.infoRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: var(--space-m);
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .infoRow {
+    grid-template-columns: 1fr;
+  }
+}

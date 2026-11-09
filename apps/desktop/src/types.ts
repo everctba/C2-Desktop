@@ -6,6 +6,8 @@ export interface ModelSummary {
   host: string;
   port: number;
   ctx_size: number;
+  gpu_layers: number;
+  threads: number;
   disable_thinking: boolean;
   provider: string;
   base_url: string | null;

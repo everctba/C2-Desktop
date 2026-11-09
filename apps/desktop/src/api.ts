@@ -152,6 +152,8 @@ const mockStatus: StatusReport = {
     host: "127.0.0.1",
     port: 8099,
     ctx_size: 8192,
+    gpu_layers: 99,
+    threads: 0,
     disable_thinking: true,
     provider: "local",
     base_url: null,

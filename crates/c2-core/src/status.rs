@@ -21,6 +21,8 @@ pub struct ModelSummary {
     pub host: String,
     pub port: u16,
     pub ctx_size: u32,
+    pub gpu_layers: u32,
+    pub threads: u32,
     pub disable_thinking: bool,
     /// `local` ou `openai_compat`.
     pub provider: String,
@@ -132,6 +134,8 @@ pub fn build_timed(workspace: &Workspace) -> Result<(StatusReport, StatusTimings
             host: config.model.host.clone(),
             port: config.model.port,
             ctx_size: config.model.ctx_size,
+            gpu_layers: config.model.gpu_layers,
+            threads: config.model.threads,
             disable_thinking: config.model.disable_thinking,
         },
         index: IndexSummary {

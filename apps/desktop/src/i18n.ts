@@ -396,6 +396,14 @@ const EN: Record<string, string> = {
   "engine será iniciado automaticamente ao abrir o projeto":
     "engine will start automatically when opening the project",
   "engine automático desligado": "automatic engine disabled",
+  "GPU e modelo": "GPU and model",
+  "modelo carregado": "model loaded",
+  "modelo não carregado": "model not loaded",
+  Contexto: "Context",
+  "Camadas GPU": "GPU layers",
+  "não detectada": "not detected",
+  "consultando…": "checking…",
+  "0 (CPU)": "0 (CPU)",
   // ---- idioma ----
   Idioma: "Language",
   "Idioma da interface": "Interface language",
