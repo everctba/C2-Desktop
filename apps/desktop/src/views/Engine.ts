@@ -109,6 +109,12 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   const gpuStatus = document.createElement("span");
   gpuStatus.className = styles.fieldValue;
   gpuStatus.textContent = t("consultando…");
+  const cargaTrack = document.createElement("div");
+  cargaTrack.className = styles.cargaTrack;
+  cargaTrack.style.display = "none";
+  const cargaFill = document.createElement("div");
+  cargaFill.className = styles.cargaFill;
+  cargaTrack.appendChild(cargaFill);
   const gpuRows = document.createElement("div");
   gpuRows.style.display = "grid";
   gpuRows.style.gap = "var(--space-2xs)";
@@ -145,7 +151,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     onClick: ctx.onUnloadModel,
   });
   btnDescarregar.style.marginTop = "var(--space-s)";
-  gpuCard.append(gpuTitle, gpuStatus, gpuRows, btnDescarregar);
+  gpuCard.append(gpuTitle, gpuStatus, cargaTrack, gpuRows, btnDescarregar);
   infoRow.appendChild(gpuCard);
   page.appendChild(infoRow);
 
@@ -351,12 +357,31 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     }
   };
 
+  let cargaInicio: number | null = null;
   const atualizarGpu = async (status: StatusReport | null) => {
     const carregado = Boolean(status?.runtime.healthy);
-    gpuStatus.textContent = carregado
-      ? t("modelo carregado")
-      : t("modelo não carregado");
-    gpuStatus.style.color = carregado ? "var(--accent-1)" : "var(--text-subtle)";
+    const carregando = Boolean(ctx.running) && !carregado;
+    if (carregado) {
+      gpuStatus.textContent = t("modelo carregado");
+      gpuStatus.style.color = "var(--accent-1)";
+      cargaTrack.style.display = "none";
+      cargaInicio = null;
+    } else if (carregando) {
+      if (cargaInicio === null) cargaInicio = performance.now();
+      const pct = Math.min(
+        90,
+        Math.round(((performance.now() - cargaInicio) / 20000) * 80),
+      );
+      gpuStatus.textContent = `${t("carregando modelo…")} ${pct}%`;
+      gpuStatus.style.color = "var(--warning)";
+      cargaTrack.style.display = "block";
+      cargaFill.style.width = `${pct}%`;
+    } else {
+      gpuStatus.textContent = t("modelo não carregado");
+      gpuStatus.style.color = "var(--text-subtle)";
+      cargaTrack.style.display = "none";
+      cargaInicio = null;
+    }
     btnDescarregar.disabled = !carregado;
     if (status?.model) {
       (gpuContexto.lastElementChild as HTMLElement).textContent =

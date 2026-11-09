@@ -411,7 +411,7 @@ const EN: Record<string, string> = {
   "Modelo carregado na VRAM": "Model loaded in VRAM",
   "Model on GPU": "Model on GPU",
   "Descarregar modelo": "Unload model",
-  // ---- idioma ----
+  "carregando modelo…": "loading model…",
   Idioma: "Language",
   "Idioma da interface": "Interface language",
   English: "English",

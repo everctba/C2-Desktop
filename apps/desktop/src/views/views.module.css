@@ -363,3 +363,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+.cargaTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-surface-3);
+  overflow: hidden;
+  margin-top: var(--space-2xs);
+}
+
+.cargaFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--warning);
+  transition: width 400ms ease;
+}

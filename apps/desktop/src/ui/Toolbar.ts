@@ -9,6 +9,7 @@ export interface ToolbarProps {
   running: boolean;
   busy: boolean;
   modelLoaded: boolean;
+  modelLoading: boolean;
   vramMb: number | null;
   onPlay: () => void;
   onStop: () => void;
@@ -39,7 +40,13 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
     Pill(t(props.running ? "engine rodando" : "engine parado"), props.running ? "success" : "neutral", "xs"),
   );
 
-  if (props.modelLoaded) {
+  if (props.modelLoading && !props.modelLoaded) {
+    const banner = document.createElement("div");
+    banner.className = `${styles.modelBanner} ${styles.modelBannerLoading}`;
+    banner.setAttribute("data-model-banner", "1");
+    banner.textContent = t("Carregando modelo…");
+    bar.appendChild(banner);
+  } else if (props.modelLoaded) {
     const banner = document.createElement("div");
     banner.className = `${styles.modelBanner} ${styles.modelBannerOn}`;
     banner.setAttribute("data-model-banner", "1");

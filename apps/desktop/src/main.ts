@@ -756,6 +756,10 @@ function shell(content: HTMLElement): void {
       modelLoaded:
         Boolean(state.status?.runtime.healthy) &&
         state.status?.model.provider !== "openai_compat",
+      modelLoading:
+        Boolean(state.running) &&
+        !state.status?.runtime.healthy &&
+        state.status?.model.provider !== "openai_compat",
       vramMb: state.gpuUsedMb,
       onPlay: () => void toggleEngine(),
       onStop: () => void toggleEngine(),
