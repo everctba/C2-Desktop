@@ -280,7 +280,12 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     opcaoIdioma("pt-BR", t("Português (Brasil)"), flagBR(22)),
   );
   idiomaBody.appendChild(gradeIdioma);
-  page.appendChild(idiomaCard);
+
+  // Idioma e Execucao automatica lado a lado no topo.
+  const topoConfig = document.createElement("div");
+  topoConfig.className = styles.duasColunas;
+  topoConfig.appendChild(idiomaCard);
+  page.appendChild(topoConfig);
 
   // ---- Modo de uso (IA local x API Key) + simples/avancado ----
   const avancado = localStorage.getItem("c2.config.avancado") === "1";
@@ -766,7 +771,7 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
       },
     }).root,
   );
-  page.appendChild(execucaoCard);
+  topoConfig.appendChild(execucaoCard);
 
   // ---- Manutencao: limpar metadados (acao destrutiva, dupla confirmacao) ----
   const manutencaoCard = Card({ title: t("Manutenção"), accent: 10 });
