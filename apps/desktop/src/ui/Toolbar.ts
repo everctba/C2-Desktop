@@ -12,8 +12,6 @@ export interface ToolbarProps {
   vramMb: number | null;
   onPlay: () => void;
   onStop: () => void;
-  onReindex: () => void;
-  onPickProject: () => void;
 }
 
 export function Toolbar(props: ToolbarProps): HTMLElement {
@@ -70,24 +68,6 @@ export function Toolbar(props: ToolbarProps): HTMLElement {
     }),
   );
 
-  bar.appendChild(
-    Button({
-      label: t("Reindexar tudo"),
-      iconName: "refresh",
-      variant: "ghost",
-      disabled: !props.projectPath || props.busy,
-      onClick: props.onReindex,
-    }),
-  );
-
-  bar.appendChild(
-    Button({
-      label: t("Abrir projeto"),
-      variant: "ghost",
-      iconName: "projects",
-      onClick: props.onPickProject,
-    }),
-  );
 
   return bar;
 }

@@ -700,8 +700,6 @@ function shell(content: HTMLElement): void {
       vramMb: state.gpuUsedMb,
       onPlay: () => void toggleEngine(),
       onStop: () => void toggleEngine(),
-      onReindex: () => void runReindex(true),
-      onPickProject: () => void pickProject(),
     }),
   );
 
