@@ -92,7 +92,9 @@ opção desmarcável). O código do instalador fica em `scripts/c2.iss`.
 
 ```bash
 cd meu-projeto
-c2 init                      # cria .c2/config.json
+c2 init                      # cria .c2/config.json, mostra a intro ASCII e abre o desktop
+c2 init --no-open            # so cria o workspace (sem abrir a janela)
+c2 init --json               # saida JSON limpa (nao abre janela)
 c2 config set model.path /caminho/modelo.gguf
 c2 config set model.binary /caminho/llama-server   # opcional: busca automática
 c2 start                     # indexa e fica observando (Ctrl+C encerra)
@@ -424,7 +426,7 @@ apps/desktop/src-tauri/capabilities/
 
 | Comando | Função |
 |---|---|
-| `c2 init` | cria `.c2/config.json` (idempotente) |
+| `c2 init` | cria `.c2/config.json` (idempotente), imprime a intro e abre o desktop |
 | `c2 start` | indexa continuamente e supervisiona o runtime |
 | `c2 stop` | encerra engine e `llama-server` |
 | `c2 status` | workspace, índice, histórico e runtime |

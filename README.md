@@ -116,6 +116,7 @@ Depois:
 ```powershell
 cd meu-projeto
 c2 init --agent   # grava regras em AGENTS.md + MCP (.mcp.json/.cursor/mcp.json)
+# c2 init (sem flags) abre o C2 Desktop; --no-open/--json nao abrem
 c2 config set model.path "H:\modelos\gemma-4-E2B-Q4_K_M.gguf"
 c2 reindex
 c2 grep "onde valida permissão de usuário"

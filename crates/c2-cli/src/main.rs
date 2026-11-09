@@ -6,6 +6,8 @@
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+#[cfg(not(windows))]
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,6 +22,49 @@ use c2_core::search::{self, SearchOptions};
 use c2_core::{cleaner, discover, EngineState, LlmClient, Workspace};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
+
+#[cfg(windows)]
+#[link(name = "shell32")]
+extern "system" {
+    fn ShellExecuteW(
+        hwnd: *mut std::ffi::c_void,
+        operation: *const u16,
+        file: *const u16,
+        parameters: *const u16,
+        directory: *const u16,
+        show: i32,
+    ) -> *mut std::ffi::c_void;
+}
+
+/// Abre o desktop via shell do Windows (fora do job/console do c2).
+#[cfg(windows)]
+fn abrir_desktop(app: &Path, root: &Path) -> Result<()> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    fn wide(valor: &OsStr) -> Vec<u16> {
+        valor.encode_wide().chain(Some(0)).collect()
+    }
+
+    let arquivo = wide(app.as_os_str());
+    let parametros = wide(OsStr::new(&format!("--root \"{}\"", root.display())));
+    let operacao = wide(OsStr::new("open"));
+    let resultado = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operacao.as_ptr(),
+            arquivo.as_ptr(),
+            parametros.as_ptr(),
+            std::ptr::null(),
+            1,
+        )
+    };
+    if (resultado as isize) <= 32 {
+        bail!("ShellExecuteW falhou ao abrir {}", app.display());
+    }
+    Ok(())
+}
+
 
 #[derive(Parser, Debug)]
 #[command(
@@ -59,6 +104,9 @@ enum Command {
         /// Gera .mcp.json e .cursor/mcp.json (MCP project-scoped)
         #[arg(long)]
         mcp: bool,
+        /// Nao abre o C2 Desktop ao terminar
+        #[arg(long)]
+        no_open: bool,
     },
 
     /// Abre a janela do C2 Desktop neste projeto
@@ -217,10 +265,22 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Command::Init { force, open, agent, mcp } => {
+        Command::Init {
+            force,
+            open,
+            agent,
+            mcp,
+            no_open,
+        } => {
             cmd_init(cli.root.as_deref(), force, cli.json, agent, mcp)?;
-            if open {
-                cmd_open(cli.root.as_deref())?;
+            let abrir = !cli.json && !no_open;
+            if abrir || open {
+                if let Err(err) = cmd_open(cli.root.as_deref()) {
+                    eprintln!("aviso: nao foi possivel abrir o C2 Desktop: {err:#}");
+                } else {
+                    println!();
+                    println!("C2 Desktop aberto. Pode fechar este terminal: o app continua rodando.");
+                }
             }
             Ok(())
         }
@@ -366,6 +426,14 @@ fn cmd_init(
             }
         }
     }
+    println!();
+    println!("Comandos para o seu agente:");
+    println!("  c2 status                         # indice atualizado?");
+    println!("  c2 grep \"<tarefa>\" --limit 5       # candidatos por significado");
+    println!("  c2 related <arquivo>               # dependencias no grafo");
+    println!("  c2 read <arquivo> --lines A:B      # so o trecho necessario");
+    println!("  c2 mcp                             # servidor MCP (STDIO)");
+    println!("  c2 note add <arquivo> --text ...   # anotacao teleologica");
     Ok(())
 }
 
@@ -521,11 +589,21 @@ fn cmd_open(root: Option<&Path>) -> Result<()> {
         )
     })?;
 
-    std::process::Command::new(&app)
-        .arg("--root")
-        .arg(workspace.root())
-        .spawn()
-        .with_context(|| format!("falha ao abrir {}", app.display()))?;
+    #[cfg(windows)]
+    {
+        abrir_desktop(&app, workspace.root())?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new(&app)
+            .arg("--root")
+            .arg(workspace.root())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .with_context(|| format!("falha ao abrir {}", app.display()))?;
+    }
 
     println!("C2 Desktop aberto em {}", workspace.root().display());
     Ok(())
