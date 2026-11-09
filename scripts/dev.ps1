@@ -30,6 +30,7 @@ Push-Location $desktop
 try {
     if ($UiOnly) {
         Write-Host 'UI so no navegador: http://127.0.0.1:1420 (mocks, sem Rust)'
+        Write-Host 'Sobre isolado:  http://127.0.0.1:1420/preview.html'
         $abridor = Start-Job -ScriptBlock {
             Start-Sleep -Seconds 2
             Start-Process 'http://127.0.0.1:1420'
