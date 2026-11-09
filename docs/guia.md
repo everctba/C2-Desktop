@@ -367,6 +367,18 @@ essa linha vira JSON inválido e o servidor responde `-32700`. O banner
 `c2-mcp: pronto` vai para **stderr**; o stdout fica reservado ao protocolo.
 Para iniciar o engine, use outro terminal/desktop.
 
+## O desktop é o modo normal
+
+- `c2 init` cria o workspace **e abre o C2 Desktop**.
+- Com modelo local configurado, o desktop sobe o engine automaticamente ao abrir
+  o projeto e mantém o índice atualizado em segundo plano.
+- Configurações de modelo, modo de uso, prompt e reindexação ficam na interface
+  do app; a CLI continua disponível para agentes e automação.
+- **MCP é somente leitura.** Ele não indexa nada: mantenha o C2 Desktop aberto
+  para o índice andar. Se precisar de atualização imediata com o app fechado,
+  use `c2 reindex`.
+- Em Config → **Execução automática** dá para desligar o start automático do engine.
+
 ## Diagnóstico de cold start
 
 O desktop grava marcas de boot em `%APPDATA%/dev.c2.desktop/perf.log` (JSONL):

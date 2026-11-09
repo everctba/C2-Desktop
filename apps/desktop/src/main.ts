@@ -23,6 +23,8 @@ import type { View } from "./views/view";
 const app = document.getElementById("app")!;
 
 const RECENT_KEY = "c2.recent";
+const AUTO_ENGINE_KEY = "c2.autoEngine";
+let autoEngineBloqueado = false;
 const MAX_RECENT = 12;
 
 /** Projetos abertos recentemente, mais recente primeiro. */
@@ -63,7 +65,9 @@ async function openRecent(path: string): Promise<void> {
   await sincronizarPromptIdioma();
   await loadStatus();
   state.route = state.status?.initialized ? "engine" : "projects";
+  autoEngineBloqueado = false;
   render();
+  void iniciarEngineAuto();
 }
 
 interface AppState {
@@ -142,7 +146,9 @@ async function pickProject(): Promise<string | null> {
   await loadStatus();
   // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
   state.route = state.status?.initialized ? "engine" : "projects";
+  autoEngineBloqueado = false;
   render();
+  void iniciarEngineAuto();
   return state.root;
 }
 
@@ -177,7 +183,9 @@ function openWelcomeFlow(modo: "local" | "nuvem" = "local"): void {
     finish: () => {
       localStorage.setItem("c2.onboarded", "1");
       state.route = modo === "nuvem" ? "settings" : "engine";
+      autoEngineBloqueado = false;
       render();
+      void iniciarEngineAuto();
     },
     openSettings: () => {
       state.route = "settings";
@@ -657,10 +665,12 @@ async function toggleEngine(): Promise<void> {
   render();
   try {
     if (state.running) {
+      autoEngineBloqueado = true;
       await api.engineStop(state.root);
       state.running = false;
       log("engine parado");
     } else {
+      autoEngineBloqueado = false;
       if (!(await ensureModel())) return;
       if (!(await ensureModelLoaded())) return;
       await api.engineStart(state.root);
@@ -673,6 +683,31 @@ async function toggleEngine(): Promise<void> {
     state.busy = false;
     await loadStatus();
     render();
+  }
+}
+
+function autoEngineLigado(): boolean {
+  return localStorage.getItem(AUTO_ENGINE_KEY) !== "0";
+}
+
+/**
+ * O desktop e o modo normal do C2: com projeto + modelo local, sobe o engine
+ * sozinho para o indice andar em segundo plano. MCP continua somente leitura.
+ */
+async function iniciarEngineAuto(): Promise<void> {
+  if (!state.root || state.running || state.busy || autoEngineBloqueado) return;
+  if (!autoEngineLigado()) return;
+  const status = state.status;
+  if (!status?.initialized || !status.model.path) return;
+  if (status.model.provider === "openai_compat") return;
+  try {
+    await api.engineStart(state.root);
+    state.running = true;
+    log("engine iniciado automaticamente");
+    render();
+  } catch (error) {
+    autoEngineBloqueado = true;
+    log(`auto-start do engine falhou: ${String(error)}`);
   }
 }
 
@@ -883,6 +918,7 @@ async function boot(): Promise<void> {
   render();
   logBoot("render_ok");
   requestAnimationFrame(() => perfBoot("first_raf"));
+  void iniciarEngineAuto();
 
   // Primeira execucao sem modelo: abre o assistente de primeiros passos.
   const primeiraVez = localStorage.getItem("c2.onboarded") !== "1";

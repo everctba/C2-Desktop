@@ -741,6 +741,33 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
   modeloSimplesBody.appendChild(modeloAcoes);
   page.appendChild(modeloSimples);
 
+  // ---- Execucao automatica (desktop e o modo normal) ----
+  const execucaoCard = Card({ title: t("Execução automática"), accent: 2 });
+  const execucaoBody = cardBody(execucaoCard);
+  const execucaoTexto = document.createElement("p");
+  execucaoTexto.className = "pageHint";
+  execucaoTexto.style.maxWidth = "none";
+  execucaoTexto.textContent = t(
+    "Mantenha o C2 Desktop aberto: ele indexa em segundo plano automaticamente. " +
+      "A CLI e o MCP apenas leem; não mantêm o índice atualizado sozinhos.",
+  );
+  execucaoBody.appendChild(execucaoTexto);
+  execucaoBody.appendChild(
+    Toggle({
+      label: t("Iniciar engine automaticamente ao abrir o projeto"),
+      checked: localStorage.getItem("c2.autoEngine") !== "0",
+      tone: "brand",
+      onChange: (ligado) => {
+        if (ligado) localStorage.removeItem("c2.autoEngine");
+        else localStorage.setItem("c2.autoEngine", "0");
+        status.textContent = ligado
+          ? t("engine será iniciado automaticamente ao abrir o projeto")
+          : t("engine automático desligado");
+      },
+    }).root,
+  );
+  page.appendChild(execucaoCard);
+
   // ---- Manutencao: limpar metadados (acao destrutiva, dupla confirmacao) ----
   const manutencaoCard = Card({ title: t("Manutenção"), accent: 10 });
   const manutencaoBody = cardBody(manutencaoCard);

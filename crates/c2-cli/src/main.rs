@@ -290,6 +290,10 @@ fn run(cli: Cli) -> Result<()> {
                         "{}",
                         cor(VERDE, "✓ C2 Desktop aberto. Pode fechar este terminal: o app continua rodando.")
                     );
+                    println!(
+                        "{}",
+                        cor(CINZA, "  Configure modelo, modo de uso e prompt no C2 Desktop. A CLI fica para os agentes.")
+                    );
                 }
             }
             Ok(())
@@ -1805,7 +1809,10 @@ fn cmd_mcp(root: Option<&Path>) -> Result<()> {
             "c2-mcp: aviso: este e um servidor STDIO para clientes MCP; nao digite comandos aqui."
         );
         eprintln!(
-            "        para iniciar o engine, abra outro terminal e rode `c2 start` (Ctrl+C encerra o servidor)."
+            "        para iniciar o engine, abra o C2 Desktop (ou outro terminal com `c2 start`); Ctrl+C encerra o servidor."
+        );
+        eprintln!(
+            "        a indexacao automatica depende do C2 Desktop aberto; este servidor e somente leitura."
         );
     }
 
