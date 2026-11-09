@@ -206,7 +206,7 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
 
     const corpo = document.createElement("div");
     corpo.style.display = "grid";
-    corpo.style.gridTemplateColumns = "1fr";
+    corpo.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
     corpo.style.gap = "var(--space-s)";
     const intro = document.createElement("p");
     intro.textContent =
