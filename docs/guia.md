@@ -403,6 +403,21 @@ Model on GPU · VRAM 4.3 GB
   para liberar a GPU, feche o C2 (ou pare o runtime manualmente).
 - a VRAM e atualizada a cada 5 s via `gpu_info`.
 
+## Onde ficam os dados e o que o desinstalador limpa
+
+- **Modelo entre projetos:** `%APPDATA%\dev.c2.desktop\global-model.json` guarda
+  o caminho do `.gguf` e as preferencias de runtime; projetos sem modelo herdam
+  esse caminho. Trocar de projeto nao apaga essa preferencia.
+- **Config do projeto:** `<projeto>\.c2\config.json` (nao e removido pelo
+  desinstalador; e dado do projeto).
+- **Cache/janela:** `%LOCALAPPDATA%\dev.c2.desktop` (WebView2, `c2.onboarded`,
+  `c2.root`, recentes).
+- **Desinstalar:** o uninstaller pergunta *"Remover tambem configuracoes do C2,
+  caminho do GGUF, idioma e cache deste PC?"*. Em **Yes** apaga
+  `%APPDATA%\dev.c2.desktop` e `%LOCALAPPDATA%\dev.c2.desktop`. Em upgrade
+  silencioso essas pastas sao preservadas. Os `.c2.json`, `.c2/` dos projetos
+  e os arquivos `.gguf` **nao** sao tocados.
+
 ## Tipografia
 
 - **UI:** sans-serif do sistema (`Segoe UI`/`system-ui`) — sem fonte externa.

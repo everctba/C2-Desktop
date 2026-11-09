@@ -57,8 +57,10 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 [CustomMessages]
 Integration=Integration:
 AddToPath=Add C2 (CLI and MCP) to the system PATH
+CleanUserData=Also remove C2 settings, the GGUF path, language and cache from this PC?
 brazilianportuguese.Integration=Integração:
 brazilianportuguese.AddToPath=Adicionar C2 (CLI e MCP) ao PATH do sistema
+brazilianportuguese.CleanUserData=Remover também configurações do C2, caminho do GGUF, idioma e cache deste PC?
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -210,7 +212,27 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Resposta: Integer;
 begin
   if CurUninstallStep = usPostUninstall then
+  begin
     RemoveFromSystemPath;
+
+    // Em upgrade o uninstaller antigo roda silencioso: preserva as configuracoes.
+    // No desinstalar manual, pergunta se limpa os dados do usuario.
+    if UninstallSilent then
+      Exit;
+
+    Resposta := MsgBox(
+      ExpandConstant('{cm:CleanUserData}'),
+      mbConfirmation,
+      MB_YESNO
+    );
+    if Resposta = IDYES then
+    begin
+      DelTree(ExpandConstant('{userappdata}\dev.c2.desktop'), True, True, True);
+      DelTree(ExpandConstant('{localappdata}\dev.c2.desktop'), True, True, True);
+    end;
+  end;
 end;
