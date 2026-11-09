@@ -240,3 +240,16 @@ export interface ReadResult {
   line_end: number;
   lines: string[];
 }
+
+export interface EmbeddingStatus {
+  enabled: boolean;
+  healthy: boolean;
+  pid: number | null;
+  model_path: string | null;
+  model_id: string;
+  dim: number;
+  device: string;
+  port: number;
+  binary: string | null;
+  last_error: string | null;
+}

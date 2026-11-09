@@ -418,6 +418,23 @@ const EN: Record<string, string> = {
   "Escolha o idioma da interface. A CLI e as ferramentas MCP continuam em inglês.":
     "Choose the interface language. The CLI and MCP tools stay in English.",
   "idioma atualizado": "language updated",
+  "Busca semântica (embeddings)": "Semantic search (embeddings)",
+  "Busca por significado usando embeddings locais dos resumos .c2.json. O grep lexical continua; embeddings são um sinal extra de recall.":
+    "Search by meaning using local embeddings of the .c2.json summaries. Lexical grep stays; embeddings add an extra recall signal.",
+  "Ativar busca semântica": "Enable semantic search",
+  "carregando runtime…": "loading runtime…",
+  "Configurar modelo…": "Configure model…",
+  "Abrir pasta de modelos": "Open models folder",
+  "nenhum modelo configurado": "no model configured",
+  "device de embeddings atualizado": "embeddings device updated",
+  "Configurar busca semântica": "Configure semantic search",
+  Arquivo: "File",
+  "Pasta de modelos": "Models folder",
+  "escolha uma pasta fora do C:": "choose a folder outside C:",
+  "Escolher pasta…": "Choose folder…",
+  "Abrir pasta": "Open folder",
+  "Baixar do Hugging Face": "Download from Hugging Face",
+  "modelo de embeddings configurado": "embedding model configured",
 };
 
 export function idiomaAtual(): Lang {

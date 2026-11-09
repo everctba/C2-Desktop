@@ -159,6 +159,144 @@ fn aplicar_modelo_global(app: &tauri::AppHandle, workspace: &Workspace) -> Resul
     Ok(true)
 }
 
+/// Preferencias globais do modelo de embeddings (bge-m3).
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+struct EmbeddingGlobal {
+    path: Option<String>,
+    model_id: Option<String>,
+    dim: Option<usize>,
+    device: Option<String>,
+}
+
+fn caminho_embedding_global(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("global-embedding.json"))
+        .map_err(|erro| erro.to_string())
+}
+
+fn ler_embedding_global(app: &tauri::AppHandle) -> EmbeddingGlobal {
+    let Ok(caminho) = caminho_embedding_global(app) else {
+        return EmbeddingGlobal::default();
+    };
+    std::fs::read_to_string(caminho)
+        .ok()
+        .and_then(|texto| serde_json::from_str(&texto).ok())
+        .unwrap_or_default()
+}
+
+fn salvar_embedding_global(app: &tauri::AppHandle, modelo: &EmbeddingGlobal) -> Result<(), String> {
+    let caminho = caminho_embedding_global(app)?;
+    if let Some(pai) = caminho.parent() {
+        std::fs::create_dir_all(pai).map_err(|erro| erro.to_string())?;
+    }
+    let texto = serde_json::to_string_pretty(modelo).map_err(|erro| erro.to_string())?;
+    std::fs::write(&caminho, texto).map_err(|erro| erro.to_string())
+}
+
+fn aplicar_embedding_global(app: &tauri::AppHandle, workspace: &Workspace) -> Result<(), String> {
+    if !workspace.is_initialized() {
+        return Ok(());
+    }
+    let mut config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    if config
+        .index
+        .embeddings
+        .model_path
+        .as_deref()
+        .map(|valor| !valor.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return Ok(());
+    }
+    let global = ler_embedding_global(app);
+    let Some(path) = global.path.filter(|valor| Path::new(valor).is_file()) else {
+        return Ok(());
+    };
+    config.index.embeddings.model_path = Some(path);
+    if let Some(model_id) = global.model_id {
+        config.index.embeddings.model_id = model_id;
+    }
+    if let Some(dim) = global.dim {
+        config.index.embeddings.dim = dim;
+    }
+    if let Some(device) = global.device {
+        config.index.embeddings.device = device;
+    }
+    workspace
+        .save_config(&config)
+        .map_err(|erro| erro.to_string())
+}
+
+#[tauri::command]
+fn embedding_status(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<c2_core::embedding_runtime::EmbeddingStatus, String> {
+    let workspace = open_workspace(&root)?;
+    aplicar_embedding_global(&app, &workspace)?;
+    let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    Ok(c2_core::embedding_runtime::status(&workspace, &config))
+}
+
+#[tauri::command]
+fn embedding_save(
+    app: tauri::AppHandle,
+    root: String,
+    model_path: Option<String>,
+    enabled: Option<bool>,
+    device: Option<String>,
+) -> Result<c2_core::embedding_runtime::EmbeddingStatus, String> {
+    let workspace = open_workspace(&root)?;
+    let mut config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    if let Some(path) = model_path {
+        if !path.trim().is_empty() && !Path::new(&path).is_file() {
+            return Err(format!("arquivo GGUF nao encontrado: {path}"));
+        }
+        config.index.embeddings.model_path = Some(path);
+    }
+    if let Some(enabled) = enabled {
+        config.index.embeddings.enabled = enabled;
+    }
+    if let Some(device) = device {
+        if device != "cpu" && device != "gpu" {
+            return Err("device deve ser cpu ou gpu".to_string());
+        }
+        config.index.embeddings.device = device;
+    }
+    workspace.save_config(&config).map_err(|erro| erro.to_string())?;
+    let global = EmbeddingGlobal {
+        path: config.index.embeddings.model_path.clone(),
+        model_id: Some(config.index.embeddings.model_id.clone()),
+        dim: Some(config.index.embeddings.dim),
+        device: Some(config.index.embeddings.device.clone()),
+    };
+    salvar_embedding_global(&app, &global)?;
+    Ok(c2_core::embedding_runtime::status(&workspace, &config))
+}
+
+#[tauri::command]
+fn embedding_start(root: String) -> Result<c2_core::embedding_runtime::EmbeddingStatus, String> {
+    let workspace = open_workspace(&root)?;
+    let config = workspace.load_config().map_err(|erro| erro.to_string())?;
+    c2_core::embedding_runtime::ensure(&workspace, &config).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn embedding_stop(root: String) -> Result<bool, String> {
+    let workspace = open_workspace(&root)?;
+    c2_core::embedding_runtime::stop(&workspace).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn embedding_pick_model(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .add_filter("Modelo GGUF", &["gguf"])
+        .blocking_pick_file()
+        .map(|path| path.to_string())
+}
+
 /// Projeto com que a janela foi aberta (se veio de `c2 open`).
 #[tauri::command]
 fn initial_root(initial: State<'_, InitialRoot>) -> Option<String> {
@@ -187,6 +325,7 @@ async fn workspace_status(
             }
             // Modelo e preferencia do app: se o projeto nao tem, herda o global.
             aplicar_modelo_global(&app_dentro, &workspace)?;
+        aplicar_embedding_global(&app_dentro, &workspace)?;
             let (report, timings) =
                 status::build_timed(&workspace).map_err(|err| err.to_string())?;
             Ok((Some(report), Some(timings)))

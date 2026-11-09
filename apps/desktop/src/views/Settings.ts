@@ -1,8 +1,8 @@
-import { api } from "../api";
-import type { StatusReport } from "../types";
+import { api, openExternal } from "../api";
+import type { EmbeddingStatus, StatusReport } from "../types";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
-import { dialogField, openDialog } from "../ui/Dialog";
+import { createDialog, dialogField, openDialog } from "../ui/Dialog";
 import { limparMetadados } from "./Cleanup";
 import { iniciarProbeUI } from "../perf";
 import { Input } from "../ui/Input";
@@ -772,6 +772,245 @@ export async function renderSettings(ctx: SettingsContext): Promise<View> {
     }).root,
   );
   topoConfig.appendChild(execucaoCard);
+
+  // ---- Busca semantica (embeddings bge-m3, opcional) ----
+  const embeddingCard = Card({ title: t("Busca semântica (embeddings)"), accent: 3 });
+  const embeddingBody = cardBody(embeddingCard);
+  const embedStatusInicial = ctx.root
+    ? await api.embeddingStatus(ctx.root).catch(() => null)
+    : null;
+  let embedStatus: EmbeddingStatus | null = embedStatusInicial;
+  let embedDevice = embedStatus?.device === "gpu" ? "gpu" : "cpu";
+
+  const embedTexto = document.createElement("p");
+  embedTexto.className = "pageHint";
+  embedTexto.style.maxWidth = "none";
+  embedTexto.textContent = t(
+    "Busca por significado usando embeddings locais dos resumos .c2.json. " +
+      "O grep lexical continua; embeddings são um sinal extra de recall.",
+  );
+  embeddingBody.appendChild(embedTexto);
+
+  const embedInfo = document.createElement("div");
+  embedInfo.className = styles.field;
+  const embedInfoLabel = document.createElement("span");
+  embedInfoLabel.className = styles.fieldLabel;
+  embedInfoLabel.textContent = t("Modelo");
+  const embedInfoValor = document.createElement("span");
+  embedInfoValor.className = styles.mono;
+  embedInfo.append(embedInfoLabel, embedInfoValor);
+  embeddingBody.appendChild(embedInfo);
+
+  const embedAcoes = document.createElement("div");
+  embedAcoes.className = styles.actions;
+  embedAcoes.style.marginTop = "var(--space-s)";
+  const embedToggle = Toggle({
+    label: t("Ativar busca semântica"),
+    checked: Boolean(embedStatus?.enabled),
+    tone: "brand",
+    onChange: (ligado) => {
+      void (async () => {
+        if (ligado && !embedStatus?.model_path) {
+          await abrirModalEmbedding();
+          embedToggle.control.setAttribute("aria-checked", "false");
+          embedToggle.control.className = embedToggle.control.className.replace(/\bon\b/, "");
+          return;
+        }
+        try {
+          embedStatus = await api.embeddingSave(
+            ctx.root,
+            undefined,
+            ligado,
+            embedDevice,
+          );
+          if (ligado) {
+            embedInfoValor.textContent = t("carregando runtime…");
+            embedStatus = await api.embeddingStart(ctx.root);
+          } else {
+            await api.embeddingStop(ctx.root);
+          }
+          atualizarEmbedding(embedStatus);
+        } catch (erro) {
+          embedInfoValor.textContent = `erro: ${String(erro)}`;
+        }
+      })();
+    },
+  });
+  embedAcoes.appendChild(embedToggle.root);
+
+  const btnCpu = Button({
+    label: "CPU",
+    size: "xs",
+    variant: "secondary",
+    onClick: () => void trocarDevice("cpu"),
+  });
+  const btnGpu = Button({
+    label: "GPU",
+    size: "xs",
+    variant: "secondary",
+    onClick: () => void trocarDevice("gpu"),
+  });
+  embedAcoes.append(btnCpu, btnGpu);
+  embeddingBody.appendChild(embedAcoes);
+
+  const embedConfigAcoes = document.createElement("div");
+  embedConfigAcoes.className = styles.actions;
+  embedConfigAcoes.style.marginTop = "var(--space-s)";
+  embedConfigAcoes.append(
+    Button({
+      label: t("Configurar modelo…"),
+      size: "xs",
+      variant: "secondary",
+      onClick: () => void abrirModalEmbedding(),
+    }),
+    Button({
+      label: t("Abrir pasta de modelos"),
+      size: "xs",
+      variant: "ghost",
+      onClick: () => {
+        const pasta = embedStatus?.model_path?.replace(/[\\/][^\\/]+$/, "");
+        if (pasta) void api.openProjectFolder(pasta);
+      },
+    }),
+  );
+  embeddingBody.appendChild(embedConfigAcoes);
+
+  const atualizarEmbedding = (status: EmbeddingStatus | null) => {
+    embedStatus = status;
+    embedDevice = status?.device === "gpu" ? "gpu" : "cpu";
+    embedInfoValor.textContent = status?.model_path
+      ? status.model_path
+      : t("nenhum modelo configurado");
+    btnCpu.style.borderColor = embedDevice === "cpu" ? "var(--accent-1)" : "";
+    btnCpu.style.background = embedDevice === "cpu" ? "var(--accent-1-10)" : "";
+    btnGpu.style.borderColor = embedDevice === "gpu" ? "var(--accent-1)" : "";
+    btnGpu.style.background = embedDevice === "gpu" ? "var(--accent-1-10)" : "";
+  };
+
+  const trocarDevice = async (device: string) => {
+    try {
+      embedStatus = await api.embeddingSave(
+        ctx.root,
+        undefined,
+        undefined,
+        device,
+      );
+      if (embedStatus.enabled && embedStatus.model_path) {
+        await api.embeddingStop(ctx.root);
+        embedInfoValor.textContent = t("carregando runtime…");
+        embedStatus = await api.embeddingStart(ctx.root);
+      }
+      atualizarEmbedding(embedStatus);
+      status.textContent = t("device de embeddings atualizado");
+    } catch (erro) {
+      embedInfoValor.textContent = `erro: ${String(erro)}`;
+    }
+  };
+
+  const abrirModalEmbedding = async () => {
+    const handle = createDialog({ title: t("Configurar busca semântica") });
+    const corpo = document.createElement("div");
+    corpo.style.display = "grid";
+    corpo.style.gap = "var(--space-s)";
+    const texto = document.createElement("p");
+    texto.className = "pageHint";
+    texto.style.maxWidth = "none";
+    texto.textContent = t(
+      "Baixe o bge-m3-Q8_0.gguf (~600 MB) em uma pasta fora do C: " +
+        "(ex.: D:\C2\data\models\embeddings) e selecione o arquivo. " +
+        "Nada é baixado automaticamente.",
+    );
+    corpo.appendChild(texto);
+    const info = dialogField(t("Arquivo"), "bge-m3-Q8_0.gguf · ~600 MB · bge-m3 Q8_0");
+    corpo.appendChild(info);
+
+    let pastaModelos = embedStatus?.model_path?.replace(/[\\/][^\\/]+$/, "") ?? "";
+    const pastaInfo = document.createElement("div");
+    pastaInfo.className = styles.field;
+    const pastaLabel = document.createElement("span");
+    pastaLabel.className = styles.fieldLabel;
+    pastaLabel.textContent = t("Pasta de modelos");
+    const pastaValor = document.createElement("span");
+    pastaValor.className = styles.mono;
+    pastaValor.textContent = pastaModelos || t("escolha uma pasta fora do C:");
+    pastaInfo.append(pastaLabel, pastaValor);
+    corpo.appendChild(pastaInfo);
+
+    const pastaAcoes = document.createElement("div");
+    pastaAcoes.className = styles.actions;
+    pastaAcoes.append(
+      Button({
+        label: t("Escolher pasta…"),
+        size: "xs",
+        variant: "secondary",
+        onClick: () => {
+          void (async () => {
+            const escolhida = await api.pickFolder();
+            if (!escolhida) return;
+            pastaModelos = escolhida.replace(/\\/g, "/");
+            pastaValor.textContent = pastaModelos;
+          })();
+        },
+      }),
+      Button({
+        label: t("Abrir pasta"),
+        size: "xs",
+        variant: "ghost",
+        onClick: () => {
+          if (pastaModelos) void api.openProjectFolder(pastaModelos);
+        },
+      }),
+    );
+    corpo.appendChild(pastaAcoes);
+
+    const acoes = document.createElement("div");
+    acoes.className = styles.actions;
+    acoes.append(
+      Button({
+        label: t("Baixar do Hugging Face"),
+        size: "xs",
+        variant: "secondary",
+        onClick: () =>
+          void openExternal(
+            "https://huggingface.co/lm-kit/bge-m3-gguf/resolve/main/bge-m3-Q8_0.gguf",
+          ),
+      }),
+      Button({
+        label: t("Selecionar .gguf…"),
+        size: "xs",
+        variant: "primary",
+        onClick: () => {
+          void (async () => {
+            const escolhido = await api.embeddingPickModel();
+            if (!escolhido) return;
+            try {
+              embedInfoValor.textContent = t("carregando runtime…");
+              embedStatus = await api.embeddingSave(
+                ctx.root,
+                escolhido,
+                true,
+                embedDevice,
+              );
+              embedStatus = await api.embeddingStart(ctx.root);
+              atualizarEmbedding(embedStatus);
+              status.textContent = t("modelo de embeddings configurado");
+              handle.close();
+            } catch (erro) {
+              embedInfoValor.textContent = `erro: ${String(erro)}`;
+            }
+          })();
+        },
+      }),
+    );
+    corpo.appendChild(acoes);
+    handle.body.appendChild(corpo);
+    handle.footer.appendChild(
+      Button({ label: t("Fechar"), variant: "ghost", onClick: () => handle.close() }),
+    );
+  };
+
+  atualizarEmbedding(embedStatus);
+  page.appendChild(embeddingCard);
 
   // ---- Manutencao: limpar metadados (acao destrutiva, dupla confirmacao) ----
   const manutencaoCard = Card({ title: t("Manutenção"), accent: 10 });
