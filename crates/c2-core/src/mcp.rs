@@ -66,6 +66,18 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "c2_similar",
+            "description": "Arquivos com resumo semanticamente parecido (cosine de embeddings) e seus scores. Requer embeddings indexados.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "file": { "type": "string", "description": "Caminho relativo ao workspace" },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10 }
+                },
+                "required": ["file"]
+            }
+        },
+        {
             "name": "c2_map",
             "description": "Arvore plana do projeto: uma linha por arquivo indexavel.",
             "inputSchema": {
@@ -93,7 +105,7 @@ pub fn tools() -> Value {
 
 /// Nomes das ferramentas (para painel/testes).
 pub fn tool_names() -> Vec<&'static str> {
-    vec!["c2_grep", "c2_read", "c2_related", "c2_map", "c2_annotate"]
+    vec!["c2_grep", "c2_read", "c2_related", "c2_similar", "c2_map", "c2_annotate"]
 }
 
 /// Processa uma linha JSON-RPC. Devolve `None` para notificacoes (sem `id`).
@@ -213,8 +225,12 @@ fn chamar_ferramenta(
             }
             let mut saida = String::new();
             for (indice, hit) in hits.iter().enumerate() {
+                let sem = hit
+                    .embedding_score
+                    .map(|valor| format!(" Â· sem {valor:.3}"))
+                    .unwrap_or_default();
                 saida.push_str(&format!(
-                    "{}. {} (score {:.2})\n   {}\n",
+                    "{}. {} (score {:.2}{sem})\n   {}\n",
                     indice + 1,
                     hit.file,
                     hit.score,
@@ -297,6 +313,34 @@ fn chamar_ferramenta(
             saida.push_str(&format!("usado por ({}):\n", usado_por.len()));
             for item in &usado_por {
                 saida.push_str(&format!("  {item}\n"));
+            }
+            Ok(saida)
+        }
+        "c2_similar" => {
+            let arquivo = argumentos
+                .get("file")
+                .and_then(Value::as_str)
+                .ok_or_else(|| texto_erro("c2_similar exige 'file'"))?;
+            let limite = argumentos
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(10)
+                .clamp(1, 20) as usize;
+            let vizinhos = crate::embedding_insights::similar(
+                workspace, config, arquivo, limite,
+            )?;
+            if vizinhos.is_empty() {
+                return Ok(format!("nenhum similar para {arquivo} (embeddings indexados?)"));
+            }
+            let mut saida = String::new();
+            for (indice, vizinho) in vizinhos.iter().enumerate() {
+                saida.push_str(&format!(
+                    "{}. {} (cosine {:.3})\n   {}\n",
+                    indice + 1,
+                    vizinho.file,
+                    vizinho.score,
+                    tronco(&vizinho.summary, 240)
+                ));
             }
             Ok(saida)
         }
