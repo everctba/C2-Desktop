@@ -40,6 +40,30 @@ const EN: Record<string, string> = {
   "OpenAI, Groq, DeepSeek, OpenRouter ou servidor local (LM Studio/Ollama/vLLM). Sem GPU.":
     "OpenAI, Groq, DeepSeek, OpenRouter or a local server (LM Studio/Ollama/vLLM). No GPU required.",
   "Decidir depois": "Decide later",
+  "Bem-vindo ao C2": "Welcome to C2",
+  Nuvem: "Cloud",
+  Projeto: "Project",
+  Modelo: "Model",
+  Selecionar: "Select",
+  "pasta selecionada": "selected folder",
+  "modelo selecionado": "selected model",
+  "Trocar modelo…": "Change model…",
+  "Selecionar .gguf…": "Select .gguf…",
+  "Abra a pasta do projeto primeiro (proximo passo).":
+    "Open the project folder first (next step).",
+  "O C2 fala o padrao OpenAI-compatible: OpenAI, Groq, DeepSeek, OpenRouter ou um servidor local (LM Studio/Ollama/vLLM). A chave fica no cofre do sistema, nunca no config. O conteudo dos arquivos sai da maquina.":
+    "C2 speaks the OpenAI-compatible standard: OpenAI, Groq, DeepSeek, OpenRouter or a local server (LM Studio/Ollama/vLLM). The key stays in the system vault, never in config. File contents leave the machine.",
+  "Salve a chave em Config → Provedor de IA e clique em Testar conexao. Depois siga para o projeto.":
+    "Save the key in Settings → AI Provider and click Test connection. Then continue to the project.",
+  "O C2 roda o modelo na sua máquina — nada sai do seu computador. Recomendamos o Gemma 4 E2B em Q4_K_M (~3,2 GB), que cabe numa GPU de 8 GB.":
+    "C2 runs the model on your machine — nothing leaves your computer. We recommend Gemma 4 E2B Q4_K_M (~3.2 GB), which fits in an 8 GB GPU.",
+  "VRAM insuficiente para o modelo recomendado": "Not enough VRAM for the recommended model",
+  "Nenhuma GPU detectada": "No GPU detected",
+  "O C2 grava os metadados ao lado de cada arquivo (<arquivo>.c2.json). Escolha a pasta que você quer indexar.":
+    "C2 writes metadata next to each file (<file>.c2.json). Choose the folder you want to index.",
+  "Escolha o modelo que você baixou. O C2 lê apenas o cabeçalho para validar (nome, quantização e se cabe na VRAM) e guarda só o caminho — o arquivo não é copiado.":
+    "Choose the model you downloaded. C2 only reads the header to validate it (name, quantization and whether it fits in VRAM) and stores only the path — the file is not copied.",
+
 
   "Modelo GGUF na sua GPU. Privado, sem custo por token. Precisa de GPU de 8 GB.":
     "GGUF model on your GPU. Private, no per-token cost. Needs an 8 GB GPU.",
@@ -58,7 +82,6 @@ const EN: Record<string, string> = {
   "Modelo local": "Local model",
   "nenhum modelo": "no model",
   "não configurado": "not configured",
-  "Selecionar .gguf…": "Select .gguf…",
   "modelo atualizado": "model updated",
   "Modelo inválido": "Invalid model",
   Erro: "Error",
@@ -235,8 +258,6 @@ const EN: Record<string, string> = {
   "Conecte seu provedor (API Key)": "Connect your provider (API Key)",
   "Abrir Configuracoes": "Open Settings",
   "Testar conexao": "Test connection",
-  "Abra a pasta do projeto primeiro (proximo passo).":
-    "Open the project folder first (next step).",
   "Baixe um modelo local (GGUF)": "Download a local model (GGUF)",
   "Configurar nuvem": "Configure cloud",
   "Escolha a pasta do projeto": "Choose the project folder",
@@ -269,7 +290,6 @@ const EN: Record<string, string> = {
   "Camadas na GPU inválidas.": "Invalid GPU layers.",
   "Estimativa": "Estimate",
 
-  Projeto: "Project",
   "Arquivos descobertos": "Discovered files",
   Metadados: "Metadata",
   "Sensíveis pulados": "Sensitive skipped",
@@ -283,7 +303,6 @@ const EN: Record<string, string> = {
   "não localizado": "not found",
   "runtime embarcado": "embedded runtime",
   atual: "current",
-  Modelo: "Model",
   "workspace": "workspace",
   "Força reindexar mesmo sem mudanças; consome o modelo em todos os arquivos.":
     "Forces reindexing even without changes; consumes the model on every file.",

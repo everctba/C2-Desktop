@@ -30,7 +30,7 @@ export function openWelcome(
   modo: "local" | "nuvem" = "local",
 ): void {
   const dialog = createDialog({
-    title: "Bem-vindo ao C2",
+    title: t("Bem-vindo ao C2"),
     onClose: () => handlers.dismiss(),
   });
   dialog.element.style.width = "min(620px, 100%)";
@@ -50,7 +50,9 @@ export function openWelcome(
   let modeloEscolhido: string | null = null;
 
   const TOTAL = modo === "nuvem" ? 2 : 3;
-  const rotulos = modo === "nuvem" ? ["Nuvem", "Projeto"] : ["Modelo", "Projeto", "Selecionar"];
+  const rotulos = modo === "nuvem"
+    ? [t("Nuvem"), t("Projeto")]
+    : [t("Modelo"), t("Projeto"), t("Selecionar")];
 
   const renderPassos = () => {
     passo.innerHTML = "";
@@ -203,7 +205,7 @@ export function openWelcome(
         campo.className = styles.field;
         const rotulo = document.createElement("span");
         rotulo.className = styles.fieldLabel;
-        rotulo.textContent = "pasta selecionada";
+        rotulo.textContent = t("pasta selecionada");
         const valor = document.createElement("span");
         valor.className = styles.mono;
         valor.textContent = raiz;
@@ -259,7 +261,7 @@ export function openWelcome(
           campo.className = styles.field;
           const rotulo = document.createElement("span");
           rotulo.className = styles.fieldLabel;
-          rotulo.textContent = "modelo selecionado";
+          rotulo.textContent = t("modelo selecionado");
           const valor = document.createElement("span");
           valor.className = styles.mono;
           valor.textContent = modeloEscolhido;
@@ -269,7 +271,7 @@ export function openWelcome(
         corpo.appendChild(
           botaoConteudo(
             Button({
-              label: modeloEscolhido ? "Trocar modelo…" : "Selecionar .gguf…",
+              label: modeloEscolhido ? t("Trocar modelo…") : t("Selecionar .gguf…"),
               iconName: "projects",
               variant: "primary",
               onClick: async () => {
@@ -348,7 +350,7 @@ function titulo(texto: string): HTMLElement {
 
 function texto(conteudo: string): HTMLElement {
   const el = document.createElement("p");
-  el.textContent = conteudo;
+  el.textContent = t(conteudo);
   el.style.margin = "0";
   el.style.fontSize = "var(--text-xs)";
   el.style.lineHeight = "1.5";
