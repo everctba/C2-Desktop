@@ -90,7 +90,10 @@ fn usage_path(workspace: &Workspace) -> std::path::PathBuf {
 pub fn record(workspace: &Workspace, event: &UsageEvent) -> Result<()> {
     let path = usage_path(workspace);
     fs::create_dir_all(workspace.logs_dir()).at(&workspace.logs_dir())?;
-    if fs::metadata(&path).map(|meta| meta.len() > MAX_LOG_BYTES).unwrap_or(false) {
+    if fs::metadata(&path)
+        .map(|meta| meta.len() > MAX_LOG_BYTES)
+        .unwrap_or(false)
+    {
         let rotated = path.with_extension("jsonl.1");
         let _ = fs::rename(&path, rotated);
     }
@@ -220,5 +223,4 @@ mod tests {
         assert_eq!(evento.schema_version, 1);
         assert!(evento.at.ends_with('Z'));
     }
-
 }
