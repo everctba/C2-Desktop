@@ -1,6 +1,13 @@
 import { api, onEngineEvent } from "../api";
 import { t } from "../i18n";
-import type { FileEntry, IndexReport, MetaFile, RelatedResult, StatusReport } from "../types";
+import type {
+  EmbeddingStatus,
+  FileEntry,
+  IndexReport,
+  MetaFile,
+  RelatedResult,
+  StatusReport,
+} from "../types";
 import { Button } from "../ui/Button";
 import { Card, cardBody } from "../ui/Card";
 import { Pill } from "../ui/Pill";
@@ -156,6 +163,74 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   gpuCard.append(gpuTitle, gpuStatus, cargaTrack, gpuRows, btnDescarregar);
   infoRow.appendChild(gpuCard);
   page.appendChild(infoRow);
+
+  /* card de embeddings (opcional) */
+  const embedStatus = await api.embeddingStatus(ctx.root).catch(() => null);
+  const embCard = Card({ title: t("Embeddings"), accent: 4 });
+  const embBody = cardBody(embCard);
+  const embStatus = document.createElement("div");
+  embStatus.className = styles.field;
+  const embStatusLabel = document.createElement("span");
+  embStatusLabel.className = styles.fieldLabel;
+  embStatusLabel.textContent = t("status");
+  const embStatusValue = document.createElement("span");
+  embStatusValue.className = styles.fieldValue;
+  embStatus.append(embStatusLabel, embStatusValue);
+
+  const embDeviceRow = document.createElement("div");
+  embDeviceRow.className = styles.field;
+  const embDeviceLabel = document.createElement("span");
+  embDeviceLabel.className = styles.fieldLabel;
+  embDeviceLabel.textContent = t("execução");
+  const embDeviceValue = document.createElement("span");
+  embDeviceValue.className = styles.mono;
+  embDeviceRow.append(embDeviceLabel, embDeviceValue);
+
+  const embCount = document.createElement("div");
+  embCount.className = styles.field;
+  const embCountLabel = document.createElement("span");
+  embCountLabel.className = styles.fieldLabel;
+  embCountLabel.textContent = t("arquivos indexados");
+  const embCountValue = document.createElement("span");
+  embCountValue.className = styles.mono;
+  embCount.append(embCountLabel, embCountValue);
+
+  const embNow = document.createElement("div");
+  embNow.className = styles.field;
+  const embNowLabel = document.createElement("span");
+  embNowLabel.className = styles.fieldLabel;
+  embNowLabel.textContent = t("processando agora");
+  const embNowValue = document.createElement("span");
+  embNowValue.className = styles.mono;
+  embNow.append(embNowLabel, embNowValue);
+
+  const embTrack = document.createElement("div");
+  embTrack.className = styles.cargaTrack;
+  const embFill = document.createElement("div");
+  embFill.className = styles.cargaFill;
+  embTrack.appendChild(embFill);
+
+  let embTotal = Math.max(1, ctx.status?.metadata ?? 0);
+  let embDone = 0;
+  const atualizarEmbStatus = (status: EmbeddingStatus | null) => {
+    if (!status?.enabled) {
+      embStatusValue.textContent = t("desativada em Configurações");
+    } else if (!status.model_path) {
+      embStatusValue.textContent = t("modelo não configurado");
+    } else if (status.healthy) {
+      embStatusValue.textContent = t("modelo carregado");
+    } else {
+      embStatusValue.textContent = t("runtime parado");
+    }
+    embDeviceValue.textContent = status?.device === "gpu" ? "GPU" : "CPU";
+    embCountValue.textContent = `${embDone} de ${embTotal}`;
+    embNowValue.textContent = "—";
+    const pct = embTotal > 0 ? Math.min(100, Math.round((embDone / embTotal) * 100)) : 0;
+    embFill.style.width = `${pct}%`;
+  };
+  atualizarEmbStatus(embedStatus);
+  embBody.append(embStatus, embDeviceRow, embCount, embTrack, embNow);
+  page.appendChild(embCard);
 
   /* ações */
   const actions = document.createElement("div");
@@ -512,6 +587,44 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       const pct = total > 0 ? Math.round((indice / total) * 100) : 0;
       progressoReindex.style.display = "flex";
       textoProgresso.textContent = `${t("reindexando")}… ${pct}% (${indice} ${t("de")} ${total})`;
+    }),
+    onEngineEvent("engine://embedding_started", () => {
+      embStatusValue.textContent = t("processando embeddings");
+      embNowValue.textContent = t("preparando…");
+    }),
+    onEngineEvent("engine://embedding_progress", (payload) => {
+      const progresso = payload as { rel?: string; index?: number; total?: number };
+      embTotal = Math.max(1, progresso.total ?? embTotal);
+      embDone = progresso.index ?? embDone;
+      embStatusValue.textContent = t("processando embeddings");
+      embCountValue.textContent = `${embDone} de ${embTotal}`;
+      embNowValue.textContent = progresso.rel ?? "—";
+      embFill.style.width = `${Math.min(100, Math.round((embDone / embTotal) * 100))}%`;
+    }),
+    onEngineEvent("engine://embedding_cycle", (payload) => {
+      const report = payload as {
+        files?: number;
+        embedded?: number;
+        cached?: number;
+        errors?: number;
+      };
+      embTotal = Math.max(1, report.files ?? embTotal);
+      embDone = (report.embedded ?? 0) + (report.cached ?? 0);
+      embStatusValue.textContent =
+        (report.errors ?? 0) > 0 ? t("concluído com erros") : t("modelo carregado");
+      embCountValue.textContent = `${embDone} de ${embTotal}`;
+      embNowValue.textContent = "—";
+      embFill.style.width = "100%";
+      appendLog(
+        `embeddings: ${report.embedded ?? 0} gerados, ${report.cached ?? 0} em cache, ` +
+          `${report.errors ?? 0} erros`,
+      );
+      void refreshStatus();
+    }),
+    onEngineEvent("engine://embedding_error", (payload) => {
+      embStatusValue.textContent = t("erro nos embeddings");
+      embNowValue.textContent = String(payload);
+      appendLog(`erro nos embeddings: ${String(payload)}`);
     }),
     onEngineEvent("engine://error", (payload) => {
       appendLog(`erro: ${String(payload)}`);

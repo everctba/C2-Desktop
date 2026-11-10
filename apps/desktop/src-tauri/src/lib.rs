@@ -1,4 +1,4 @@
-//! Ponte entre a janela (frontend) e o nucleo do C2.
+﻿//! Ponte entre a janela (frontend) e o nucleo do C2.
 //!
 //! Toda a logica vive em `c2-core`; aqui so adaptamos chamadas e eventos.
 //! Ver `docs/adr/0001-arquitetura-em-camadas.md`.
@@ -292,12 +292,26 @@ fn embedding_stop(root: String) -> Result<bool, String> {
 async fn embedding_index(
     root: String,
     full: Option<bool>,
+    app: tauri::AppHandle,
 ) -> Result<c2_core::embedding_index::EmbeddingIndexReport, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let workspace = open_workspace(&root)?;
         let config = workspace.load_config().map_err(|erro| erro.to_string())?;
-        c2_core::embedding_index::run(&workspace, &config, full.unwrap_or(false), |_, _, _| {})
-            .map_err(|erro| erro.to_string())
+        let _ = app.emit("engine://embedding_started", ());
+        let report = c2_core::embedding_index::run(
+            &workspace,
+            &config,
+            full.unwrap_or(false),
+            |rel, index, total| {
+                let _ = app.emit(
+                    "engine://embedding_progress",
+                    serde_json::json!({ "rel": rel, "index": index, "total": total }),
+                );
+            },
+        )
+        .map_err(|erro| erro.to_string())?;
+        let _ = app.emit("engine://embedding_cycle", &report);
+        Ok(report)
     })
     .await
     .map_err(|erro| erro.to_string())?
@@ -501,6 +515,7 @@ async fn workspace_reindex(
             logger.warn("desktop", format!("ultimo erro: {erro}"));
         }
 
+        indexar_embeddings(&app, &workspace, &config);
         let _ = runtime::stop(&workspace);
         Ok(report)
     })
@@ -511,6 +526,45 @@ async fn workspace_reindex(
 #[tauri::command]
 fn reindex_cancel(reindex: State<'_, Reindex>) {
     reindex.cancel.store(true, Ordering::SeqCst);
+}
+
+/// Roda a indexacao de embeddings depois de um ciclo/reindex, quando ligada.
+/// Emite progresso por arquivo para o card do Engine; falhas nao derrubam o engine.
+fn indexar_embeddings(app: &tauri::AppHandle, workspace: &Workspace, config: &c2_core::config::Config) {
+    let cfg = &config.index.embeddings;
+    if !cfg.enabled
+        || cfg
+            .model_path
+            .as_deref()
+            .map(|valor| valor.trim().is_empty())
+            .unwrap_or(true)
+    {
+        return;
+    }
+    let _ = app.emit("engine://embedding_started", ());
+    let resultado = c2_core::embedding_index::run(
+        workspace,
+        config,
+        false,
+        |rel, index, total| {
+            let _ = app.emit(
+                "engine://embedding_progress",
+                serde_json::json!({
+                    "rel": rel,
+                    "index": index,
+                    "total": total,
+                }),
+            );
+        },
+    );
+    match resultado {
+        Ok(report) => {
+            let _ = app.emit("engine://embedding_cycle", report);
+        }
+        Err(err) => {
+            let _ = app.emit("engine://embedding_error", err.to_string());
+        }
+    }
 }
 
 #[tauri::command]
@@ -572,6 +626,7 @@ fn engine_start(
                         logger.warn("engine", format!("erro no ciclo: {erro}"));
                     }
                     let _ = app.emit("engine://cycle", report);
+                    indexar_embeddings(&app, &workspace, &config);
                 }
                 Err(err) => {
                     logger.error("engine", format!("falha no ciclo: {err}"));
@@ -1459,7 +1514,7 @@ pub fn run() {
             if let Some(icone) = app.default_window_icon().cloned() {
                 TrayIconBuilder::new()
                     .icon(icone)
-                    .tooltip("C2 — Comments 2.0 for AI")
+                    .tooltip("C2 â€” Comments 2.0 for AI")
                     .menu(&menu)
                     .show_menu_on_left_click(false)
                     .on_menu_event(|app, event| match event.id.as_ref() {
@@ -1511,3 +1566,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o C2 Desktop");
 }
+
