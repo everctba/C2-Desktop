@@ -84,7 +84,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
     why.style.maxWidth = "none";
     why.textContent = forest.teleology.why;
     const goal = document.createElement("div");
-    goal.className = styles.breakdown;
+    goal.className = styles.breakdownWrap;
     goal.textContent = `${t("objetivo")}: ${forest.teleology.goal}`;
     visaoBody.append(what, why, goal);
     page.appendChild(visao);
@@ -103,7 +103,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
       nome.className = styles.mono;
       nome.textContent = layer;
       const entrada = document.createElement("span");
-      entrada.className = styles.breakdown;
+      entrada.className = styles.breakdownWrap;
       entrada.textContent = t("domínio");
       linha.append(nome, entrada);
       arquiteturaBody.appendChild(linha);
@@ -127,7 +127,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
       row.append(head, texto);
       if (dominio.why) {
         const why = document.createElement("div");
-        why.className = styles.breakdown;
+        why.className = styles.breakdownWrap;
         why.textContent = dominio.why;
         row.appendChild(why);
       }
@@ -145,7 +145,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
         nome.className = styles.mono;
         nome.textContent = decisao.title;
         const texto = document.createElement("span");
-        texto.className = styles.breakdown;
+        texto.className = styles.breakdownWrap;
         texto.textContent = decisao.summary;
         linha.append(nome, texto);
         decisoesBody.appendChild(linha);
@@ -157,7 +157,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
         nome.className = styles.mono;
         nome.textContent = risco.title;
         const texto = document.createElement("span");
-        texto.className = styles.breakdown;
+        texto.className = styles.breakdownWrap;
         texto.textContent = risco.summary;
         linha.append(nome, texto);
         decisoesBody.appendChild(linha);
@@ -175,7 +175,7 @@ export async function renderForest(ctx: ForestContext): Promise<View> {
         nome.className = styles.mono;
         nome.textContent = item.kind;
         const texto = document.createElement("span");
-        texto.className = styles.breakdown;
+        texto.className = styles.breakdownWrap;
         texto.textContent = `${item.claim} · docs: ${item.docs_ref} · código: ${item.code_ref}`;
         linha.append(nome, texto);
         divBody.appendChild(linha);

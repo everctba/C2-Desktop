@@ -100,6 +100,8 @@
   background: var(--bg-surface-2);
   cursor: pointer;
   transition: background 150ms ease;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .resultRow:hover {
@@ -136,6 +138,9 @@
   font-size: var(--text-s);
   color: var(--text-muted);
   line-height: 1.45;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .emptyState {
@@ -234,6 +239,17 @@
   font-size: var(--text-2xs);
   color: var(--text-subtle);
   white-space: nowrap;
+}
+
+/* Texto longo de floresta/memoria: permite quebrar dentro do card. */
+.breakdownWrap {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .mark {
