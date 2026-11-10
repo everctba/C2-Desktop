@@ -130,6 +130,10 @@ pub struct UsageSummary {
     pub calls: usize,
     pub meta_reads: usize,
     pub annotations: usize,
+    pub code_reads: usize,
+    /// Chamada de contexto (grep/related/similar/brief/map) antes da primeira
+    /// leitura de codigo. Indica adocao sem lembrete explicito.
+    pub preflight_before_code: bool,
     pub by_actor: BTreeMap<String, usize>,
     pub by_tool: BTreeMap<String, usize>,
 }
@@ -139,14 +143,36 @@ pub fn summarize(eventos: &[UsageEvent]) -> UsageSummary {
         calls: eventos.len(),
         ..UsageSummary::default()
     };
-    for evento in eventos {
+    let mut ordenados = eventos.to_vec();
+    ordenados.sort_by(|a, b| a.at.cmp(&b.at));
+    let mut primeira_leitura_codigo: Option<usize> = None;
+    let mut primeira_chamada_contexto: Option<usize> = None;
+    for (indice, evento) in ordenados.iter().enumerate() {
         resumo.meta_reads += evento.meta_reads;
         if evento.tool == "c2_annotate" || evento.annotation_kind.is_some() {
             resumo.annotations += 1;
         }
+        if evento.tool == "c2_read" || evento.tool == "read" {
+            resumo.code_reads += 1;
+            if primeira_leitura_codigo.is_none() {
+                primeira_leitura_codigo = Some(indice);
+            }
+        }
+        if matches!(
+            evento.tool.as_str(),
+            "c2_grep" | "c2_related" | "c2_similar" | "c2_brief" | "c2_map"
+        ) && primeira_chamada_contexto.is_none()
+        {
+            primeira_chamada_contexto = Some(indice);
+        }
         *resumo.by_actor.entry(evento.actor.clone()).or_default() += 1;
         *resumo.by_tool.entry(evento.tool.clone()).or_default() += 1;
     }
+    resumo.preflight_before_code = match (primeira_chamada_contexto, primeira_leitura_codigo) {
+        (Some(contexto), Some(leitura)) => contexto < leitura,
+        (Some(_), None) => true,
+        _ => false,
+    };
     resumo
 }
 
@@ -195,6 +221,28 @@ mod tests {
         let resumo = summarize(&eventos);
         assert_eq!(resumo.meta_reads, 1);
         assert_eq!(resumo.annotations, 1);
+        fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn preflight_antes_da_leitura() {
+        let (dir, workspace) = ws("preflight");
+        record(
+            &workspace,
+            &UsageEvent::new("mcp", "c2_grep").result_count(2),
+        )
+        .unwrap();
+        record(
+            &workspace,
+            &UsageEvent::new("mcp", "c2_read")
+                .file("src/a.rs")
+                .meta_reads(1),
+        )
+        .unwrap();
+        let resumo = summarize(&events(&workspace, 10).unwrap());
+        assert_eq!(resumo.code_reads, 1);
+        assert_eq!(resumo.meta_reads, 1);
+        assert!(resumo.preflight_before_code);
         fs::remove_dir_all(dir).ok();
     }
 

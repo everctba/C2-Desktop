@@ -326,6 +326,8 @@ export interface UsageSummary {
   calls: number;
   meta_reads: number;
   annotations: number;
+  code_reads: number;
+  preflight_before_code: boolean;
   by_actor: Record<string, number>;
   by_tool: Record<string, number>;
 }

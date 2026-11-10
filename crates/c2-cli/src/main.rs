@@ -150,6 +150,9 @@ enum Command {
     /// Mostra o estado do workspace
     Status,
 
+    /// Estatisticas locais de uso (adocao, leituras e anotacoes)
+    Stats,
+
     /// Busca decisoes/gotchas nas anotacoes de agentes
     Decisions {
         query: Option<String>,
@@ -410,6 +413,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Mcp => cmd_mcp(cli.root.as_deref()),
         Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
+        Command::Stats => cmd_stats(cli.root.as_deref(), cli.json),
         Command::Forest { action } => cmd_forest(cli.root.as_deref(), action, cli.json),
         Command::Decisions {
             query,
@@ -1307,6 +1311,31 @@ fn cmd_decisions(
             "{:.2}{cosine}  [{}] {} — {}\n   {}",
             hit.score, hit.kind, hit.file, hit.at, hit.text
         );
+    }
+    Ok(())
+}
+
+fn cmd_stats(root: Option<&Path>, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let eventos = c2_core::usage::events(&workspace, 5000)?;
+    let resumo = c2_core::usage::summarize(&eventos);
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&resumo)?);
+        return Ok(());
+    }
+    println!(
+        "calls {} · code_reads {} · meta_reads {} · annotations {} · preflight_before_code {}",
+        resumo.calls,
+        resumo.code_reads,
+        resumo.meta_reads,
+        resumo.annotations,
+        resumo.preflight_before_code
+    );
+    for (ator, quantidade) in &resumo.by_actor {
+        println!("{ator}: {quantidade}");
+    }
+    for (ferramenta, quantidade) in &resumo.by_tool {
+        println!("{ferramenta}: {quantidade}");
     }
     Ok(())
 }

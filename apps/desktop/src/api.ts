@@ -416,7 +416,7 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
     case "usage_events":
       return [] as T;
     case "usage_summary":
-      return { calls: 0, meta_reads: 0, annotations: 0, by_actor: {}, by_tool: {} } as T;
+      return { calls: 0, meta_reads: 0, annotations: 0, code_reads: 0, preflight_before_code: false, by_actor: {}, by_tool: {} } as T;
     case "note_remove":
       return {} as T;
     case "embedding_status":
