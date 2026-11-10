@@ -217,10 +217,12 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
     corpo.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
     corpo.style.gap = "var(--space-s)";
     const intro = document.createElement("p");
-    intro.textContent =
-      "Escolha o caminho inicial. Dá para trocar depois em Config → Modo de uso.";
+    intro.textContent = t(
+      "Escolha o caminho inicial. Dá para trocar depois em Config → Modo de uso.",
+    );
     intro.style.margin = "0";
     intro.style.color = "var(--text-muted)";
+    intro.style.gridColumn = "1 / -1";
     corpo.appendChild(intro);
 
     const finalizar = (modo: "local" | "nuvem") => {
@@ -249,20 +251,20 @@ function escolherModoInicial(): Promise<"local" | "nuvem" | null> {
 
     corpo.append(
       opcao(
-        "IA local (padrão)",
-        "Modelo GGUF na sua GPU. Privado e sem custo por token. Precisa de GPU de 8 GB.",
+        t("IA local (padrão)"),
+        t("Modelo GGUF na sua GPU. Privado e sem custo por token. Precisa de GPU de 8 GB."),
         "local",
       ),
       opcao(
-        "API Key / nuvem",
-        "OpenAI, Groq, DeepSeek, OpenRouter ou servidor local (LM Studio/Ollama/vLLM). Sem GPU.",
+        t("API Key / nuvem"),
+        t("OpenAI, Groq, DeepSeek, OpenRouter ou servidor local (LM Studio/Ollama/vLLM). Sem GPU."),
         "nuvem",
       ),
     );
     handle.body.appendChild(corpo);
 
     const depois = Button({
-      label: "Decidir depois",
+      label: t("Decidir depois"),
       variant: "ghost",
       onClick: () => finalizar("local"),
     });

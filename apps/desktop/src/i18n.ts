@@ -33,6 +33,14 @@ const EN: Record<string, string> = {
   "Escolha onde a IA roda. O restante da tela se adapta ao modo; o que não se aplica fica oculto (abra 'avançado' para ver tudo).":
     "Choose where the AI runs. The rest of the screen adapts; what does not apply stays hidden (open \"advanced\" to see everything).",
   "IA local (padrão)": "Local AI (default)",
+  "Escolha o caminho inicial. Dá para trocar depois em Config → Modo de uso.":
+    "Choose the initial path. You can change it later in Settings → Usage mode.",
+  "Modelo GGUF na sua GPU. Privado e sem custo por token. Precisa de GPU de 8 GB.":
+    "GGUF model on your GPU. Private, no per-token cost. Needs an 8 GB GPU.",
+  "OpenAI, Groq, DeepSeek, OpenRouter ou servidor local (LM Studio/Ollama/vLLM). Sem GPU.":
+    "OpenAI, Groq, DeepSeek, OpenRouter or a local server (LM Studio/Ollama/vLLM). No GPU required.",
+  "Decidir depois": "Decide later",
+
   "Modelo GGUF na sua GPU. Privado, sem custo por token. Precisa de GPU de 8 GB.":
     "GGUF model on your GPU. Private, no per-token cost. Needs an 8 GB GPU.",
   "API Key / nuvem": "API Key / cloud",
