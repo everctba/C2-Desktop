@@ -230,7 +230,7 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   };
   atualizarEmbStatus(embedStatus);
   embBody.append(embStatus, embDeviceRow, embCount, embTrack, embNow);
-  page.appendChild(embCard);
+  infoRow.appendChild(embCard);
 
   /* ações */
   const actions = document.createElement("div");
