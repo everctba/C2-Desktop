@@ -27,6 +27,8 @@ interface ProgressEvent {
   decision: string;
   index: number;
   total: number;
+  done?: boolean;
+  indexed?: boolean;
 }
 
 /**
@@ -472,6 +474,13 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
     onEngineEvent("engine://progress", (payload) => {
       const progress = payload as ProgressEvent;
       if (!progress?.rel) return;
+      if (progress.done) {
+        if (progress.indexed) {
+          appendLog(`${t("indexado")}: ${progress.rel}`);
+          void refreshLista();
+        }
+        return;
+      }
       setActivity(`indexando ${progress.index}/${progress.total} · ${progress.decision} · ${progress.rel}`);
       agendarLista();
     }),
@@ -486,7 +495,17 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
       void refreshLista();
     }),
     onEngineEvent("reindex://progress", (payload) => {
-      const progresso = payload as { index?: number; total?: number; rel?: string };
+      const progresso = payload as {
+        index?: number;
+        total?: number;
+        rel?: string;
+        done?: boolean;
+        indexed?: boolean;
+      };
+      if (progresso.done && progresso.indexed && progresso.rel) {
+        appendLog(`${t("indexado")}: ${progresso.rel}`);
+        void refreshLista();
+      }
       if (!progressoReindex || !textoProgresso) return;
       const total = progresso.total ?? 0;
       const indice = progresso.index ?? 0;

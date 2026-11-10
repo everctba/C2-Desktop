@@ -423,6 +423,7 @@ const EN: Record<string, string> = {
     "Search by meaning using local embeddings of the .c2.json summaries. Lexical grep stays; embeddings add an extra recall signal.",
   "Ativar busca semântica": "Enable semantic search",
   "carregando runtime…": "loading runtime…",
+  indexado: "indexed",
   "Configurar modelo…": "Configure model…",
   "Abrir pasta de modelos": "Open models folder",
   "nenhum modelo configurado": "no model configured",

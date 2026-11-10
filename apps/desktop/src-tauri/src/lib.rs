@@ -477,6 +477,8 @@ async fn workspace_reindex(
                     "total": progress.total,
                     "rel": progress.rel,
                     "decision": progress.decision.label(),
+                    "done": progress.done,
+                    "indexed": progress.indexed,
                 }),
             );
         })
