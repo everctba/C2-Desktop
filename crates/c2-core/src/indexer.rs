@@ -108,6 +108,10 @@ pub struct Progress {
     pub decision: Decision,
     pub index: usize,
     pub total: usize,
+    /// Falso no inicio do arquivo; verdadeiro depois de processar.
+    pub done: bool,
+    /// Verdadeiro quando o processamento gerou metadado novo/atualizado.
+    pub indexed: bool,
 }
 
 /// Resultado de um ciclo.
@@ -352,7 +356,10 @@ pub fn run<P: SemanticProvider>(
             decision: item.decision,
             index: position + 1,
             total,
+            done: false,
+            indexed: false,
         });
+        let indexados_antes = report.indexed;
 
         match item.decision {
             Decision::Unchanged => {
@@ -441,6 +448,15 @@ pub fn run<P: SemanticProvider>(
                 }
             }
         }
+
+        on_progress(&Progress {
+            rel: item.rel.clone(),
+            decision: item.decision,
+            index: position + 1,
+            total,
+            done: true,
+            indexed: report.indexed > indexados_antes,
+        });
 
         let teto = config.model.max_cost_usd_per_run;
         if teto > 0.0 && report.cost_usd >= teto {

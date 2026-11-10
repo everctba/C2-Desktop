@@ -818,7 +818,13 @@ function render(): void {
         view = await renderAbout();
         break;
       case "search":
-        view = await renderSearch({ root: state.root });
+        view = await renderSearch({
+          root: state.root,
+          onNavigate: (route) => {
+            state.route = route;
+            render();
+          },
+        });
         break;
       default:
         view = await renderProjects({

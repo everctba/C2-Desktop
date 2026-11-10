@@ -1,0 +1,68 @@
+{
+  "workspace": "C2 Desktop",
+  "corpus_metadados": 173,
+  "vetores": 172,
+  "modelo": "lm-kit/bge-m3-gguf Q8_0",
+  "dim": 1024,
+  "pooling": "cls",
+  "min_score": 0.35,
+  "weight": 2.0,
+  "top_k": 5,
+  "queries": [
+    {
+      "query": "criptografia",
+      "expected": "crates/c2-core/src/security.rs",
+      "lexical_hit": false,
+      "hybrid_hit": true,
+      "hybrid_rank": 2,
+      "nota": "lexical nao encontra 'criptografia'; hibrido acha security.rs e hash.rs"
+    },
+    {
+      "query": "onde calcula o hash dos arquivos",
+      "expected": "crates/c2-core/src/hash.rs",
+      "lexical_hit": true,
+      "hybrid_hit": true
+    },
+    {
+      "query": "cliente que fala com o modelo local",
+      "expected": "crates/c2-core/src/llm.rs",
+      "lexical_hit": true,
+      "hybrid_hit": true
+    },
+    {
+      "query": "busca semantica por significado",
+      "expected": "crates/c2-core/src/search.rs",
+      "lexical_hit": true,
+      "hybrid_hit": true
+    },
+    {
+      "query": "configuracao de embeddings",
+      "expected": "crates/c2-core/src/config.rs",
+      "lexical_hit": true,
+      "hybrid_hit": true
+    }
+  ],
+  "recall_at_5_lexical": 0.8,
+  "recall_at_5_hybrid": 1.0,
+  "observacao": "conjunto pequeno e deliberadamente dificil; o ganho de recall vem de consultas sem sobreposicao lexical. Nao usar como claim de marketing sem o benchmark ampliado da c2-kga.11.",
+  "latency_ms_lexical_p50": 109,
+  "latency_ms_hybrid_p50": 328,
+  "latency_ms_lexical_samples": [
+    64,
+    139,
+    133,
+    109,
+    99
+  ],
+  "latency_ms_hybrid_samples": [
+    335,
+    354,
+    328,
+    327,
+    320
+  ],
+  "latency_nota": "CLI c2.exe em CPU, sem cold start; hibrido inclui embedding da query + leitura dos vetores.",
+  "token_ratio_meta_por_fonte_media": 0.068,
+  "token_reduction_media_percent": 93.2,
+  "token_nota": "estimativa chars/4 em 5 arquivos do topo; nao e contagem do tokenizer do modelo."
+}

@@ -418,6 +418,51 @@ const EN: Record<string, string> = {
   "Escolha o idioma da interface. A CLI e as ferramentas MCP continuam em inglês.":
     "Choose the interface language. The CLI and MCP tools stay in English.",
   "idioma atualizado": "language updated",
+  "Busca semântica (embeddings)": "Semantic search (embeddings)",
+  "Busca por significado usando embeddings locais dos resumos .c2.json. O grep lexical continua; embeddings são um sinal extra de recall.":
+    "Search by meaning using local embeddings of the .c2.json summaries. Lexical grep stays; embeddings add an extra recall signal.",
+  "Ativar busca semântica": "Enable semantic search",
+  "carregando runtime…": "loading runtime…",
+  indexado: "indexed",
+  Embeddings: "Embeddings",
+  "desativada em Configurações": "disabled in Settings",
+  "modelo não configurado": "model not configured",
+  "processando embeddings": "processing embeddings",
+  "preparando…": "preparing…",
+  "concluído com erros": "completed with errors",
+  "erro nos embeddings": "embeddings error",
+  "arquivos indexados": "indexed files",
+  "processando agora": "processing now",
+  execução: "runtime",
+  status: "status",
+
+  "Configurar modelo…": "Configure model…",
+  "Abrir pasta de modelos": "Open models folder",
+  "nenhum modelo configurado": "no model configured",
+  "device de embeddings atualizado": "embeddings device updated",
+  "Configurar busca semântica": "Configure semantic search",
+  Arquivo: "File",
+  "Pasta de modelos": "Models folder",
+  "escolha uma pasta fora do C:": "choose a folder outside C:",
+  "Escolher pasta…": "Choose folder…",
+  "Abrir pasta": "Open folder",
+  "Baixar do Hugging Face": "Download from Hugging Face",
+  "modelo de embeddings configurado": "embedding model configured",
+  "Indexar embeddings": "Index embeddings",
+  Híbrida: "Hybrid",
+  "Busca híbrida indisponível": "Hybrid search unavailable",
+  "Para usar a busca híbrida, ative a Busca semântica em Configurações, selecione o modelo bge-m3 e marque Ativar busca semântica.":
+    "To use hybrid search, enable Semantic search in Settings, select the bge-m3 model and check Enable semantic search.",
+  "Abrir Configurações": "Open Settings",
+  "Configure o modelo de embeddings em Configurações → Busca semântica para habilitar.":
+    "Configure the embedding model in Settings → Semantic search to enable this.",
+
+  semântico: "semantic",
+  semelhantes: "similar",
+  "ocultar semelhantes": "hide similar",
+  "sem similares (indexe os embeddings)": "no similar files (index embeddings first)",
+  "abrir metadado deste arquivo": "open this file metadata",
+  "indexando embeddings…": "indexing embeddings…",
 };
 
 export function idiomaAtual(): Lang {

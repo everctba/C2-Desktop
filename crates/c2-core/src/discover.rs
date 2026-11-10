@@ -130,6 +130,10 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
             discovery.skipped.sensitive += 1;
             continue;
         }
+        if is_generated_lockfile(&file_name) {
+            discovery.skipped.other += 1;
+            continue;
+        }
         if file_name.starts_with('.') {
             continue;
         }
@@ -181,6 +185,25 @@ pub fn discover(root: &Path, config: &Config) -> Result<Discovery> {
 
     discovery.files.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(discovery)
+}
+
+/// Lockfiles gerados por gerenciadores de pacote. Sao grandes, mudam sozinhos
+/// e nao descrevem responsabilidade de codigo; nunca valem uma chamada ao modelo.
+fn is_generated_lockfile(name: &str) -> bool {
+    matches!(
+        name,
+        "Cargo.lock"
+            | "package-lock.json"
+            | "pnpm-lock.yaml"
+            | "yarn.lock"
+            | "bun.lockb"
+            | "composer.lock"
+            | "Pipfile.lock"
+            | "poetry.lock"
+            | "Gemfile.lock"
+            | "flake.lock"
+            | "go.sum"
+    )
 }
 
 /// Verdadeiro quando a amostra parece binaria (contem byte NUL).
@@ -255,6 +278,20 @@ mod tests {
         assert_eq!(found.skipped.binary, 1); // binario.txt traz NUL
         assert_eq!(found.skipped.too_large, 1); // grande.rs
         assert_eq!(found.skipped.unsupported_extension, 1); // img.bin
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn lockfiles_gerados_nao_entram_no_indice() {
+        let base = tmp("lock");
+        write(&base.join("Cargo.lock"), b"[[package]]\nname = \"x\"\n");
+        write(&base.join("package-lock.json"), b"{}");
+        write(&base.join("src").join("a.rs"), b"fn main() {}");
+        let config = Config::default();
+        let found = discover(&base, &config).unwrap();
+        let names: Vec<_> = found.files.iter().map(|f| f.rel.as_str()).collect();
+        assert_eq!(names, vec!["src/a.rs"]);
+        assert_eq!(found.skipped.other, 2);
         fs::remove_dir_all(&base).ok();
     }
 

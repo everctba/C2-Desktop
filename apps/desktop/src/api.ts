@@ -14,6 +14,11 @@ import type {
   ProviderTest,
   CostEstimate,
   RuntimePlan,
+  EmbeddingStatus,
+  Neighbor,
+  DuplicateReport,
+  LinkSuggestion,
+  CoChange,
   IndexReport,
   InitResult,
   MetaFile,
@@ -68,6 +73,27 @@ export const api = {
   initialRoot: () => invoke<string | null>("initial_root"),
   runtimePlan: (root: string, ctxSize?: number, gpuLayers?: number) =>
     invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
+  embeddingStatus: (root: string) => invoke<EmbeddingStatus>("embedding_status", { root }),
+  embeddingSave: (
+    root: string,
+    modelPath?: string,
+    enabled?: boolean,
+    device?: string,
+  ) =>
+    invoke<EmbeddingStatus>("embedding_save", { root, modelPath, enabled, device }),
+  embeddingStart: (root: string) => invoke<EmbeddingStatus>("embedding_start", { root }),
+  embeddingStop: (root: string) => invoke<boolean>("embedding_stop", { root }),
+  embeddingPickModel: () => invoke<string | null>("embedding_pick_model"),
+  embeddingSimilar: (root: string, file: string, limit = 10) =>
+    invoke<Neighbor[]>("embedding_similar", { root, file, limit }),
+  embeddingDuplicates: (root: string, threshold = 0.90) =>
+    invoke<DuplicateReport>("embedding_duplicates", { root, threshold }),
+  embeddingLinks: (root: string, threshold = 0.90, limit = 20) =>
+    invoke<LinkSuggestion[]>("embedding_links", { root, threshold, limit }),
+  embeddingCochange: (root: string, file: string, limit = 10) =>
+    invoke<CoChange[]>("embedding_cochange", { root, file, limit }),
+  embeddingIndex: (root: string, full = false) =>
+    invoke<{ files: number; embedded: number; cached: number; skipped: number; errors: number; last_error: string | null; model_id: string; dim: number }>("embedding_index", { root, full }),
   modelLoad: (root: string, ctxSize: number, gpuLayers: number) =>
     invoke<null>("model_load", { root, ctxSize, gpuLayers }),
   modelUnload: (root: string) => invoke<void>("model_unload", { root }),
@@ -115,8 +141,8 @@ export const api = {
   engineStart: (root: string) => invoke<null>("engine_start", { root }),
   engineStop: (root: string) => invoke<null>("engine_stop", { root }),
   engineRunning: () => invoke<boolean>("engine_running"),
-  grep: (root: string, query: string, limit = 10) =>
-    invoke<Hit[]>("search_grep", { root, query, limit }),
+  grep: (root: string, query: string, limit = 10, hybrid = false) =>
+    invoke<Hit[]>("search_grep", { root, query, limit, hybrid }),
   read: (root: string, file: string, start?: number, end?: number) =>
     invoke<ReadResult>("file_read", { root, file, start, end }),
   related: (root: string, file: string) => invoke<RelatedResult>("file_related", { root, file }),
@@ -365,6 +391,45 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       } as T;
     case "model_unload":
       return undefined as T;
+    case "embedding_status":
+      return {
+        enabled: false,
+        healthy: false,
+        pid: null,
+        model_path: null,
+        model_id: "lm-kit/bge-m3-gguf",
+        dim: 1024,
+        device: "cpu",
+        port: 8199,
+        binary: null,
+        last_error: null,
+      } as T;
+    case "embedding_save":
+      return {
+        enabled: Boolean(args?.enabled),
+        healthy: false,
+        pid: null,
+        model_path: String(args?.modelPath ?? ""),
+        model_id: "lm-kit/bge-m3-gguf",
+        dim: 1024,
+        device: String(args?.device ?? "cpu"),
+        port: 8199,
+        binary: null,
+        last_error: null,
+      } as T;
+    case "embedding_start":
+    case "embedding_stop":
+      return true as T;
+    case "embedding_pick_model":
+      return null as T;
+    case "embedding_similar":
+    case "embedding_links":
+    case "embedding_cochange":
+      return [] as T;
+    case "embedding_duplicates":
+      return { pairs: [], generic: [] } as T;
+    case "embedding_index":
+      return { files: 0, embedded: 0, cached: 0, skipped: 0, errors: 0, last_error: null, model_id: "lm-kit/bge-m3-gguf", dim: 1024 } as T;
     case "model_load":
       await delay(1500);
       return null as T;

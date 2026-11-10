@@ -151,6 +151,12 @@ enum Command {
     /// Mostra o estado do workspace
     Status,
 
+    /// Runtime de embeddings (busca semantica opcional)
+    Embeddings {
+        #[command(subcommand)]
+        action: EmbeddingAction,
+    },
+
     /// Le e altera a configuracao do workspace
     Config {
         #[command(subcommand)]
@@ -203,6 +209,12 @@ enum Command {
         /// Mostra a composicao do score e a evidencia
         #[arg(long)]
         explain: bool,
+        /// Adiciona cosine de embeddings ao grep lexical
+        #[arg(long)]
+        hybrid: bool,
+        /// Alias de --hybrid (busca semantica)
+        #[arg(long)]
+        semantic: bool,
     },
 
     /// Le um arquivo ou trecho (a partir de c2-e7t7)
@@ -262,6 +274,53 @@ enum NoteAction {
 }
 
 #[derive(Subcommand, Debug)]
+enum EmbeddingAction {
+    /// Mostra o estado do runtime de embeddings
+    Status,
+    /// Sobe o runtime de embeddings
+    Start,
+    /// Para o runtime de embeddings
+    Stop,
+    /// Gera o vetor de um texto (diagnostico)
+    Embed {
+        text: String,
+    },
+    /// Indexa os resumos .c2.json em vetores
+    Index {
+        /// Ignora o cache e re-embedda todos
+        #[arg(long)]
+        full: bool,
+    },
+    /// Arquivos similares a um arquivo (por cosine)
+    Similar {
+        file: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Agrupa os vizinhos por domínio
+        #[arg(long)]
+        domains: bool,
+    },
+    /// Pares de metadados duplicados e metadados genéricos
+    Duplicates {
+        #[arg(long, default_value_t = 0.90)]
+        threshold: f32,
+    },
+    /// Sugere links de grafo entre arquivos similares
+    Links {
+        #[arg(long, default_value_t = 0.90)]
+        threshold: f32,
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Arquivos que mudam nos mesmos commits
+    Cochange {
+        file: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum ConfigAction {
     /// Mostra o valor de uma chave (ex.: model.port)
     Get { key: String },
@@ -317,6 +376,7 @@ fn run(cli: Cli) -> Result<()> {
         Command::Mcp => cmd_mcp(cli.root.as_deref()),
         Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
+        Command::Embeddings { action } => cmd_embeddings(cli.root.as_deref(), action, cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
             ConfigAction::Set { key, value } => {
@@ -338,12 +398,15 @@ fn run(cli: Cli) -> Result<()> {
             limit,
             files_only,
             explain,
+            hybrid,
+            semantic,
         } => cmd_grep(
             cli.root.as_deref(),
             &query,
             limit,
             files_only,
             explain,
+            hybrid || semantic,
             cli.json,
         ),
         Command::Read { file, lines } => cmd_read(cli.root.as_deref(), file, lines, cli.json),
@@ -900,6 +963,147 @@ fn cmd_open(root: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+fn cmd_embeddings(
+    root: Option<&Path>,
+    action: EmbeddingAction,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let mut config = workspace.load_config()?;
+    match action {
+        EmbeddingAction::Status => {
+            let status = c2_core::embedding_runtime::status(&workspace, &config);
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&status)?);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&status)?);
+            }
+        }
+        EmbeddingAction::Start => {
+            c2_core::embedding_runtime::ensure(&workspace, &config)?;
+            println!("runtime de embeddings pronto");
+        }
+        EmbeddingAction::Stop => {
+            let parou = c2_core::embedding_runtime::stop(&workspace)?;
+            println!("{}", if parou { "runtime de embeddings parado" } else { "runtime de embeddings nao estava rodando" });
+        }
+        EmbeddingAction::Index { full } => {
+            let report = c2_core::embedding_index::run(
+                &workspace,
+                &config,
+                full,
+                |_, idx, total| {
+                    if total > 0 && (idx == total || idx % 25 == 0) {
+                        eprintln!("embeddings: {idx}/{total}");
+                    }
+                },
+            )?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "embeddings: {} arquivos, {} gerados, {} em cache, {} pulados, {} erros",
+                    report.files, report.embedded, report.cached, report.skipped, report.errors
+                );
+                if let Some(erro) = &report.last_error {
+                    println!("ultimo erro: {erro}");
+                }
+            }
+        }
+        EmbeddingAction::Similar {
+            file,
+            limit,
+            domains,
+        } => {
+            let vizinhos = c2_core::embedding_insights::similar(&workspace, &config, &file, limit)?;
+            if json_output {
+                if domains {
+                    let grupos = c2_core::embedding_insights::domains(&vizinhos);
+                    println!("{}", serde_json::to_string_pretty(&grupos)?);
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&vizinhos)?);
+                }
+            } else if vizinhos.is_empty() {
+                println!("nenhum similar para {file}");
+            } else {
+                for vizinho in &vizinhos {
+                    println!("{:.3}  {}", vizinho.score, vizinho.file);
+                }
+                if domains {
+                    for (dominio, arquivos) in c2_core::embedding_insights::domains(&vizinhos) {
+                        println!("[{dominio}] {}", arquivos.join(", "));
+                    }
+                }
+            }
+        }
+        EmbeddingAction::Duplicates { threshold } => {
+            let report =
+                c2_core::embedding_insights::duplicates(&workspace, &config, threshold)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "duplicados: {} pares; genericos: {} arquivos",
+                    report.pairs.len(),
+                    report.generic.len()
+                );
+                for pair in report.pairs.iter().take(20) {
+                    println!(
+                        "{:.3}  {} <> {}{}",
+                        pair.score,
+                        pair.a,
+                        pair.b,
+                        if pair.linked { " (ligado)" } else { "" }
+                    );
+                }
+            }
+        }
+        EmbeddingAction::Links { threshold, limit } => {
+            let sugestoes = c2_core::embedding_insights::link_suggestions(
+                &workspace, &config, threshold, limit,
+            )?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&sugestoes)?);
+            } else {
+                for sugestao in &sugestoes {
+                    println!("{:.3}  {} -> {}", sugestao.score, sugestao.from, sugestao.to);
+                }
+            }
+        }
+        EmbeddingAction::Cochange { file, limit } => {
+            let arquivos = c2_core::embedding_insights::cochange(&workspace, &file, limit)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&arquivos)?);
+            } else {
+                for item in &arquivos {
+                    println!("{} commits  {}", item.commits, item.file);
+                }
+            }
+        }
+        EmbeddingAction::Embed { text } => {
+            if !config.index.embeddings.enabled {
+                config.index.embeddings.enabled = true;
+            }
+            c2_core::embedding_runtime::ensure(&workspace, &config)?;
+            let vetor = c2_core::embedding_runtime::embed(&config, &text)?;
+            let norma = vetor.iter().map(|v| v * v).sum::<f32>().sqrt();
+            if json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "dim": vetor.len(),
+                        "norm": norma,
+                        "vector": vetor,
+                    }))?
+                );
+            } else {
+                println!("embedding: {} dimensoes, norma {:.4}", vetor.len(), norma);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
     let workspace = require_workspace(root)?;
     let config = workspace.load_config()?;
@@ -1349,6 +1553,7 @@ fn cmd_grep(
     limit: usize,
     files_only: bool,
     explain: bool,
+    hybrid: bool,
     json_output: bool,
 ) -> Result<()> {
     let workspace = require_workspace(root)?;
@@ -1356,6 +1561,7 @@ fn cmd_grep(
     let options = SearchOptions {
         limit,
         include_snippets: !files_only,
+        hybrid,
     };
     let hits = search::search(&workspace, &config, query, &options)?;
 

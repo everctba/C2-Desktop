@@ -179,6 +179,7 @@ export interface Hit {
   path_score: number;
   symbol_score: number;
   semantic_score: number;
+  embedding_score?: number;
   evidence: Evidence[];
   summary: string;
   snippet: Snippet | null;
@@ -239,4 +240,54 @@ export interface ReadResult {
   line_start: number;
   line_end: number;
   lines: string[];
+}
+
+export interface EmbeddingStatus {
+  enabled: boolean;
+  healthy: boolean;
+  pid: number | null;
+  model_path: string | null;
+  model_id: string;
+  dim: number;
+  device: string;
+  vectors: number;
+  files: number;
+  port: number;
+  binary: string | null;
+  last_error: string | null;
+}
+
+export interface Neighbor {
+  file: string;
+  summary: string;
+  score: number;
+}
+
+export interface DuplicatePair {
+  a: string;
+  b: string;
+  score: number;
+  linked: boolean;
+}
+
+export interface GenericFile {
+  file: string;
+  summary: string;
+  what: string;
+}
+
+export interface DuplicateReport {
+  pairs: DuplicatePair[];
+  generic: GenericFile[];
+}
+
+export interface LinkSuggestion {
+  from: string;
+  to: string;
+  score: number;
+}
+
+export interface CoChange {
+  file: string;
+  commits: number;
 }

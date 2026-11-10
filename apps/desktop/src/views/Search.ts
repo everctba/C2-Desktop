@@ -2,14 +2,16 @@ import { api } from "../api";
 import { t } from "../i18n";
 import type { Hit, MetaFile, RelatedResult } from "../types";
 import { Button } from "../ui/Button";
-import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
+import { createDialog, dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
+import { Toggle } from "../ui/Toggle";
 import type { View } from "./view";
 import styles from "./views.module.css";
 
 export interface SearchContext {
   root: string;
+  onNavigate: (route: "settings") => void;
 }
 
 const EXEMPLOS = [
@@ -72,6 +74,37 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     results.appendChild(empty);
   };
 
+  const embedStatus = await api.embeddingStatus(ctx.root).catch(() => null);
+  const embeddingReady = Boolean(embedStatus?.enabled && embedStatus?.model_path);
+  let hibrida = false;
+
+  const avisoEmbedding = () => {
+    const handle = createDialog({ title: t("Busca híbrida indisponível") });
+    const corpo = document.createElement("div");
+    corpo.style.display = "grid";
+    corpo.style.gap = "var(--space-s)";
+    const texto = document.createElement("p");
+    texto.className = "pageHint";
+    texto.style.maxWidth = "none";
+    texto.textContent = t(
+      "Para usar a busca híbrida, ative a Busca semântica em Configurações, " +
+        "selecione o modelo bge-m3 e marque Ativar busca semântica.",
+    );
+    corpo.appendChild(texto);
+    handle.body.appendChild(corpo);
+    handle.footer.append(
+      Button({
+        label: t("Abrir Configurações"),
+        variant: "primary",
+        onClick: () => {
+          handle.close();
+          ctx.onNavigate("settings");
+        },
+      }),
+      Button({ label: t("Fechar"), variant: "ghost", onClick: () => handle.close() }),
+    );
+  };
+
   const run = async (query: string) => {
     const termo = query.trim();
     if (termo.length < 2) {
@@ -83,7 +116,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     results.innerHTML = "";
     summary.textContent = t("buscando");
     try {
-      const hits = await api.grep(ctx.root, termo, 10);
+      const hits = await api.grep(ctx.root, termo, 10, hibrida);
       const ms = Math.round(performance.now() - inicio);
       results.innerHTML = "";
       summary.textContent = `${hits.length} resultado(s) em ${ms} ms · "${termo}"`;
@@ -144,6 +177,33 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
         field.input.focus();
       },
     }),
+    (() => {
+      const toggle = Toggle({
+        label: t("Híbrida"),
+        checked: false,
+        tone: "brand",
+        onChange: (ligado) => {
+          if (ligado && !embeddingReady) {
+            toggle.control.setAttribute("aria-checked", "false");
+            toggle.control.className = toggle.control.className
+              .split(" ")
+              .filter((classe) => !classe.includes("_on"))
+              .join(" ");
+            avisoEmbedding();
+            return;
+          }
+          hibrida = ligado;
+          if (field.input.value.trim().length >= 2) void run(field.input.value);
+        },
+      });
+      if (!embeddingReady) {
+        toggle.root.title = t(
+          "Configure o modelo de embeddings em Configurações → Busca semântica para habilitar.",
+        );
+        toggle.control.style.opacity = "0.55";
+      }
+      return toggle.root;
+    })(),
     summary,
   );
   page.appendChild(actions);
@@ -230,7 +290,11 @@ function resultRow(
   barra.appendChild(preenchimento);
   const detalhe = document.createElement("span");
   detalhe.className = styles.breakdown;
-  detalhe.textContent = `path ${hit.path_score.toFixed(1)} · símbolo ${hit.symbol_score.toFixed(1)} · meta ${hit.semantic_score.toFixed(1)}`;
+  detalhe.textContent =
+    `path ${hit.path_score.toFixed(1)} · símbolo ${hit.symbol_score.toFixed(1)} · meta ${hit.semantic_score.toFixed(1)}` +
+    (hit.embedding_score !== undefined
+      ? ` · sem ${hit.embedding_score.toFixed(2)}`
+      : "");
   scoreRow.append(barra, detalhe);
   row.appendChild(scoreRow);
 
@@ -244,7 +308,17 @@ function resultRow(
   /* evidencias por campo */
   const evidence = document.createElement("div");
   evidence.className = styles.evidence;
-  evidence.appendChild(Pill(hit.symbol_score > 0 ? "símbolo" : "metadado", "neutral", "xs"));
+  evidence.appendChild(
+    Pill(
+      hit.embedding_score !== undefined
+        ? "semântico"
+        : hit.symbol_score > 0
+          ? "símbolo"
+          : "metadado",
+      "neutral",
+      "xs",
+    ),
+  );
   for (const item of hit.evidence.slice(0, 4)) {
     evidence.appendChild(Pill(`${item.field}: ${item.terms.join(", ")}`, "neutral", "xs"));
   }
@@ -310,8 +384,63 @@ function resultRow(
       relacionados.appendChild(falha);
     }
   });
-  acoes.appendChild(btnRelacionados);
-  row.append(acoes, relacionados);
+  const semelhantes = document.createElement("div");
+  const btnSemelhantes = document.createElement("button");
+  btnSemelhantes.type = "button";
+  btnSemelhantes.textContent = t("semelhantes");
+  btnSemelhantes.style.cssText = btnRelacionados.style.cssText;
+  btnSemelhantes.addEventListener("click", async (evento) => {
+    evento.stopPropagation();
+    if (semelhantes.childElementCount > 0) {
+      semelhantes.replaceChildren();
+      btnSemelhantes.textContent = t("semelhantes");
+      return;
+    }
+    try {
+      const vizinhos = await api.embeddingSimilar(root, hit.file, 5);
+      const caixa = document.createElement("div");
+      caixa.className = styles.relatedBox;
+      if (vizinhos.length === 0) {
+        const texto = document.createElement("span");
+        texto.className = styles.breakdown;
+        texto.textContent = t("sem similares (indexe os embeddings)");
+        caixa.appendChild(texto);
+      } else {
+        vizinhos.forEach((item, indice) => {
+          if (indice > 0) {
+            const separador = document.createElement("span");
+            separador.className = styles.breakdown;
+            separador.textContent = " · ";
+            caixa.appendChild(separador);
+          }
+          const link = document.createElement("button");
+          link.type = "button";
+          link.className = styles.breakdown;
+          link.style.cssText =
+            "background:none;border:0;padding:0;color:var(--accent-1);" +
+            "font:inherit;cursor:pointer;text-decoration:underline";
+          link.textContent = `${item.score.toFixed(2)} ${item.file}`;
+          link.title = t("abrir metadado deste arquivo");
+          link.addEventListener("click", (evento) => {
+            evento.stopPropagation();
+            void abrirMetadado(root, item.file);
+          });
+          caixa.appendChild(link);
+        });
+      }
+      semelhantes.appendChild(caixa);
+      btnSemelhantes.textContent = t("ocultar semelhantes");
+    } catch (erro) {
+      semelhantes.replaceChildren();
+      const falha = document.createElement("span");
+      falha.className = styles.breakdown;
+      falha.textContent = String(erro);
+      semelhantes.appendChild(falha);
+    }
+  });
+
+  acoes.append(btnRelacionados, btnSemelhantes);
+  row.append(acoes, relacionados, semelhantes);
 
   row.addEventListener("click", () => void abrirMetadado(root, hit.file));
   return row;

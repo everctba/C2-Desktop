@@ -497,6 +497,10 @@ pub fn start(workspace: &Workspace, config: &Config, resolved: &Resolved) -> Res
         .arg(config.model.port.to_string())
         .arg("-c")
         .arg(config.model.ctx_size.to_string())
+        // O indexador e sequencial; um slot evita dividir o KV cache entre
+        // requisicoes concorrentes e estourar o contexto em arquivos grandes.
+        .arg("-np")
+        .arg("1")
         .arg("--no-webui")
         .stdout(Stdio::from(out))
         .stderr(Stdio::from(err))
