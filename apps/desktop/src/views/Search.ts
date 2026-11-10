@@ -400,13 +400,34 @@ function resultRow(
       const vizinhos = await api.embeddingSimilar(root, hit.file, 5);
       const caixa = document.createElement("div");
       caixa.className = styles.relatedBox;
-      const texto = document.createElement("span");
-      texto.className = styles.breakdown;
-      texto.textContent =
-        vizinhos.length > 0
-          ? vizinhos.map((item) => `${item.score.toFixed(2)} ${item.file}`).join(" · ")
-          : t("sem similares (indexe os embeddings)");
-      caixa.appendChild(texto);
+      if (vizinhos.length === 0) {
+        const texto = document.createElement("span");
+        texto.className = styles.breakdown;
+        texto.textContent = t("sem similares (indexe os embeddings)");
+        caixa.appendChild(texto);
+      } else {
+        vizinhos.forEach((item, indice) => {
+          if (indice > 0) {
+            const separador = document.createElement("span");
+            separador.className = styles.breakdown;
+            separador.textContent = " · ";
+            caixa.appendChild(separador);
+          }
+          const link = document.createElement("button");
+          link.type = "button";
+          link.className = styles.breakdown;
+          link.style.cssText =
+            "background:none;border:0;padding:0;color:var(--accent-1);" +
+            "font:inherit;cursor:pointer;text-decoration:underline";
+          link.textContent = `${item.score.toFixed(2)} ${item.file}`;
+          link.title = t("abrir metadado deste arquivo");
+          link.addEventListener("click", (evento) => {
+            evento.stopPropagation();
+            void abrirMetadado(root, item.file);
+          });
+          caixa.appendChild(link);
+        });
+      }
       semelhantes.appendChild(caixa);
       btnSemelhantes.textContent = t("ocultar semelhantes");
     } catch (erro) {

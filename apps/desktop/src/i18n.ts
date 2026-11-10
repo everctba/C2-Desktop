@@ -449,6 +449,7 @@ const EN: Record<string, string> = {
   semelhantes: "similar",
   "ocultar semelhantes": "hide similar",
   "sem similares (indexe os embeddings)": "no similar files (index embeddings first)",
+  "abrir metadado deste arquivo": "open this file metadata",
   "indexando embeddings…": "indexing embeddings…",
 };
 
