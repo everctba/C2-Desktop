@@ -10,6 +10,7 @@ export type IconName =
   | "settings"
   | "close"
   | "mcp"
+  | "note"
   | "copy"
   | "info";
 
@@ -27,6 +28,8 @@ const PATHS: Record<IconName, string> = {
   // prancheta com aba (copiar)
   copy:
     "M4 4h9v10H4zM5.5 5.5v7h6v-7zM6 2h5v2H6z",
+  // nota
+  note: "M4 2h8l2 2v12H4zM7 6h6M7 9h6M7 12h4",
   // plugue (MCP)
   mcp:
     "M5 2h2v3H5zM9 2h2v3H9zM4 5h8v2a4 4 0 0 1-8 0zM7 11h2v3H7z",

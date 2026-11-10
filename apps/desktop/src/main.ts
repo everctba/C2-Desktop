@@ -11,6 +11,7 @@ import { Input } from "./ui/Input";
 import { loadingBar, memoryBar } from "./ui/MemoryBar";
 import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
+import { renderMemory } from "./views/Memory";
 import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
@@ -827,6 +828,9 @@ function render(): void {
             render();
           },
         });
+        break;
+      case "memory":
+        view = await renderMemory({ root: state.root });
         break;
       default:
         view = await renderProjects({

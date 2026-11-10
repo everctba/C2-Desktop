@@ -15,6 +15,9 @@ import type {
   CostEstimate,
   RuntimePlan,
   EmbeddingStatus,
+  NotesInventory,
+  UsageEvent,
+  UsageSummary,
   Neighbor,
   DuplicateReport,
   LinkSuggestion,
@@ -73,6 +76,12 @@ export const api = {
   initialRoot: () => invoke<string | null>("initial_root"),
   runtimePlan: (root: string, ctxSize?: number, gpuLayers?: number) =>
     invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
+  notesInventory: (root: string) => invoke<NotesInventory>("notes_inventory", { root }),
+  noteRemove: (root: string, file: string, index: number) =>
+    invoke<unknown>("note_remove", { root, file, index }),
+  usageEvents: (root: string, limit = 2000) =>
+    invoke<UsageEvent[]>("usage_events", { root, limit }),
+  usageSummary: (root: string) => invoke<UsageSummary>("usage_summary", { root }),
   embeddingStatus: (root: string) => invoke<EmbeddingStatus>("embedding_status", { root }),
   embeddingSave: (
     root: string,
@@ -391,6 +400,14 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       } as T;
     case "model_unload":
       return undefined as T;
+    case "notes_inventory":
+      return { total: 0, stale: 0, by_kind: {}, domains: {}, notes: [] } as T;
+    case "usage_events":
+      return [] as T;
+    case "usage_summary":
+      return { calls: 0, meta_reads: 0, annotations: 0, by_actor: {}, by_tool: {} } as T;
+    case "note_remove":
+      return {} as T;
     case "embedding_status":
       return {
         enabled: false,

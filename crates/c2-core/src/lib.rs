@@ -32,6 +32,7 @@ pub mod search;
 pub mod secret;
 pub mod security;
 pub mod state;
+pub mod usage;
 pub mod status;
 pub mod workspace;
 

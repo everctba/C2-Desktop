@@ -291,3 +291,41 @@ export interface CoChange {
   file: string;
   commits: number;
 }
+
+export interface NoteEntry {
+  file: string;
+  domain: string;
+  index: number;
+  stale: boolean;
+  missing_hash: boolean;
+  note: AgentNote;
+}
+
+export interface NotesInventory {
+  total: number;
+  stale: number;
+  by_kind: Record<string, number>;
+  domains: Record<string, number>;
+  notes: NoteEntry[];
+}
+
+export interface UsageEvent {
+  schema_version: number;
+  at: string;
+  actor: string;
+  tool: string;
+  file?: string;
+  meta_reads: number;
+  result_count?: number;
+  annotation_kind?: string;
+  duration_ms?: number;
+  ok: boolean;
+}
+
+export interface UsageSummary {
+  calls: number;
+  meta_reads: number;
+  annotations: number;
+  by_actor: Record<string, number>;
+  by_tool: Record<string, number>;
+}

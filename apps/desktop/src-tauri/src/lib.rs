@@ -693,7 +693,13 @@ fn search_grep(
         include_snippets: true,
         hybrid: hybrid.unwrap_or(false),
     };
-    search::search(&workspace, &config, &query, &options).map_err(|err| err.to_string())
+    let hits = search::search(&workspace, &config, &query, &options)
+        .map_err(|err| err.to_string())?;
+    let _ = c2_core::usage::record(
+        &workspace,
+        &c2_core::usage::UsageEvent::new("desktop", "c2_grep").result_count(hits.len()),
+    );
+    Ok(hits)
 }
 
 #[derive(Serialize)]
@@ -828,6 +834,87 @@ fn list_files(root: String) -> Result<Vec<FileEntry>, String> {
     Ok(entries)
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+struct NoteEntry {
+    file: String,
+    domain: String,
+    /// Indice 1-based dentro do arquivo (para remover).
+    index: usize,
+    stale: bool,
+    missing_hash: bool,
+    note: c2_core::schema::AgentNote,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct NotesInventory {
+    total: usize,
+    stale: usize,
+    by_kind: std::collections::BTreeMap<String, usize>,
+    domains: std::collections::BTreeMap<String, usize>,
+    notes: Vec<NoteEntry>,
+}
+
+#[tauri::command]
+fn notes_inventory(root: String) -> Result<NotesInventory, String> {
+    let workspace = open_workspace(&root)?;
+    let mut inventory = NotesInventory {
+        total: 0,
+        stale: 0,
+        by_kind: std::collections::BTreeMap::new(),
+        domains: std::collections::BTreeMap::new(),
+        notes: Vec::new(),
+    };
+    for (file, notas) in c2_core::notes::list(&workspace, None).map_err(|e| e.to_string())? {
+        let meta_path = c2_core::schema::meta_path_for(&workspace.root().join(&file));
+        let meta = c2_core::schema::MetaFile::read(&meta_path).ok();
+        let atual = meta.as_ref().map(|m| m.hash.as_str()).unwrap_or_default();
+        let domain = c2_core::embedding_insights::domain_of(&file);
+        for (indice, note) in notas.into_iter().enumerate() {
+            let stale = note
+                .hash
+                .as_deref()
+                .map(|hash| hash != atual)
+                .unwrap_or(false);
+            let missing_hash = note.hash.is_none();
+            if stale {
+                inventory.stale += 1;
+            }
+            inventory.total += 1;
+            *inventory.by_kind.entry(note.kind.clone()).or_default() += 1;
+            *inventory.domains.entry(domain.clone()).or_default() += 1;
+            inventory.notes.push(NoteEntry {
+                file: file.clone(),
+                domain: domain.clone(),
+                index: indice + 1,
+                stale,
+                missing_hash,
+                note,
+            });
+        }
+    }
+    inventory.notes.sort_by(|a, b| b.note.at.cmp(&a.note.at));
+    Ok(inventory)
+}
+
+#[tauri::command]
+fn note_remove(root: String, file: String, index: usize) -> Result<c2_core::schema::AgentNote, String> {
+    let workspace = open_workspace(&root)?;
+    c2_core::notes::remove(&workspace, &file, index).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn usage_events(root: String, limit: Option<usize>) -> Result<Vec<c2_core::usage::UsageEvent>, String> {
+    let workspace = open_workspace(&root)?;
+    c2_core::usage::events(&workspace, limit.unwrap_or(2000)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn usage_summary(root: String) -> Result<c2_core::usage::UsageSummary, String> {
+    let workspace = open_workspace(&root)?;
+    let eventos = c2_core::usage::events(&workspace, 2000).map_err(|e| e.to_string())?;
+    Ok(c2_core::usage::summarize(&eventos))
+}
+
 #[tauri::command]
 fn read_meta(root: String, file: String) -> Result<MetaFile, String> {
     let workspace = open_workspace(&root)?;
@@ -836,7 +923,14 @@ fn read_meta(root: String, file: String) -> Result<MetaFile, String> {
         &rel.replace('/', std::path::MAIN_SEPARATOR_STR),
     ));
     let full = workspace.root().join(meta_path);
-    MetaFile::read(&full).map_err(|err| err.to_string())
+    let meta = MetaFile::read(&full).map_err(|err| err.to_string())?;
+    let _ = c2_core::usage::record(
+        &workspace,
+        &c2_core::usage::UsageEvent::new("desktop", "read_meta")
+            .file(&rel)
+            .meta_reads(1),
+    );
+    Ok(meta)
 }
 
 #[tauri::command]
@@ -1442,6 +1536,10 @@ pub fn run() {
             file_related,
             list_files,
             read_meta,
+            notes_inventory,
+            note_remove,
+            usage_events,
+            usage_summary,
             config_get,
             config_set,
             pick_folder,
@@ -1566,4 +1664,5 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("falha ao iniciar o C2 Desktop");
 }
+
 

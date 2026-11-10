@@ -1709,6 +1709,10 @@ fn cmd_grep(
         hybrid,
     };
     let hits = search::search(&workspace, &config, query, &options)?;
+    let _ = c2_core::usage::record(
+        &workspace,
+        &c2_core::usage::UsageEvent::new("cli", "c2_grep").result_count(hits.len()),
+    );
 
     if json_output {
         println!("{}", serde_json::to_string_pretty(&hits)?);
@@ -1771,6 +1775,13 @@ fn cmd_note(root: Option<&Path>, acao: NoteAction, json_output: bool) -> Result<
                 by.as_deref(),
                 model.as_deref(),
             )?;
+            let _ = c2_core::usage::record(
+                &workspace,
+                &c2_core::usage::UsageEvent::new("cli", "c2_annotate")
+                    .file(&rel)
+                    .meta_reads(1)
+                    .annotation(&kind),
+            );
             if json_output {
                 println!("{}", serde_json::to_string_pretty(&nota)?);
             } else {
@@ -1834,6 +1845,12 @@ fn cmd_read(
         .with_context(|| format!("arquivo fora do workspace: {rel}"))?;
     let content =
         std::fs::read_to_string(&safe).with_context(|| format!("nao foi possivel ler {rel}"))?;
+    let _ = c2_core::usage::record(
+        &workspace,
+        &c2_core::usage::UsageEvent::new("cli", "c2_read")
+            .file(&rel)
+            .meta_reads(1),
+    );
 
     let all: Vec<&str> = content.lines().collect();
     let (start, end) = parse_line_range(lines.as_deref(), all.len())?;

@@ -127,13 +127,17 @@ pub fn domains(neighbors: &[Neighbor]) -> BTreeMap<String, Vec<String>> {
 
 pub fn domain_of(file: &str) -> String {
     let partes: Vec<&str> = file.split('/').collect();
-    if partes.len() >= 2 {
-        if partes[0] == "src" || partes[0] == "crates" || partes[0] == "apps" {
-            return partes[1].to_string();
-        }
-        return partes[0].to_string();
+    if partes.len() >= 3 && matches!(partes[0], "src" | "crates" | "apps") {
+        return partes[1].to_string();
     }
-    "(raiz)".to_string()
+    if partes.len() == 2 {
+        // src/pagamento.rs -> pagamento, nao o nome do arquivo com extensao.
+        return partes[1].split('.').next().unwrap_or(partes[1]).to_string();
+    }
+    if partes.len() == 1 {
+        return partes[0].split('.').next().unwrap_or(partes[0]).to_string();
+    }
+    partes[0].to_string()
 }
 
 /// Pares com cosine alto (prováveis duplicados) e metadados genéricos.

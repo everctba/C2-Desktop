@@ -161,7 +161,28 @@ pub fn handle(workspace: &Workspace, config: &Config, linha: &str) -> Option<Str
                 .get("arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-            match chamar_ferramenta(workspace, config, nome, &argumentos) {
+            let inicio = std::time::Instant::now();
+            let resultado = chamar_ferramenta(workspace, config, nome, &argumentos);
+            let mut evento = crate::usage::UsageEvent::new("mcp", nome)
+                .duration(inicio.elapsed().as_millis() as u64);
+            if let Some(arquivo) = argumentos.get("file").and_then(Value::as_str) {
+                evento = evento.file(arquivo);
+                if matches!(nome, "c2_read" | "c2_related" | "c2_similar" | "c2_annotate") {
+                    evento = evento.meta_reads(1);
+                }
+            }
+            if nome == "c2_annotate" {
+                let kind = argumentos
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or("note");
+                evento = evento.annotation(kind);
+            }
+            if resultado.is_err() {
+                evento = evento.failed();
+            }
+            let _ = crate::usage::record(workspace, &evento);
+            match resultado {
                 Ok(texto) => Ok(json!({
                     "content": [{ "type": "text", "text": texto }],
                     "isError": false
