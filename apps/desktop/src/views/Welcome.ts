@@ -148,7 +148,14 @@ export function openWelcome(
         .then((gpu) => {
           const suficiente = gpu !== null && gpu.total_mb >= 4096;
           if (suficiente) {
-            const nota = texto("GPU detectada: " + gpu!.name + " (" + Math.round(gpu!.total_mb / 1024) + " GB).");
+            const nota = texto(
+              t("GPU detectada") +
+                ": " +
+                gpu!.name +
+                " (" +
+                Math.round(gpu!.total_mb / 1024) +
+                " GB).",
+            );
             nota.style.opacity = "0.7";
             avisoGpu.appendChild(nota);
             return;

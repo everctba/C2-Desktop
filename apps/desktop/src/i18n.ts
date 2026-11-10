@@ -59,6 +59,7 @@ const EN: Record<string, string> = {
     "C2 runs the model on your machine — nothing leaves your computer. We recommend Gemma 4 E2B Q4_K_M (~3.2 GB), which fits in an 8 GB GPU.",
   "VRAM insuficiente para o modelo recomendado": "Not enough VRAM for the recommended model",
   "Nenhuma GPU detectada": "No GPU detected",
+  "GPU detectada": "GPU detected",
   "O C2 grava os metadados ao lado de cada arquivo (<arquivo>.c2.json). Escolha a pasta que você quer indexar.":
     "C2 writes metadata next to each file (<file>.c2.json). Choose the folder you want to index.",
   "Escolha o modelo que você baixou. O C2 lê apenas o cabeçalho para validar (nome, quantização e se cabe na VRAM) e guarda só o caminho — o arquivo não é copiado.":
