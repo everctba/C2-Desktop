@@ -105,7 +105,14 @@ pub fn tools() -> Value {
 
 /// Nomes das ferramentas (para painel/testes).
 pub fn tool_names() -> Vec<&'static str> {
-    vec!["c2_grep", "c2_read", "c2_related", "c2_similar", "c2_map", "c2_annotate"]
+    vec![
+        "c2_grep",
+        "c2_read",
+        "c2_related",
+        "c2_similar",
+        "c2_map",
+        "c2_annotate",
+    ]
 }
 
 /// Processa uma linha JSON-RPC. Devolve `None` para notificacoes (sem `id`).
@@ -326,11 +333,11 @@ fn chamar_ferramenta(
                 .and_then(Value::as_u64)
                 .unwrap_or(10)
                 .clamp(1, 20) as usize;
-            let vizinhos = crate::embedding_insights::similar(
-                workspace, config, arquivo, limite,
-            )?;
+            let vizinhos = crate::embedding_insights::similar(workspace, config, arquivo, limite)?;
             if vizinhos.is_empty() {
-                return Ok(format!("nenhum similar para {arquivo} (embeddings indexados?)"));
+                return Ok(format!(
+                    "nenhum similar para {arquivo} (embeddings indexados?)"
+                ));
             }
             let mut saida = String::new();
             for (indice, vizinho) in vizinhos.iter().enumerate() {

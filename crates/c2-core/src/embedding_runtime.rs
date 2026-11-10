@@ -198,10 +198,12 @@ pub fn embed(config: &Config, texto: &str) -> Result<Vec<f32>> {
         .build()
         .post(&url)
         .send_json(body)
-        .map_err(|erro| C2Error::InvalidConfig(format!("falha no endpoint de embeddings: {erro}")))?;
-    let json: serde_json::Value = resposta
-        .into_json()
-        .map_err(|erro| C2Error::InvalidConfig(format!("resposta de embeddings invalida: {erro}")))?;
+        .map_err(|erro| {
+            C2Error::InvalidConfig(format!("falha no endpoint de embeddings: {erro}"))
+        })?;
+    let json: serde_json::Value = resposta.into_json().map_err(|erro| {
+        C2Error::InvalidConfig(format!("resposta de embeddings invalida: {erro}"))
+    })?;
     let vetor = json
         .pointer("/data/0/embedding")
         .and_then(|valor| valor.as_array())
@@ -293,7 +295,13 @@ fn last_error(workspace: &Workspace) -> Option<String> {
             !linha.is_empty()
                 && (linha.contains(" E ") || linha.to_ascii_lowercase().contains("error"))
         })
-        .or_else(|| texto.lines().rev().map(str::trim).find(|linha| !linha.is_empty()))
+        .or_else(|| {
+            texto
+                .lines()
+                .rev()
+                .map(str::trim)
+                .find(|linha| !linha.is_empty())
+        })
         .map(|linha| linha.chars().take(240).collect())
 }
 

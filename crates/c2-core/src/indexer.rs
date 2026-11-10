@@ -1330,5 +1330,4 @@ mod tests {
         assert!(report.calls <= 1);
         std::fs::remove_dir_all(&base).ok();
     }
-
 }

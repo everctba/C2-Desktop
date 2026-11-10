@@ -115,7 +115,9 @@ impl EmbeddingCache {
     pub fn path_for(&self, rel: &str) -> Option<PathBuf> {
         let rel = rel.trim_start_matches('/').replace('\\', "/");
         if rel.is_empty()
-            || rel.split('/').any(|parte| parte.is_empty() || parte == ".." || parte == ".")
+            || rel
+                .split('/')
+                .any(|parte| parte.is_empty() || parte == ".." || parte == ".")
             || rel.contains(':')
         {
             return None;
@@ -225,10 +227,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "c2-embedding-{tag}-{}-{stamp}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("c2-embedding-{tag}-{}-{stamp}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         path
     }

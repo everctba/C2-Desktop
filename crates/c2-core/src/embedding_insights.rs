@@ -87,9 +87,7 @@ pub fn similar(
     let alvo = vetores
         .iter()
         .find(|item| item.meta.file == file)
-        .ok_or_else(|| {
-            C2Error::InvalidConfig(format!("arquivo sem vetor de embedding: {file}"))
-        })?;
+        .ok_or_else(|| C2Error::InvalidConfig(format!("arquivo sem vetor de embedding: {file}")))?;
     let mut vizinhos = Vec::new();
     for item in &vetores {
         if item.meta.file == file {
@@ -105,7 +103,11 @@ pub fn similar(
             }
         }
     }
-    vizinhos.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    vizinhos.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     vizinhos.truncate(limit);
     Ok(vizinhos)
 }
@@ -115,7 +117,10 @@ pub fn domains(neighbors: &[Neighbor]) -> BTreeMap<String, Vec<String>> {
     let mut grupos: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for neighbor in neighbors {
         let dominio = domain_of(&neighbor.file);
-        grupos.entry(dominio).or_default().push(neighbor.file.clone());
+        grupos
+            .entry(dominio)
+            .or_default()
+            .push(neighbor.file.clone());
     }
     grupos
 }
@@ -155,7 +160,11 @@ pub fn duplicates(
             }
         }
     }
-    pairs.sort_by(|x, y| y.score.partial_cmp(&x.score).unwrap_or(std::cmp::Ordering::Equal));
+    pairs.sort_by(|x, y| {
+        y.score
+            .partial_cmp(&x.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     pairs.truncate(100);
 
     let mut generic = Vec::new();
@@ -308,15 +317,31 @@ mod tests {
         let path = crate::schema::meta_path_for(&ws.root().join(rel));
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         meta.write_atomic(&path).unwrap();
-        let cache = EmbeddingCache::new(ws, &config.index.embeddings.model_id, config.index.embeddings.dim);
+        let cache = EmbeddingCache::new(
+            ws,
+            &config.index.embeddings.model_id,
+            config.index.embeddings.dim,
+        );
         cache.store(rel, "sha256:x", &vetor).unwrap();
     }
 
     #[test]
     fn similares_e_dominios() {
         let (ws, config) = setup("sim");
-        adicionar(&ws, &config, "src/pagamento/a.rs", [1.0, 0.0, 0.0, 0.0], vec![]);
-        adicionar(&ws, &config, "src/pagamento/b.rs", [0.9, 0.1, 0.0, 0.0], vec![]);
+        adicionar(
+            &ws,
+            &config,
+            "src/pagamento/a.rs",
+            [1.0, 0.0, 0.0, 0.0],
+            vec![],
+        );
+        adicionar(
+            &ws,
+            &config,
+            "src/pagamento/b.rs",
+            [0.9, 0.1, 0.0, 0.0],
+            vec![],
+        );
         adicionar(&ws, &config, "src/auth/c.rs", [0.0, 0.0, 1.0, 0.0], vec![]);
         let vizinhos = similar(&ws, &config, "src/pagamento/a.rs", 5).unwrap();
         assert_eq!(vizinhos[0].file, "src/pagamento/b.rs");

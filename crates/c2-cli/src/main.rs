@@ -68,7 +68,6 @@ fn abrir_desktop(app: &Path, root: &Path) -> Result<()> {
     Ok(())
 }
 
-
 #[derive(Parser, Debug)]
 #[command(
     name = "c2",
@@ -282,9 +281,7 @@ enum EmbeddingAction {
     /// Para o runtime de embeddings
     Stop,
     /// Gera o vetor de um texto (diagnostico)
-    Embed {
-        text: String,
-    },
+    Embed { text: String },
     /// Indexa os resumos .c2.json em vetores
     Index {
         /// Ignora o cache e re-embedda todos
@@ -479,7 +476,11 @@ fn cmd_lang(lang: Option<&str>) -> Result<()> {
         }
         Some(valor) => {
             let lang = i18n::parse(valor).ok_or_else(|| {
-                anyhow::anyhow!("{}: {valor} ({})", i18n::t("invalid language", "idioma invalido"), i18n::t("use en or pt-BR", "use en ou pt-BR"))
+                anyhow::anyhow!(
+                    "{}: {valor} ({})",
+                    i18n::t("invalid language", "idioma invalido"),
+                    i18n::t("use en or pt-BR", "use en ou pt-BR")
+                )
             })?;
             i18n::salvar(lang).map_err(|erro| anyhow::anyhow!(erro))?;
             i18n::set(lang);
@@ -537,7 +538,14 @@ fn cmd_init(
     if outcome.created {
         println!(
             "{}",
-            cor(VERDE_CLARO, &format!("{} {}", i18n::t("C2 workspace created at", "Workspace C2 criado em"), outcome.root.display()))
+            cor(
+                VERDE_CLARO,
+                &format!(
+                    "{} {}",
+                    i18n::t("C2 workspace created at", "Workspace C2 criado em"),
+                    outcome.root.display()
+                )
+            )
         );
     } else {
         println!(
@@ -546,9 +554,15 @@ fn cmd_init(
                 AMARELO,
                 &format!(
                     "{} {} ({})",
-                    i18n::t("C2 workspace already existed at", "Workspace C2 ja existia em"),
+                    i18n::t(
+                        "C2 workspace already existed at",
+                        "Workspace C2 ja existia em"
+                    ),
                     outcome.root.display(),
-                    i18n::t("nothing was overwritten; use --force", "nada foi sobrescrito; use --force")
+                    i18n::t(
+                        "nothing was overwritten; use --force",
+                        "nada foi sobrescrito; use --force"
+                    )
                 )
             )
         );
@@ -556,28 +570,89 @@ fn cmd_init(
 
     if let Some(caminho) = &agents_path {
         println!();
-        println!("{}", cor(CIANO, &format!("{} {}", i18n::t("Agent rules written to", "Regras do agente gravadas em"), caminho.display())));
-        println!("{}", cor(CINZA, i18n::t("(block between the `c2:agent:begin` and `c2:agent:end` markers)", "(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)")));
+        println!(
+            "{}",
+            cor(
+                CIANO,
+                &format!(
+                    "{} {}",
+                    i18n::t("Agent rules written to", "Regras do agente gravadas em"),
+                    caminho.display()
+                )
+            )
+        );
+        println!(
+            "{}",
+            cor(
+                CINZA,
+                i18n::t(
+                    "(block between the `c2:agent:begin` and `c2:agent:end` markers)",
+                    "(bloco entre os marcadores `c2:agent:begin` e `c2:agent:end`)"
+                )
+            )
+        );
     }
     for caminho in &mcp_paths {
-        println!("{}", cor(CIANO, &format!("{} {}", i18n::t("MCP configured at", "MCP configurado em"), caminho.display())));
+        println!(
+            "{}",
+            cor(
+                CIANO,
+                &format!(
+                    "{} {}",
+                    i18n::t("MCP configured at", "MCP configurado em"),
+                    caminho.display()
+                )
+            )
+        );
     }
     if mcp_paths.is_empty() && !agent {
         println!();
-        println!("{}", cor(CINZA, i18n::t("To configure project MCP: `c2 init --mcp` (or --agent).", "Para configurar o MCP do projeto: `c2 init --mcp` (ou --agent).")));
+        println!(
+            "{}",
+            cor(
+                CINZA,
+                i18n::t(
+                    "To configure project MCP: `c2 init --mcp` (or --agent).",
+                    "Para configurar o MCP do projeto: `c2 init --mcp` (ou --agent)."
+                )
+            )
+        );
     }
     if agents_path.is_none() && !mcp {
         println!();
-        println!("{}", cor(CIANO, i18n::t("For your agent to use C2 comments, paste the block below into", "Para o seu agente usar os comentarios do C2, cole o bloco abaixo no")));
-        println!("{}", cor(CIANO, i18n::t("AGENTS.md / CLAUDE.md / .cursor/rules (or run `c2 init --agent`):", "AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):")));
+        println!(
+            "{}",
+            cor(
+                CIANO,
+                i18n::t(
+                    "For your agent to use C2 comments, paste the block below into",
+                    "Para o seu agente usar os comentarios do C2, cole o bloco abaixo no"
+                )
+            )
+        );
+        println!(
+            "{}",
+            cor(
+                CIANO,
+                i18n::t(
+                    "AGENTS.md / CLAUDE.md / .cursor/rules (or run `c2 init --agent`):",
+                    "AGENTS.md / CLAUDE.md / .cursor/rules (ou rode `c2 init --agent`):"
+                )
+            )
+        );
         println!();
         println!("{}", cor(CINZA, "--- BEGIN AGENTS.MD CONTENT ---"));
         for linha in agent_snippet().lines() {
             if linha.is_empty() {
                 println!();
-            } else if linha.starts_with("## ") || linha.starts_with("<EXTREMELY") || linha.starts_with("</EXTREMELY") {
+            } else if linha.starts_with("## ")
+                || linha.starts_with("<EXTREMELY")
+                || linha.starts_with("</EXTREMELY")
+            {
                 println!("  {}", cor(CIANO, linha));
-            } else if linha.starts_with("Metadado é hipótese") || linha.starts_with("Metadata is a hypothesis") {
+            } else if linha.starts_with("Metadado é hipótese")
+                || linha.starts_with("Metadata is a hypothesis")
+            {
                 println!("  {}", cor(AMARELO, linha));
             } else {
                 println!("  {linha}");
@@ -586,32 +661,75 @@ fn cmd_init(
         println!("{}", cor(CINZA, "--- END AGENTS.MD CONTENT ---"));
     }
     println!();
-    println!("{}", negrito(&cor(CIANO, i18n::t("Commands for your agent:", "Comandos para o seu agente:"))));
-    println!("  {}{}", cor(VERDE, "c2 status"), cor(CINZA, i18n::t("                         # index up to date?", "                         # indice atualizado?")));
+    println!(
+        "{}",
+        negrito(&cor(
+            CIANO,
+            i18n::t("Commands for your agent:", "Comandos para o seu agente:")
+        ))
+    );
+    println!(
+        "  {}{}",
+        cor(VERDE, "c2 status"),
+        cor(
+            CINZA,
+            i18n::t(
+                "                         # index up to date?",
+                "                         # indice atualizado?"
+            )
+        )
+    );
     println!(
         "  {}{}",
         cor(VERDE, "c2 grep \"<tarefa>\" --limit 5"),
-        cor(CINZA, i18n::t("       # candidates by meaning", "       # candidatos por significado"))
+        cor(
+            CINZA,
+            i18n::t(
+                "       # candidates by meaning",
+                "       # candidatos por significado"
+            )
+        )
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 related <arquivo>"),
-        cor(CINZA, i18n::t("               # graph dependencies", "               # dependencias no grafo"))
+        cor(
+            CINZA,
+            i18n::t(
+                "               # graph dependencies",
+                "               # dependencias no grafo"
+            )
+        )
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 read <arquivo> --lines A:B"),
-        cor(CINZA, i18n::t("      # only the needed range", "      # so o trecho necessario"))
+        cor(
+            CINZA,
+            i18n::t(
+                "      # only the needed range",
+                "      # so o trecho necessario"
+            )
+        )
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 mcp"),
-        cor(CINZA, i18n::t("                             # MCP server (STDIO)", "                             # servidor MCP (STDIO)"))
+        cor(
+            CINZA,
+            i18n::t(
+                "                             # MCP server (STDIO)",
+                "                             # servidor MCP (STDIO)"
+            )
+        )
     );
     println!(
         "  {}{}",
         cor(VERDE, "c2 note add <arquivo> --text ..."),
-        cor(CINZA, i18n::t("   # teleological annotation", "   # anotacao teleologica"))
+        cor(
+            CINZA,
+            i18n::t("   # teleological annotation", "   # anotacao teleologica")
+        )
     );
     Ok(())
 }
@@ -857,9 +975,7 @@ fn write_mcp_configs(root: &Path) -> Result<Vec<PathBuf>> {
             .into());
         }
         let objeto = documento.as_object_mut().expect("objeto verificado");
-        let servidores = objeto
-            .entry("mcpServers")
-            .or_insert_with(|| json!({}));
+        let servidores = objeto.entry("mcpServers").or_insert_with(|| json!({}));
         if !servidores.is_object() {
             return Err(C2Error::InvalidConfig(format!(
                 "{}: mcpServers precisa ser um objeto",
@@ -959,15 +1075,15 @@ fn cmd_open(root: Option<&Path>) -> Result<()> {
             .with_context(|| format!("falha ao abrir {}", app.display()))?;
     }
 
-    println!("{} {}", i18n::t("C2 Desktop opened at", "C2 Desktop aberto em"), workspace.root().display());
+    println!(
+        "{} {}",
+        i18n::t("C2 Desktop opened at", "C2 Desktop aberto em"),
+        workspace.root().display()
+    );
     Ok(())
 }
 
-fn cmd_embeddings(
-    root: Option<&Path>,
-    action: EmbeddingAction,
-    json_output: bool,
-) -> Result<()> {
+fn cmd_embeddings(root: Option<&Path>, action: EmbeddingAction, json_output: bool) -> Result<()> {
     let workspace = require_workspace(root)?;
     let mut config = workspace.load_config()?;
     match action {
@@ -985,19 +1101,22 @@ fn cmd_embeddings(
         }
         EmbeddingAction::Stop => {
             let parou = c2_core::embedding_runtime::stop(&workspace)?;
-            println!("{}", if parou { "runtime de embeddings parado" } else { "runtime de embeddings nao estava rodando" });
+            println!(
+                "{}",
+                if parou {
+                    "runtime de embeddings parado"
+                } else {
+                    "runtime de embeddings nao estava rodando"
+                }
+            );
         }
         EmbeddingAction::Index { full } => {
-            let report = c2_core::embedding_index::run(
-                &workspace,
-                &config,
-                full,
-                |_, idx, total| {
+            let report =
+                c2_core::embedding_index::run(&workspace, &config, full, |_, idx, total| {
                     if total > 0 && (idx == total || idx % 25 == 0) {
                         eprintln!("embeddings: {idx}/{total}");
                     }
-                },
-            )?;
+                })?;
             if json_output {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -1037,8 +1156,7 @@ fn cmd_embeddings(
             }
         }
         EmbeddingAction::Duplicates { threshold } => {
-            let report =
-                c2_core::embedding_insights::duplicates(&workspace, &config, threshold)?;
+            let report = c2_core::embedding_insights::duplicates(&workspace, &config, threshold)?;
             if json_output {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -1066,7 +1184,10 @@ fn cmd_embeddings(
                 println!("{}", serde_json::to_string_pretty(&sugestoes)?);
             } else {
                 for sugestao in &sugestoes {
-                    println!("{:.3}  {} -> {}", sugestao.score, sugestao.from, sugestao.to);
+                    println!(
+                        "{:.3}  {} -> {}",
+                        sugestao.score, sugestao.from, sugestao.to
+                    );
                 }
             }
         }
@@ -1160,8 +1281,16 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!("{:<12} {}", i18n::t("Workspace:", "Workspace:"), workspace.root().display());
-    println!("{:<12} {}", i18n::t("Config:", "Config:"), workspace.config_path().display());
+    println!(
+        "{:<12} {}",
+        i18n::t("Workspace:", "Workspace:"),
+        workspace.root().display()
+    );
+    println!(
+        "{:<12} {}",
+        i18n::t("Config:", "Config:"),
+        workspace.config_path().display()
+    );
     println!(
         "{:<12} {} ({}:{})",
         i18n::t("Model:", "Modelo:"),
@@ -1179,8 +1308,16 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         config.index.extensions.len(),
         config.engine.poll_interval_secs
     );
-    println!("{:<12} {}", i18n::t("Files:", "Arquivos:"), discovery.files.len());
-    println!("{:<12} {}", i18n::t("Metadata:", "Metadados:"), metadata.len());
+    println!(
+        "{:<12} {}",
+        i18n::t("Files:", "Arquivos:"),
+        discovery.files.len()
+    );
+    println!(
+        "{:<12} {}",
+        i18n::t("Metadata:", "Metadados:"),
+        metadata.len()
+    );
     println!(
         "{:<12} {} binary, {} large, {} unsupported extension, {} sensitive",
         i18n::t("Skipped:", "Pulados:"),
@@ -1195,8 +1332,16 @@ fn cmd_status(root: Option<&Path>, json_output: bool) -> Result<()> {
         config.index.secret_policy
     );
     match engine_pid {
-        Some(pid) => println!("{:<12} {} (pid {pid})", i18n::t("Engine:", "Engine:"), i18n::t("running", "rodando")),
-        None => println!("{:<12} {}", i18n::t("Engine:", "Engine:"), i18n::t("stopped", "parado")),
+        Some(pid) => println!(
+            "{:<12} {} (pid {pid})",
+            i18n::t("Engine:", "Engine:"),
+            i18n::t("running", "rodando")
+        ),
+        None => println!(
+            "{:<12} {}",
+            i18n::t("Engine:", "Engine:"),
+            i18n::t("stopped", "parado")
+        ),
     }
     print_runtime_status(&workspace, &config);
     println!(
@@ -1978,10 +2123,22 @@ fn print_runtime_status(workspace: &Workspace, config: &c2_core::Config) {
     };
     match (&status.binary, &status.pid) {
         (Some(binary), Some(pid)) => {
-            println!("{:<12} {state} (pid {pid}) {}", i18n::t("Runtime:", "Runtime:"), binary.display())
+            println!(
+                "{:<12} {state} (pid {pid}) {}",
+                i18n::t("Runtime:", "Runtime:"),
+                binary.display()
+            )
         }
-        (Some(binary), None) => println!("{:<12} {state} ({})", i18n::t("Runtime:", "Runtime:"), binary.display()),
-        (None, _) => println!("{:<12} {}", i18n::t("Runtime:", "Runtime:"), i18n::t("not found", "nao localizado")),
+        (Some(binary), None) => println!(
+            "{:<12} {state} ({})",
+            i18n::t("Runtime:", "Runtime:"),
+            binary.display()
+        ),
+        (None, _) => println!(
+            "{:<12} {}",
+            i18n::t("Runtime:", "Runtime:"),
+            i18n::t("not found", "nao localizado")
+        ),
     }
     if let Some(source) = &status.source {
         println!("{:<12} {source}", i18n::t("Source:", "Origem:"));

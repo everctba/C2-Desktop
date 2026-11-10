@@ -5,11 +5,12 @@
 
 pub mod cleaner;
 pub mod config;
+pub mod cost;
 pub mod discover;
 pub mod embedding;
-pub mod embedding_runtime;
 pub mod embedding_index;
 pub mod embedding_insights;
+pub mod embedding_runtime;
 pub mod error;
 pub mod gguf;
 pub mod gpu;
@@ -22,9 +23,8 @@ pub mod llm_fake;
 pub mod log;
 pub mod mcp;
 pub mod migrate;
-pub mod notes;
 pub mod news;
-pub mod cost;
+pub mod notes;
 pub mod process;
 pub mod runtime;
 pub mod schema;

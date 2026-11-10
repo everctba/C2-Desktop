@@ -221,17 +221,29 @@ mod tests {
         let ws = workspace(&config);
         gravar_meta(&ws, "src/a.rs", "sha256:a");
         let mut chamadas = 0;
-        let report = run_with(&ws, &config, false, |_, _, _| {}, |_| {
-            chamadas += 1;
-            Ok(vec![1.0, 0.0, 0.0, 0.0])
-        })
+        let report = run_with(
+            &ws,
+            &config,
+            false,
+            |_, _, _| {},
+            |_| {
+                chamadas += 1;
+                Ok(vec![1.0, 0.0, 0.0, 0.0])
+            },
+        )
         .unwrap();
         assert_eq!(report.embedded, 1);
         assert_eq!(chamadas, 1);
-        let report = run_with(&ws, &config, false, |_, _, _| {}, |_| {
-            chamadas += 1;
-            Ok(vec![0.0, 1.0, 0.0, 0.0])
-        })
+        let report = run_with(
+            &ws,
+            &config,
+            false,
+            |_, _, _| {},
+            |_| {
+                chamadas += 1;
+                Ok(vec![0.0, 1.0, 0.0, 0.0])
+            },
+        )
         .unwrap();
         assert_eq!(report.cached, 1);
         assert_eq!(report.embedded, 0);
@@ -247,16 +259,28 @@ mod tests {
         let ws = workspace(&config);
         gravar_meta(&ws, "src/b.rs", "sha256:a");
         let mut chamadas = 0;
-        run_with(&ws, &config, false, |_, _, _| {}, |_| {
-            chamadas += 1;
-            Ok(vec![1.0, 0.0, 0.0, 0.0])
-        })
+        run_with(
+            &ws,
+            &config,
+            false,
+            |_, _, _| {},
+            |_| {
+                chamadas += 1;
+                Ok(vec![1.0, 0.0, 0.0, 0.0])
+            },
+        )
         .unwrap();
         gravar_meta(&ws, "src/b.rs", "sha256:b");
-        let report = run_with(&ws, &config, false, |_, _, _| {}, |_| {
-            chamadas += 1;
-            Ok(vec![1.0, 0.0, 0.0, 0.0])
-        })
+        let report = run_with(
+            &ws,
+            &config,
+            false,
+            |_, _, _| {},
+            |_| {
+                chamadas += 1;
+                Ok(vec![1.0, 0.0, 0.0, 0.0])
+            },
+        )
         .unwrap();
         assert_eq!(report.embedded, 1);
         assert_eq!(chamadas, 2);
