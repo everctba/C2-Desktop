@@ -126,6 +126,12 @@ pub fn start(workspace: &Workspace, config: &Config) -> Result<EmbeddingStatus> 
         .arg(ngl.to_string())
         .arg("-t")
         .arg(embedding.threads.to_string())
+        // Resumos semanticos podem passar de 512 tokens; o batch fisico
+        // padrao do llama-server rejeitava esses inputs.
+        .arg("-b")
+        .arg("2048")
+        .arg("-ub")
+        .arg("2048")
         .stdin(Stdio::null())
         .stdout(Stdio::from(out))
         .stderr(Stdio::from(err));
@@ -283,7 +289,11 @@ fn last_error(workspace: &Workspace) -> Option<String> {
         .lines()
         .rev()
         .map(str::trim)
-        .find(|linha| !linha.is_empty())
+        .find(|linha| {
+            !linha.is_empty()
+                && (linha.contains(" E ") || linha.to_ascii_lowercase().contains("error"))
+        })
+        .or_else(|| texto.lines().rev().map(str::trim).find(|linha| !linha.is_empty()))
         .map(|linha| linha.chars().take(240).collect())
 }
 
