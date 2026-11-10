@@ -27,6 +27,10 @@ pub struct EmbeddingStatus {
     pub model_id: String,
     pub dim: usize,
     pub device: String,
+    /// Metadados com vetor válido no cache.
+    pub vectors: usize,
+    /// Total de metadados do workspace.
+    pub files: usize,
     pub port: u16,
     pub binary: Option<String>,
     pub last_error: Option<String>,
@@ -35,6 +39,7 @@ pub struct EmbeddingStatus {
 pub fn status(workspace: &Workspace, config: &Config) -> EmbeddingStatus {
     let embedding = &config.index.embeddings;
     let pid = read_pid(workspace);
+    let (files, vectors) = crate::embedding_index::stats(workspace, config).unwrap_or((0, 0));
     EmbeddingStatus {
         enabled: embedding.enabled,
         healthy: health(embedding),
@@ -43,6 +48,8 @@ pub fn status(workspace: &Workspace, config: &Config) -> EmbeddingStatus {
         model_id: embedding.model_id.clone(),
         dim: embedding.dim,
         device: embedding.device.clone(),
+        vectors,
+        files,
         port: embedding.port,
         binary: find_server(workspace).map(|path| path.display().to_string()),
         last_error: last_error(workspace),

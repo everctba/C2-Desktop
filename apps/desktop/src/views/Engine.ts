@@ -210,8 +210,8 @@ export async function renderEngine(ctx: EngineContext): Promise<View> {
   embFill.className = styles.cargaFill;
   embTrack.appendChild(embFill);
 
-  let embTotal = Math.max(1, ctx.status?.metadata ?? 0);
-  let embDone = 0;
+  let embTotal = Math.max(1, embedStatus?.files ?? ctx.status?.metadata ?? 0);
+  let embDone = embedStatus?.vectors ?? 0;
   const atualizarEmbStatus = (status: EmbeddingStatus | null) => {
     if (!status?.enabled) {
       embStatusValue.textContent = t("desativada em Configurações");

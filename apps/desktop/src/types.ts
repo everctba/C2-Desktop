@@ -250,6 +250,8 @@ export interface EmbeddingStatus {
   model_id: string;
   dim: number;
   device: string;
+  vectors: number;
+  files: number;
   port: number;
   binary: string | null;
   last_error: string | null;

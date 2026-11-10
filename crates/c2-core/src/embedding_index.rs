@@ -147,6 +147,24 @@ pub fn run_with(
     Ok(report)
 }
 
+/// Quantos arquivos têm metadado e quantos têm vetor válido no cache.
+pub fn stats(workspace: &Workspace, config: &Config) -> Result<(usize, usize)> {
+    let cfg = &config.index.embeddings;
+    let cache = EmbeddingCache::new(workspace, &cfg.model_id, cfg.dim);
+    let mut total = 0usize;
+    let mut com_vetor = 0usize;
+    for meta_path in cleaner::metadata_files(workspace.root())? {
+        let Ok(meta) = MetaFile::read(&meta_path) else {
+            continue;
+        };
+        total += 1;
+        if cache.load(&meta.file, &meta.hash).is_some() {
+            com_vetor += 1;
+        }
+    }
+    Ok((total, com_vetor))
+}
+
 /// Caminho do metadado ao lado de um arquivo relativo (utilitário da CLI/UI).
 pub fn meta_for(workspace: &Workspace, rel: &str) -> std::path::PathBuf {
     meta_path_for(&workspace.root().join(rel))
