@@ -855,6 +855,23 @@ struct NotesInventory {
 }
 
 #[tauri::command]
+fn forest_overview(root: String) -> Result<c2_core::forest::Forest, String> {
+    let workspace = open_workspace(&root)?;
+    c2_core::forest::load(&workspace).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn forest_build(root: String) -> Result<c2_core::forest::BuildReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let workspace = open_workspace(&root)?;
+        let config = workspace.load_config().map_err(|e| e.to_string())?;
+        c2_core::forest::build(&workspace, &config).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn notes_inventory(root: String) -> Result<NotesInventory, String> {
     let workspace = open_workspace(&root)?;
     let mut inventory = NotesInventory {
@@ -1536,6 +1553,8 @@ pub fn run() {
             file_related,
             list_files,
             read_meta,
+            forest_overview,
+            forest_build,
             notes_inventory,
             note_remove,
             usage_events,

@@ -1,0 +1,17 @@
+﻿{
+    "generated_at":  "2026-11-10T19:33:57.9241183-03:00",
+    "domains":  2,
+    "decisions":  0,
+    "risks":  2,
+    "divergences":  2,
+    "has_missing_path":  true,
+    "has_embeddings_claim":  true,
+    "brief_chars":  652,
+    "brief_has_gotcha":  true,
+    "divergence_claims":  [
+                              "Este projeto NAO usa embeddings (afirmacao desatualizada de proposito). | README.md:3",
+                              "documento cita caminho inexistente: src/nao_existe.rs | README.md:4"
+                          ],
+    "files":  2,
+    "ok":  true
+}

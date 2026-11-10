@@ -11,6 +11,7 @@ export type IconName =
   | "close"
   | "mcp"
   | "note"
+  | "forest"
   | "copy"
   | "info";
 
@@ -28,6 +29,8 @@ const PATHS: Record<IconName, string> = {
   // prancheta com aba (copiar)
   copy:
     "M4 4h9v10H4zM5.5 5.5v7h6v-7zM6 2h5v2H6z",
+  // arvore
+  forest: "M6 2 2 7h2v5h4V7h2zM5 12h2v2H5z",
   // nota
   note: "M4 2h8l2 2v12H4zM7 6h6M7 9h6M7 12h4",
   // plugue (MCP)

@@ -329,3 +329,59 @@ export interface UsageSummary {
   by_actor: Record<string, number>;
   by_tool: Record<string, number>;
 }
+
+export interface ForestTeleology {
+  what: string;
+  why: string;
+  goal: string;
+  who: string[];
+  success: string[];
+  non_goals: string[];
+}
+
+export interface ForestDomain {
+  path: string;
+  what: string;
+  why: string;
+  goal: string;
+  boundaries: string[];
+  key_files: string[];
+  depends_on: string[];
+  evidence: string[];
+}
+
+export interface ForestDecision {
+  id: string;
+  title: string;
+  status: string;
+  summary: string;
+  evidence: string[];
+}
+
+export interface ForestRisk {
+  title: string;
+  severity: string;
+  summary: string;
+  evidence: string[];
+}
+
+export interface ForestDivergence {
+  kind: string;
+  claim: string;
+  docs_ref: string;
+  code_ref: string;
+  severity: string;
+}
+
+export interface ForestData {
+  schema_version: number;
+  generated_at: string;
+  teleology: ForestTeleology;
+  architecture: { summary: string; layers: string[]; entrypoints: string[] };
+  domains: ForestDomain[];
+  decisions: ForestDecision[];
+  risks: ForestRisk[];
+  divergences: ForestDivergence[];
+  sources: { path: string; hash: string; mtime: number }[];
+  section_hashes: Record<string, string>;
+}

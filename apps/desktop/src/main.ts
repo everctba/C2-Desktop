@@ -12,6 +12,7 @@ import { loadingBar, memoryBar } from "./ui/MemoryBar";
 import { Pill } from "./ui/Pill";
 import { renderSearch } from "./views/Search";
 import { renderMemory } from "./views/Memory";
+import { renderForest } from "./views/Forest";
 import { renderMcp } from "./views/Mcp";
 import { renderSettings } from "./views/Settings";
 import { renderAbout } from "./views/About";
@@ -831,6 +832,9 @@ function render(): void {
         break;
       case "memory":
         view = await renderMemory({ root: state.root });
+        break;
+      case "forest":
+        view = await renderForest({ root: state.root });
         break;
       default:
         view = await renderProjects({

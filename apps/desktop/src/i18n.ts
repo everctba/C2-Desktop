@@ -41,6 +41,23 @@ const EN: Record<string, string> = {
     "OpenAI, Groq, DeepSeek, OpenRouter or a local server (LM Studio/Ollama/vLLM). No GPU required.",
   "Decidir depois": "Decide later",
   "Memória": "Memory",
+  "Floresta": "Forest",
+  "A visão do projeto inteiro: propósito, domínios, decisões, riscos e divergências entre docs e código.":
+    "The whole-project view: purpose, domains, decisions, risks and docs-vs-code divergences.",
+  "Atualizar floresta": "Refresh forest",
+  "Gerar floresta": "Build forest",
+  "gerando floresta…": "building forest…",
+  "Floresta ainda não gerada": "Forest not built yet",
+  "Gere a floresta para sintetizar os domínios a partir dos metadados e docs.":
+    "Build the forest to synthesize domains from metadata and docs.",
+  "Visão e propósito": "Vision and purpose",
+  objetivo: "goal",
+  Arquitetura: "Architecture",
+  "Domínios": "Domains",
+  "domínio": "domain",
+  "Decisões e riscos": "Decisions and risks",
+  "Divergências": "Divergences",
+
   "O que a IA aprendeu neste projeto: gotchas, correções, invariantes e pendências. Notas obsoletas aparecem para revisão.":
     "What the AI learned in this project: gotchas, corrections, invariants and pending items. Stale notes are flagged for review.",
   "Anotações": "Notes",
@@ -56,7 +73,6 @@ const EN: Record<string, string> = {
     "Where the AI accumulates gotchas/corrections — candidates for docs, tests or refactoring.",
   "Nenhuma anotação ainda.": "No notes yet.",
   tipo: "kind",
-  domínio: "domain",
   período: "period",
   todos: "all",
   hoje: "today",

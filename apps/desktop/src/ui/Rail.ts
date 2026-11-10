@@ -7,6 +7,7 @@ export type Route =
   | "engine"
   | "search"
   | "memory"
+  | "forest"
   | "mcp"
   | "settings"
   | "about";
@@ -27,6 +28,7 @@ const ITEMS: Item[] = [
   { route: "engine", icon: "engine", label: "Engine" },
   { route: "search", icon: "search", label: "Busca" },
   { route: "memory", icon: "note", label: "Memória" },
+  { route: "forest", icon: "forest", label: "Floresta" },
   { route: "mcp", icon: "mcp", label: "MCP" },
   { route: "settings", icon: "settings", label: "Config" },
 ];

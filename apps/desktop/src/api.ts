@@ -15,6 +15,7 @@ import type {
   CostEstimate,
   RuntimePlan,
   EmbeddingStatus,
+  ForestData,
   NotesInventory,
   UsageEvent,
   UsageSummary,
@@ -76,6 +77,12 @@ export const api = {
   initialRoot: () => invoke<string | null>("initial_root"),
   runtimePlan: (root: string, ctxSize?: number, gpuLayers?: number) =>
     invoke<RuntimePlan>("runtime_plan", { root, ctxSize, gpuLayers }),
+  forestOverview: (root: string) => invoke<ForestData>("forest_overview", { root }),
+  forestBuild: (root: string) =>
+    invoke<{ folders: number; folders_reused: number; files: number; notes: number; docs: number; forest_written: boolean }>(
+      "forest_build",
+      { root },
+    ),
   notesInventory: (root: string) => invoke<NotesInventory>("notes_inventory", { root }),
   noteRemove: (root: string, file: string, index: number) =>
     invoke<unknown>("note_remove", { root, file, index }),
@@ -400,6 +407,10 @@ async function mockInvoke<T>(command: string, args?: Record<string, unknown>): P
       } as T;
     case "model_unload":
       return undefined as T;
+    case "forest_overview":
+      throw new Error("forest not built");
+    case "forest_build":
+      return { folders: 0, folders_reused: 0, files: 0, notes: 0, docs: 0, forest_written: false } as T;
     case "notes_inventory":
       return { total: 0, stale: 0, by_kind: {}, domains: {}, notes: [] } as T;
     case "usage_events":

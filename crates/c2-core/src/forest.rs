@@ -424,7 +424,7 @@ pub fn build(workspace: &Workspace, _config: &Config) -> Result<BuildReport> {
         flows: vec![],
         decisions,
         risks,
-        divergences: vec![],
+        divergences: detectar_divergencias(workspace, &fontes),
         sources: fontes,
         section_hashes,
     };
@@ -615,6 +615,86 @@ fn coletar_decisoes_e_riscos(
         }
     }
     Ok(())
+}
+
+fn detectar_divergencias(workspace: &Workspace, fontes: &[SourceRef]) -> Vec<Divergence> {
+    let mut saida = Vec::new();
+    let mut vistos = BTreeSet::new();
+    for fonte in fontes {
+        let path = workspace.root().join(&fonte.path);
+        let Ok(texto) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for (numero, linha) in texto.lines().enumerate() {
+            let linha_lower = linha.to_lowercase();
+            // Afirmacao conhecida que ficou obsoleta no AGENTS/README antigo.
+            let claim_embeddings_obsoleto = linha_lower.contains("sem embeddings")
+                || linha_lower.contains("no embeddings")
+                || linha_lower.contains("nao usa embeddings")
+                || linha_lower.contains("não usa embeddings")
+                || linha_lower.contains("does not use embeddings");
+            if claim_embeddings_obsoleto
+                && workspace
+                    .root()
+                    .join("crates/c2-core/src/embedding.rs")
+                    .is_file()
+            {
+                let chave = format!("{}:{}:embeddings", fonte.path, numero + 1);
+                if vistos.insert(chave) {
+                    saida.push(Divergence {
+                        kind: "docs_vs_code".to_string(),
+                        claim: linha.trim().to_string(),
+                        docs_ref: format!("{}:{}", fonte.path, numero + 1),
+                        code_ref: "crates/c2-core/src/embedding.rs".to_string(),
+                        severity: "medium".to_string(),
+                    });
+                }
+            }
+            // Caminhos citados em backticks ou texto que nao existem no repo.
+            for bruto in linha.split_whitespace() {
+                let token = bruto
+                    .trim_matches(|c: char| {
+                        c == '`'
+                            || c == '"'
+                            || c == '\''
+                            || c == '('
+                            || c == ')'
+                            || c == ','
+                            || c == ';'
+                            || c == ':'
+                    })
+                    .trim_end_matches('.')
+                    .trim_matches('`');
+                if token.starts_with("http") || token.contains('<') {
+                    continue;
+                }
+                let parece_path = token.contains('/')
+                    && (token.contains('.')
+                        || token.starts_with("src/")
+                        || token.starts_with("crates/")
+                        || token.starts_with("apps/")
+                        || token.starts_with("docs/"));
+                if !parece_path || token.contains('#') || token.contains('*') {
+                    continue;
+                }
+                if workspace.root().join(token).exists() {
+                    continue;
+                }
+                let chave = format!("{}:{}:{token}", fonte.path, numero + 1);
+                if vistos.insert(chave) {
+                    saida.push(Divergence {
+                        kind: "docs_vs_code".to_string(),
+                        claim: format!("documento cita caminho inexistente: {token}"),
+                        docs_ref: format!("{}:{}", fonte.path, numero + 1),
+                        code_ref: "(não encontrado)".to_string(),
+                        severity: "low".to_string(),
+                    });
+                }
+            }
+        }
+    }
+    saida.truncate(100);
+    saida
 }
 
 pub fn load(workspace: &Workspace) -> Result<Forest> {
@@ -863,6 +943,60 @@ mod tests {
         let path = crate::schema::meta_path_for(&workspace.root().join(&meta.file));
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         meta.write_atomic(&path).unwrap();
+    }
+
+    #[test]
+    fn detecta_doc_com_caminho_inexistente() {
+        let (dir, workspace) = tmp("div");
+        workspace.init(false).unwrap();
+        fs::write(
+            workspace.root().join("README.md"),
+            "# Demo\nVeja `src/nao_existe.rs` para detalhes.\n",
+        )
+        .unwrap();
+        escribir_meta(&workspace, &meta("src/a.rs", "sha256:a", None));
+        let report = build(&workspace, &Config::default()).unwrap();
+        assert!(report.forest_written);
+        let forest = load(&workspace).unwrap();
+        assert!(
+            forest
+                .divergences
+                .iter()
+                .any(|d| d.docs_ref.starts_with("README.md:")),
+            "divergencia nao detectada: {:#?}",
+            forest.divergences
+        );
+        fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn detecta_claim_de_embeddings_obsoleto() {
+        let (dir, workspace) = tmp("embed-claim");
+        workspace.init(false).unwrap();
+        fs::create_dir_all(workspace.root().join("crates/c2-core/src")).unwrap();
+        fs::write(
+            workspace.root().join("crates/c2-core/src/embedding.rs"),
+            "// existe",
+        )
+        .unwrap();
+        fs::write(
+            workspace.root().join("README.md"),
+            "# Demo\nEste projeto NAO usa embeddings.\n",
+        )
+        .unwrap();
+        escribir_meta(&workspace, &meta("src/a.rs", "sha256:a", None));
+        build(&workspace, &Config::default()).unwrap();
+        let forest = load(&workspace).unwrap();
+        assert!(
+            forest
+                .divergences
+                .iter()
+                .any(|d| d.claim.to_lowercase().contains("embedding")
+                    || d.claim.to_lowercase().contains("embeddings")),
+            "divergencias: {:#?}",
+            forest.divergences
+        );
+        fs::remove_dir_all(dir).ok();
     }
 
     #[test]
