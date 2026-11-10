@@ -150,6 +150,22 @@ enum Command {
     /// Mostra o estado do workspace
     Status,
 
+    /// Busca decisoes/gotchas nas anotacoes de agentes
+    Decisions {
+        query: Option<String>,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Gera os vetores das notas antes de buscar
+        #[arg(long)]
+        index: bool,
+    },
+
+    /// Constroi/consulta a floresta teleologica
+    Forest {
+        #[command(subcommand)]
+        action: ForestAction,
+    },
+
     /// Runtime de embeddings (busca semantica opcional)
     Embeddings {
         #[command(subcommand)]
@@ -318,6 +334,27 @@ enum EmbeddingAction {
 }
 
 #[derive(Subcommand, Debug)]
+enum ForestAction {
+    /// Gera folders + forest a partir dos metadados e docs
+    Build {
+        /// Gera embeddings separados por secao (requer runtime)
+        #[arg(long)]
+        embed: bool,
+    },
+    /// Mostra o overview do projeto
+    Overview,
+    /// Mostra o resumo de um dominio/pasta
+    Domain { path: String },
+    /// Briefing curto para onboarding/agente
+    Brief {
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        task: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum ConfigAction {
     /// Mostra o valor de uma chave (ex.: model.port)
     Get { key: String },
@@ -373,6 +410,18 @@ fn run(cli: Cli) -> Result<()> {
         Command::Mcp => cmd_mcp(cli.root.as_deref()),
         Command::Migrate { yes } => cmd_migrate(cli.root.as_deref(), yes, cli.json),
         Command::Status => cmd_status(cli.root.as_deref(), cli.json),
+        Command::Forest { action } => cmd_forest(cli.root.as_deref(), action, cli.json),
+        Command::Decisions {
+            query,
+            limit,
+            index,
+        } => cmd_decisions(
+            cli.root.as_deref(),
+            query.as_deref(),
+            limit,
+            index,
+            cli.json,
+        ),
         Command::Embeddings { action } => cmd_embeddings(cli.root.as_deref(), action, cli.json),
         Command::Config { action } => match action {
             ConfigAction::Get { key } => cmd_config_get(cli.root.as_deref(), key, cli.json),
@@ -1220,6 +1269,111 @@ fn cmd_embeddings(root: Option<&Path>, action: EmbeddingAction, json_output: boo
             } else {
                 println!("embedding: {} dimensoes, norma {:.4}", vetor.len(), norma);
             }
+        }
+    }
+    Ok(())
+}
+
+fn cmd_decisions(
+    root: Option<&Path>,
+    query: Option<&str>,
+    limit: usize,
+    index: bool,
+    json_output: bool,
+) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    let config = workspace.load_config()?;
+    if index {
+        let gerados = c2_core::notes_memory::index(&workspace, &config)?;
+        if !json_output {
+            println!("notas: {gerados} vetores gerados");
+        }
+    }
+    let hits = c2_core::notes_memory::search(&workspace, &config, query.unwrap_or(""), limit)?;
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&hits)?);
+        return Ok(());
+    }
+    if hits.is_empty() {
+        println!("nenhuma nota encontrada");
+        return Ok(());
+    }
+    for hit in &hits {
+        let cosine = hit
+            .cosine
+            .map(|v| format!(" · sem {v:.2}"))
+            .unwrap_or_default();
+        println!(
+            "{:.2}{cosine}  [{}] {} — {}\n   {}",
+            hit.score, hit.kind, hit.file, hit.at, hit.text
+        );
+    }
+    Ok(())
+}
+
+fn cmd_forest(root: Option<&Path>, action: ForestAction, json_output: bool) -> Result<()> {
+    let workspace = require_workspace(root)?;
+    match action {
+        ForestAction::Build { embed } => {
+            let config = workspace.load_config()?;
+            let report = c2_core::forest::build(&workspace, &config)?;
+            let embeddings = if embed {
+                c2_core::forest::embed_sections(&workspace, &config)?
+            } else {
+                0
+            };
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!(
+                    "forest: {} folders ({} reaproveitados), {} arquivos, {} notas, {} docs",
+                    report.folders, report.folders_reused, report.files, report.notes, report.docs
+                );
+                if embed {
+                    println!("embeddings: {embeddings} secoes geradas");
+                }
+                println!(
+                    "forest: {}",
+                    c2_core::forest::forest_path(&workspace).display()
+                );
+            }
+        }
+        ForestAction::Overview => {
+            let forest = c2_core::forest::load(&workspace)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&forest)?);
+            } else {
+                println!("# {}", forest.teleology.what);
+                println!("{}", forest.teleology.why);
+                println!("objetivo: {}", forest.teleology.goal);
+                for dominio in &forest.domains {
+                    println!("- {}: {}", dominio.path, dominio.what);
+                }
+                if !forest.risks.is_empty() {
+                    println!("\nriscos/gotchas:");
+                    for risco in &forest.risks {
+                        println!("- {}: {}", risco.title, risco.summary);
+                    }
+                }
+            }
+        }
+        ForestAction::Domain { path } => {
+            let folder = c2_core::forest::load_folder(&workspace, &path)?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&folder)?);
+            } else {
+                println!("{}", folder.path);
+                println!("what: {}", folder.teleology.what);
+                println!("why: {}", folder.teleology.why);
+                println!("goal: {}", folder.teleology.goal);
+                println!("key files: {}", folder.key_files.join(", "));
+            }
+        }
+        ForestAction::Brief { domain, task } => {
+            println!(
+                "{}",
+                c2_core::forest::brief(&workspace, domain.as_deref(), task.as_deref())?
+            );
         }
     }
     Ok(())

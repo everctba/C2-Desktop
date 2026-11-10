@@ -78,6 +78,43 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "c2_decisions",
+            "description": "Busca decisoes, gotchas e correcoes nas anotacoes de agentes (agent_notes).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Duvida/decisao a procurar" },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 20, "default": 10 }
+                },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "c2_overview",
+            "description": "Overview teleologico do projeto (forest master) com dominios, riscos e memorias.",
+            "inputSchema": { "type": "object", "properties": {} }
+        },
+        {
+            "name": "c2_domain",
+            "description": "Resumo teleologico de um dominio/pasta (forest folders).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "path": { "type": "string", "description": "Dominio, ex. src/pagamento" } },
+                "required": ["path"]
+            }
+        },
+        {
+            "name": "c2_brief",
+            "description": "Briefing curto para onboarding ou tarefa, com dominios e memorias relevantes.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "domain": { "type": "string" },
+                    "task": { "type": "string" }
+                }
+            }
+        },
+        {
             "name": "c2_map",
             "description": "Arvore plana do projeto: uma linha por arquivo indexavel.",
             "inputSchema": {
@@ -167,7 +204,10 @@ pub fn handle(workspace: &Workspace, config: &Config, linha: &str) -> Option<Str
                 .duration(inicio.elapsed().as_millis() as u64);
             if let Some(arquivo) = argumentos.get("file").and_then(Value::as_str) {
                 evento = evento.file(arquivo);
-                if matches!(nome, "c2_read" | "c2_related" | "c2_similar" | "c2_annotate") {
+                if matches!(
+                    nome,
+                    "c2_read" | "c2_related" | "c2_similar" | "c2_annotate"
+                ) {
                     evento = evento.meta_reads(1);
                 }
             }
@@ -371,6 +411,53 @@ fn chamar_ferramenta(
                 ));
             }
             Ok(saida)
+        }
+        "c2_decisions" => {
+            let consulta = argumentos
+                .get("query")
+                .and_then(Value::as_str)
+                .ok_or_else(|| texto_erro("c2_decisions exige 'query'"))?;
+            let limite = argumentos
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(10)
+                .clamp(1, 20) as usize;
+            let hits = crate::notes_memory::search(workspace, config, consulta, limite)?;
+            if hits.is_empty() {
+                return Ok(format!("nenhuma decisao encontrada para \"{consulta}\""));
+            }
+            let mut saida = String::new();
+            for (indice, hit) in hits.iter().enumerate() {
+                let cosine = hit
+                    .cosine
+                    .map(|v| format!(" Â· sem {v:.2}"))
+                    .unwrap_or_default();
+                saida.push_str(&format!(
+                    "{}. [{}] {}{cosine}\n   {}\n",
+                    indice + 1,
+                    hit.kind,
+                    hit.file,
+                    tronco(&hit.text, 300)
+                ));
+            }
+            Ok(saida)
+        }
+        "c2_overview" => {
+            let forest = crate::forest::load(workspace)?;
+            Ok(serde_json::to_string_pretty(&forest).map_err(|e| texto_erro(e.to_string()))?)
+        }
+        "c2_domain" => {
+            let path = argumentos
+                .get("path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| texto_erro("c2_domain exige 'path'"))?;
+            let folder = crate::forest::load_folder(workspace, path)?;
+            Ok(serde_json::to_string_pretty(&folder).map_err(|e| texto_erro(e.to_string()))?)
+        }
+        "c2_brief" => {
+            let domain = argumentos.get("domain").and_then(Value::as_str);
+            let task = argumentos.get("task").and_then(Value::as_str);
+            crate::forest::brief(workspace, domain, task)
         }
         "c2_map" => {
             let limite = argumentos
