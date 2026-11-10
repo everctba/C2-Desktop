@@ -2,7 +2,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import type { Hit, MetaFile, RelatedResult } from "../types";
 import { Button } from "../ui/Button";
-import { dialogField, dialogPills, openDialog } from "../ui/Dialog";
+import { createDialog, dialogField, dialogPills, openDialog } from "../ui/Dialog";
 import { Input } from "../ui/Input";
 import { Pill } from "../ui/Pill";
 import { Toggle } from "../ui/Toggle";
@@ -11,6 +11,7 @@ import styles from "./views.module.css";
 
 export interface SearchContext {
   root: string;
+  onNavigate: (route: "settings") => void;
 }
 
 const EXEMPLOS = [
@@ -73,7 +74,36 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     results.appendChild(empty);
   };
 
+  const embedStatus = await api.embeddingStatus(ctx.root).catch(() => null);
+  const embeddingReady = Boolean(embedStatus?.enabled && embedStatus?.model_path);
   let hibrida = false;
+
+  const avisoEmbedding = () => {
+    const handle = createDialog({ title: t("Busca híbrida indisponível") });
+    const corpo = document.createElement("div");
+    corpo.style.display = "grid";
+    corpo.style.gap = "var(--space-s)";
+    const texto = document.createElement("p");
+    texto.className = "pageHint";
+    texto.style.maxWidth = "none";
+    texto.textContent = t(
+      "Para usar a busca híbrida, ative a Busca semântica em Configurações, " +
+        "selecione o modelo bge-m3 e marque Ativar busca semântica.",
+    );
+    corpo.appendChild(texto);
+    handle.body.appendChild(corpo);
+    handle.footer.append(
+      Button({
+        label: t("Abrir Configurações"),
+        variant: "primary",
+        onClick: () => {
+          handle.close();
+          ctx.onNavigate("settings");
+        },
+      }),
+      Button({ label: t("Fechar"), variant: "ghost", onClick: () => handle.close() }),
+    );
+  };
 
   const run = async (query: string) => {
     const termo = query.trim();
@@ -147,15 +177,33 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
         field.input.focus();
       },
     }),
-    Toggle({
-      label: t("Híbrida"),
-      checked: false,
-      tone: "brand",
-      onChange: (ligado) => {
-        hibrida = ligado;
-        if (field.input.value.trim().length >= 2) void run(field.input.value);
-      },
-    }).root,
+    (() => {
+      const toggle = Toggle({
+        label: t("Híbrida"),
+        checked: false,
+        tone: "brand",
+        onChange: (ligado) => {
+          if (ligado && !embeddingReady) {
+            toggle.control.setAttribute("aria-checked", "false");
+            toggle.control.className = toggle.control.className
+              .split(" ")
+              .filter((classe) => !classe.includes("_on"))
+              .join(" ");
+            avisoEmbedding();
+            return;
+          }
+          hibrida = ligado;
+          if (field.input.value.trim().length >= 2) void run(field.input.value);
+        },
+      });
+      if (!embeddingReady) {
+        toggle.root.title = t(
+          "Configure o modelo de embeddings em Configurações → Busca semântica para habilitar.",
+        );
+        toggle.control.style.opacity = "0.55";
+      }
+      return toggle.root;
+    })(),
     summary,
   );
   page.appendChild(actions);

@@ -437,6 +437,13 @@ const EN: Record<string, string> = {
   "modelo de embeddings configurado": "embedding model configured",
   "Indexar embeddings": "Index embeddings",
   Híbrida: "Hybrid",
+  "Busca híbrida indisponível": "Hybrid search unavailable",
+  "Para usar a busca híbrida, ative a Busca semântica em Configurações, selecione o modelo bge-m3 e marque Ativar busca semântica.":
+    "To use hybrid search, enable Semantic search in Settings, select the bge-m3 model and check Enable semantic search.",
+  "Abrir Configurações": "Open Settings",
+  "Configure o modelo de embeddings em Configurações → Busca semântica para habilitar.":
+    "Configure the embedding model in Settings → Semantic search to enable this.",
+
   semântico: "semantic",
   semelhantes: "similar",
   "ocultar semelhantes": "hide similar",
