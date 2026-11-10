@@ -122,7 +122,7 @@ pub fn start(workspace: &Workspace, config: &Config) -> Result<EmbeddingStatus> 
         .stdin(Stdio::null())
         .stdout(Stdio::from(out))
         .stderr(Stdio::from(err));
-    let child = command.spawn().map_err(|erro| {
+    let child = crate::process::spawn(command).map_err(|erro| {
         C2Error::InvalidConfig(format!("falha ao iniciar runtime de embeddings: {erro}"))
     })?;
     write_pid(workspace, child.id())?;
@@ -146,17 +146,23 @@ pub fn stop(workspace: &Workspace) -> Result<bool> {
         return Ok(false);
     };
     #[cfg(windows)]
-    let status = Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/F"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+    let status = {
+        let mut command = Command::new("taskkill");
+        command
+            .args(["/PID", &pid.to_string(), "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        crate::process::status(command)
+    };
     #[cfg(not(windows))]
-    let status = Command::new("kill")
-        .args(["-TERM", &pid.to_string()])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+    let status = {
+        let mut command = Command::new("kill");
+        command
+            .args(["-TERM", &pid.to_string()])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        crate::process::status(command)
+    };
     let _ = fs::remove_file(pid_path(workspace));
     match status {
         Ok(exit) => Ok(exit.success()),
