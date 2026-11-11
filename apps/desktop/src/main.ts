@@ -138,20 +138,23 @@ async function loadStatus(): Promise<void> {
   }
 }
 
-async function pickProject(): Promise<string | null> {
-  const path = await api.pickFolder();
-  if (!path) return null;
+async function abrirProjetoPorCaminho(path: string): Promise<string> {
   state.root = path.replace(/\\/g, "/");
   localStorage.setItem("c2.root", state.root);
   rememberProject(state.root);
   await sincronizarPromptIdioma();
   await loadStatus();
-  // Projeto pronto vai direto para a Engine; sem config ainda, fica em Projetos.
   state.route = state.status?.initialized ? "engine" : "projects";
   autoEngineBloqueado = false;
   render();
   void iniciarEngineAuto();
   return state.root;
+}
+
+async function pickProject(): Promise<string | null> {
+  const path = await api.pickFolder();
+  if (!path) return null;
+  return abrirProjetoPorCaminho(path);
 }
 
 /** Abre o seletor, valida o cabeçalho e grava o modelo no workspace. */
@@ -884,6 +887,9 @@ function subscribeEvents(): void {
     if (state.status?.model.provider === "openai_compat") {
       void avisarFalhaProvedor(String(payload));
     }
+  });
+  onEngineEvent("open-root", (payload) => {
+    if (typeof payload === "string") void abrirProjetoPorCaminho(payload);
   });
   onEngineEvent("engine://stopped", () => {
     state.running = false;

@@ -1530,6 +1530,20 @@ pub fn run() {
         .and_then(|index| args.get(index + 1))
         .cloned();
 
+    // Segunda execucao: nao cria janela, apenas foca a instancia viva.
+    if c2_core::instance::try_focus(root.as_deref().map(Path::new)) {
+        eprintln!("[c2] instancia existente focada; saindo");
+        return;
+    }
+    let primary = match c2_core::instance::claim() {
+        Ok(Some(primary)) => primary,
+        Ok(None) => return,
+        Err(err) => {
+            eprintln!("[c2] single-instance: {err}");
+            return;
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -1607,7 +1621,7 @@ pub fn run() {
                 api.prevent_close();
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
             perf::registrar(app.handle(), "tauri_setup", serde_json::json!({}));
 
             let pt = app
@@ -1677,6 +1691,17 @@ pub fn run() {
                     .build(app)?;
             }
 
+            let handle_foco = app.handle().clone();
+            primary.serve(move |root| {
+                if let Some(janela) = handle_foco.get_webview_window("main") {
+                    let _ = janela.show();
+                    let _ = janela.unminimize();
+                    let _ = janela.set_focus();
+                }
+                if let Some(root) = root {
+                    let _ = handle_foco.emit("open-root", root);
+                }
+            });
             eprintln!("[c2] setup: janela e bandeja prontas");
             Ok(())
         })

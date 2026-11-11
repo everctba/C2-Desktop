@@ -1104,6 +1104,16 @@ fn find_desktop_app() -> Option<PathBuf> {
 /// Abre a janela do C2 no workspace atual (ou na pasta informada).
 fn cmd_open(root: Option<&Path>) -> Result<()> {
     let workspace = resolve_workspace(root)?;
+    if c2_core::instance::try_focus(Some(workspace.root())) {
+        println!(
+            "{}",
+            i18n::t(
+                "C2 Desktop was already open; existing window focused.",
+                "C2 Desktop ja estava aberto; janela existente focada."
+            )
+        );
+        return Ok(());
+    }
     let app = find_desktop_app().ok_or_else(|| {
         anyhow::anyhow!(
             "C2 Desktop nao encontrado. Instale o pacote (instalar.ps1) ou abra a \

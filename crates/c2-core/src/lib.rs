@@ -17,6 +17,7 @@ pub mod gguf;
 pub mod gpu;
 pub mod hash;
 pub mod indexer;
+pub mod instance;
 pub mod links;
 pub mod llm;
 #[cfg(test)]
