@@ -76,7 +76,8 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
 
   const embedStatus = await api.embeddingStatus(ctx.root).catch(() => null);
   const embeddingReady = Boolean(embedStatus?.enabled && embedStatus?.model_path);
-  let hibrida = false;
+  // Com embeddings configurados, a busca nasce em modo hibrido.
+  let hibrida = embeddingReady;
 
   const avisoEmbedding = () => {
     const handle = createDialog({ title: t("Busca híbrida indisponível") });
@@ -180,7 +181,7 @@ export async function renderSearch(ctx: SearchContext): Promise<View> {
     (() => {
       const toggle = Toggle({
         label: t("Híbrida"),
-        checked: false,
+        checked: embeddingReady,
         tone: "brand",
         onChange: (ligado) => {
           if (ligado && !embeddingReady) {
