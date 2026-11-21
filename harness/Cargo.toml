@@ -1,0 +1,19 @@
+[package]
+name = "c2h"
+version = "0.1.0"
+edition = "2021"
+description = "C2 Harness: CLI de contexto e anotacoes por bloco"
+license = "MIT"
+
+[[bin]]
+name = "c2h"
+path = "src/main.rs"
+
+[workspace]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "2", default-features = false, features = ["json"] }
