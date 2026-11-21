@@ -13,16 +13,26 @@ MVP:
 - `validate [arquivo]`
 - `context <arquivo> [--max-chars N]`
 - `ask "<prompt>" [--system TEXT]`
+- `ask --file <arquivo> [--apply] "<tarefa>"`
+- `validate-response <response.json>`
+- `apply <response.json> [--dry-run]`
+- `status`
 - `config`
 
-Ainda não implementado:
+Implementado no MVP:
 
-- contrato completo de resposta + reparo;
-- aplicação de patch;
-- formatter/testes/rollback;
-- extractors AST completos;
+- contrato JSON + validator + reparo (até `--max-repairs`);
+- aplicação de patch com backup e rollback em falha de formatter;
+- `rustfmt` para `.rs`;
+- persistência de W5H2/evidence no sidecar;
+- `C2H_MOCK_RESPONSE` para testar sem API.
+
+Ainda pendente:
+
+- extractors AST completos (hoje heurísticos);
+- testes de projeto configuráveis no gate;
 - streaming;
-- no_path automático no PATH.
+- behavior cloning/embeddings.
 
 ## Provider
 

@@ -43,6 +43,8 @@ enum Command {
     },
     /// Valida sidecar contra o codigo atual
     Validate { file: Option<PathBuf> },
+    /// Mostra o estado dos sidecars do projeto
+    Status,
     /// Mostra o contexto compacto que seria enviado a IA
     Context {
         file: PathBuf,
@@ -54,6 +56,22 @@ enum Command {
         prompt: String,
         #[arg(long)]
         system: Option<String>,
+        /// Inclui o contexto dos blocos deste arquivo e exige contrato JSON
+        #[arg(long)]
+        file: Option<PathBuf>,
+        /// Aplica o patch apos validar
+        #[arg(long)]
+        apply: bool,
+        #[arg(long, default_value_t = 3)]
+        max_repairs: usize,
+    },
+    /// Valida um arquivo de resposta contra o contrato e o sidecar atual
+    ValidateResponse { response: PathBuf },
+    /// Aplica um arquivo de resposta (com dry-run opcional)
+    Apply {
+        response: PathBuf,
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Mostra a configuracao efetiva (sem segredos)
     Config,
@@ -107,6 +125,328 @@ struct Sidecar {
     contract_version: u32,
     file: String,
     blocks: Vec<SidecarBlock>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ResponseEnvelope {
+    contract_version: u32,
+    changes: Vec<Change>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Change {
+    file: String,
+    block_id: String,
+    action: String,
+    #[serde(default)]
+    new_code: String,
+    #[serde(default)]
+    w5h2: W5h2,
+    #[serde(default)]
+    evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct Violation {
+    code: String,
+    severity: String,
+    block_id: Option<String>,
+    msg: String,
+    fix: String,
+}
+
+fn safe_rel(file: &str) -> bool {
+    let path = Path::new(file);
+    !path.is_absolute()
+        && !file.contains('\\')
+        && !path.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir | std::path::Component::RootDir
+            )
+        })
+}
+
+fn contract_system() -> &'static str {
+    r#"Voce e um agente de codigo do C2 Harness.
+
+Responda APENAS JSON valido, sem markdown, no formato:
+{"contract_version":1,"changes":[{"file":"...","block_id":"...","action":"update|create|delete","new_code":"...","w5h2":{"what":"...","why":"...","when":"...","where":"...","who":"...","how":"...","how_much":"..."},"evidence":["arquivo:linha"]}]}
+
+Regras:
+- block_id deve existir no sidecar para update/delete;
+- new_code obrigatorio para create/update;
+- w5h2 deve ser curto e baseado em evidencia;
+- nao escreva created_at/updated_at/timestamp;
+- nao invente arquivo, block_id ou evidencia;
+- nao altere testes para passar;
+- nada de comandos shell;
+- use unknown quando nao souber."#
+}
+
+fn extrair_json(texto: &str) -> Result<ResponseEnvelope, String> {
+    let limpo = texto
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+    let inicio = limpo
+        .find('{')
+        .ok_or_else(|| "resposta sem JSON".to_string())?;
+    let fim = limpo
+        .rfind('}')
+        .ok_or_else(|| "JSON incompleto".to_string())?;
+    serde_json::from_str(&limpo[inicio..=fim]).map_err(|e| format!("JSON invalido: {e}"))
+}
+
+fn validar_resposta(raiz: &Path, resposta: &ResponseEnvelope) -> Vec<Violation> {
+    let mut v = Vec::new();
+    let mut erro = |code: &str, block: Option<&str>, msg: &str, fix: &str| {
+        v.push(Violation {
+            code: code.to_string(),
+            severity: "error".to_string(),
+            block_id: block.map(|s| s.to_string()),
+            msg: msg.to_string(),
+            fix: fix.to_string(),
+        });
+    };
+    if resposta.contract_version != CONTRACT_VERSION {
+        erro(
+            "E-SCHEMA-01",
+            None,
+            "contract_version incompativel",
+            "use contract_version 1",
+        );
+    }
+    if resposta.changes.is_empty() {
+        erro(
+            "E-SCHEMA-02",
+            None,
+            "changes vazio",
+            "inclua pelo menos uma mudanca",
+        );
+    }
+    for change in &resposta.changes {
+        if !safe_rel(&change.file) {
+            erro(
+                "E-PATH-01",
+                Some(&change.block_id),
+                "caminho invalido",
+                "use caminho relativo dentro do projeto",
+            );
+            continue;
+        }
+        let file = raiz.join(&change.file);
+        if !file.is_file() && change.action != "create" {
+            erro(
+                "E-FILE-01",
+                Some(&change.block_id),
+                "arquivo nao existe",
+                "corrija o caminho ou use action=create",
+            );
+            continue;
+        }
+        if !matches!(change.action.as_str(), "update" | "create" | "delete") {
+            erro(
+                "E-ACTION-01",
+                Some(&change.block_id),
+                "action invalida",
+                "use update/create/delete",
+            );
+        }
+        if change.action != "delete" && change.new_code.trim().is_empty() {
+            erro(
+                "E-CODE-01",
+                Some(&change.block_id),
+                "new_code vazio",
+                "retorne o codigo do bloco",
+            );
+        }
+        if change.action != "create" {
+            let side = ler_sidecar(Path::new(&change.file));
+            let existe = side
+                .as_ref()
+                .map(|s| s.blocks.iter().any(|b| b.id == change.block_id))
+                .unwrap_or(false);
+            if !existe {
+                erro(
+                    "E-BLOCK-01",
+                    Some(&change.block_id),
+                    "block_id desconhecido no sidecar",
+                    "use um block_id retornado por c2h blocks/annotate",
+                );
+            }
+        }
+        if change.w5h2.what.trim().is_empty() && change.w5h2.why.trim().is_empty() {
+            erro(
+                "E-W5H2-01",
+                Some(&change.block_id),
+                "w5h2 sem what/why",
+                "preencha what e why (ou unknown com evidencia)",
+            );
+        }
+        for ev in &change.evidence {
+            let caminho = ev.split(':').next().unwrap_or(ev);
+            if !raiz.join(caminho).exists() {
+                erro(
+                    "E-EVID-01",
+                    Some(&change.block_id),
+                    "evidencia nao existe",
+                    "use arquivo:linha existente",
+                );
+            }
+        }
+    }
+    v
+}
+
+fn montar_contexto(file: &Path) -> Result<String, String> {
+    let (_, blocos) = carregar_arquivo(file)?;
+    let side = ler_sidecar(file);
+    let mut texto = format!("ARQUIVO ALVO: {}\n", rel_file(file));
+    if let Some(side) = &side {
+        for b in &side.blocks {
+            texto.push_str(&format!(
+                "\nBLOCO: {}\nwhat: {}\nwhy: {}\nupdated_at: {}\nsemantic_hash: {}\n",
+                b.id, b.w5h2.what, b.w5h2.why, b.updated_at, b.semantic_hash
+            ));
+        }
+    } else {
+        for b in &blocos {
+            texto.push_str(&format!(
+                "\nBLOCO: {} (linhas {}-{})\n",
+                b.id, b.start_line, b.end_line
+            ));
+        }
+    }
+    Ok(texto)
+}
+
+fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
+    if let Ok(mock) = env::var("C2H_MOCK_RESPONSE") {
+        return Ok(mock);
+    }
+    let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
+    let body = serde_json::json!({
+        "model": model(),
+        "messages": [
+            {"role":"system","content":system},
+            {"role":"user","content":user}
+        ],
+        "temperature": 0.1,
+        "stream": false
+    });
+    let url = format!("{}/chat/completions", base_url().trim_end_matches('/'));
+    let resposta = ureq::post(&url)
+        .set("Authorization", &format!("Bearer {key}"))
+        .set("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(120))
+        .send_json(body)
+        .map_err(|e| format!("provider: {e}"))?;
+    let json: serde_json::Value = resposta.into_json().map_err(|e| format!("json: {e}"))?;
+    json.pointer("/choices/0/message/content")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "resposta sem choices[0].message.content".to_string())
+}
+
+fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> Result<(), String> {
+    let violacoes = validar_resposta(raiz, envelope);
+    if !violacoes.is_empty() {
+        return Err(serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?);
+    }
+    // agrupa por arquivo e aplica de baixo para cima
+    let mut por_arquivo: BTreeMap<String, Vec<&Change>> = BTreeMap::new();
+    for c in &envelope.changes {
+        por_arquivo.entry(c.file.clone()).or_default().push(c);
+    }
+    for (arquivo, changes) in por_arquivo {
+        let path = raiz.join(&arquivo);
+        let original = fs::read_to_string(&path).unwrap_or_default();
+        let mut linhas: Vec<String> = original.lines().map(|l| l.to_string()).collect();
+        let (_, blocos) = carregar_arquivo(Path::new(&arquivo))?;
+        let mut ordenadas: Vec<_> = changes
+            .iter()
+            .filter_map(|c| {
+                let b = blocos.iter().find(|b| b.id == c.block_id)?;
+                Some((b.start_line, b.end_line, *c))
+            })
+            .collect();
+        ordenadas.sort_by_key(|(inicio, _, _)| std::cmp::Reverse(*inicio));
+        for (inicio, fim, change) in ordenadas {
+            let start = inicio.saturating_sub(1);
+            let end = fim.min(linhas.len());
+            match change.action.as_str() {
+                "delete" => {
+                    linhas.drain(start..end);
+                }
+                "update" => {
+                    let novos: Vec<String> =
+                        change.new_code.lines().map(|l| l.to_string()).collect();
+                    linhas.splice(start..end, novos);
+                }
+                "create" => {
+                    linhas.extend(change.new_code.lines().map(|l| l.to_string()));
+                }
+                _ => {}
+            }
+        }
+        let novo = linhas.join("\n") + "\n";
+        if dry_run {
+            let qtd = envelope
+                .changes
+                .iter()
+                .filter(|c| c.file == arquivo)
+                .count();
+            println!("dry-run {}: {} mudancas", arquivo, qtd);
+        } else {
+            let backup = format!("{}.c2h.bak", path.display());
+            fs::copy(&path, &backup).map_err(|e| format!("backup: {e}"))?;
+            fs::write(&path, &novo).map_err(|e| format!("gravar {}: {e}", path.display()))?;
+            if let Err(erro) = rodar_formatter(&path) {
+                let _ = fs::copy(&backup, &path);
+                let _ = fs::remove_file(&backup);
+                return Err(format!("formatter falhou; rollback: {erro}"));
+            }
+            let _ = fs::remove_file(&backup);
+            cmd_annotate(Path::new(&arquivo), false)?;
+            atualizar_anotacoes(Path::new(&arquivo), &changes)?;
+        }
+    }
+    Ok(())
+}
+
+fn atualizar_anotacoes(file: &Path, changes: &[&Change]) -> Result<(), String> {
+    let Some(mut sidecar) = ler_sidecar(file) else {
+        return Ok(());
+    };
+    for change in changes {
+        if let Some(bloco) = sidecar.blocks.iter_mut().find(|b| b.id == change.block_id) {
+            if !change.w5h2.what.trim().is_empty() || !change.w5h2.why.trim().is_empty() {
+                bloco.w5h2 = change.w5h2.clone();
+            }
+            if !change.evidence.is_empty() {
+                bloco.evidence = change.evidence.clone();
+            }
+        }
+    }
+    escrever_sidecar(file, &sidecar)
+}
+
+fn rodar_formatter(path: &Path) -> Result<(), String> {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("rs") => {
+            let status = std::process::Command::new("rustfmt")
+                .args(["--edition", "2021", path.to_string_lossy().as_ref()])
+                .status();
+            match status {
+                Ok(s) if s.success() => Ok(()),
+                Ok(s) => Err(format!("rustfmt exit {s}")),
+                Err(e) => Err(format!("rustfmt indisponivel: {e}")),
+            }
+        }
+        _ => Ok(()),
+    }
 }
 
 fn agora_iso() -> String {
@@ -576,6 +916,33 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
     Ok(())
 }
 
+fn cmd_status() -> Result<(), String> {
+    let dir = Path::new(".c2h/blocks");
+    if !dir.is_dir() {
+        println!("sem sidecars em .c2h/blocks");
+        return Ok(());
+    }
+    let mut total = 0usize;
+    let mut arquivos = 0usize;
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(texto) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(sidecar) = serde_json::from_str::<Sidecar>(&texto) else {
+            continue;
+        };
+        arquivos += 1;
+        total += sidecar.blocks.len();
+    }
+    println!("arquivos: {arquivos}");
+    println!("blocos: {total}");
+    Ok(())
+}
+
 fn cmd_validate(file: Option<&Path>) -> Result<(), String> {
     let arquivos: Vec<PathBuf> = match file {
         Some(path) => vec![path.to_path_buf()],
@@ -673,34 +1040,96 @@ fn model() -> String {
     env::var("C2H_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string())
 }
 
-fn cmd_ask(prompt: &str, system: Option<&str>) -> Result<(), String> {
-    let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
-    let system = system.unwrap_or(
-        "Voce e um agente de codigo. Responda em JSON quando o harness pedir contrato; nao invente arquivos ou IDs.",
-    );
-    let body = serde_json::json!({
-        "model": model(),
-        "messages": [
-            {"role":"system","content":system},
-            {"role":"user","content":prompt}
-        ],
-        "temperature": 0.1,
-        "stream": false
-    });
-    let url = format!("{}/chat/completions", base_url().trim_end_matches('/'));
-    let resposta = ureq::post(&url)
-        .set("Authorization", &format!("Bearer {key}"))
-        .set("Content-Type", "application/json")
-        .timeout(std::time::Duration::from_secs(120))
-        .send_json(body)
-        .map_err(|e| format!("provider: {e}"))?;
-    let json: serde_json::Value = resposta.into_json().map_err(|e| format!("json: {e}"))?;
-    let content = json
-        .pointer("/choices/0/message/content")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "resposta sem choices[0].message.content".to_string())?;
-    println!("{content}");
+fn cmd_ask(
+    prompt: &str,
+    system: Option<&str>,
+    file: Option<&Path>,
+    apply: bool,
+    max_repairs: usize,
+) -> Result<(), String> {
+    if let Some(file) = file {
+        if apply {
+            return cmd_ask_contract(prompt, file, max_repairs);
+        }
+        let contexto = montar_contexto(file)?;
+        let system_eff: &str = match system {
+            Some(valor) => valor,
+            None => contract_system(),
+        };
+        let user = format!("{prompt}\n\nCONTEXTO:\n{contexto}");
+        println!("{}", chamar_provider(system_eff, &user)?);
+        return Ok(());
+    }
+    let system = system
+        .unwrap_or("Voce e um agente de codigo. Responda de forma curta e nao invente arquivos.");
+    println!("{}", chamar_provider(system, prompt)?);
     Ok(())
+}
+
+fn cmd_ask_contract(prompt: &str, file: &Path, max_repairs: usize) -> Result<(), String> {
+    let contexto = montar_contexto(file)?;
+    let mut system = contract_system().to_string();
+    let mut user = format!("{prompt}\n\nCONTEXTO:\n{contexto}");
+    let mut ultimo_erro = String::new();
+    for tentativa in 0..=max_repairs {
+        let resposta = chamar_provider(&system, &user)?;
+        match extrair_json(&resposta) {
+            Ok(envelope) => {
+                let violacoes = validar_resposta(Path::new("."), &envelope);
+                if violacoes.is_empty() {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&envelope).map_err(|e| e.to_string())?
+                    );
+                    return aplicar_envelope(Path::new("."), &envelope, false);
+                }
+                ultimo_erro =
+                    serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?;
+                if tentativa == max_repairs {
+                    break;
+                }
+                system = format!(
+                    "{}\n\nA resposta anterior foi rejeitada. Corrija apenas as violacoes e devolva o envelope completo.",
+                    contract_system()
+                );
+                user = format!(
+                    "TAREFA ORIGINAL:\n{prompt}\n\nVIOLATIONS:\n{ultimo_erro}\n\nRESPOSTA ANTERIOR:\n{resposta}"
+                );
+            }
+            Err(erro) => {
+                ultimo_erro = erro.clone();
+                if tentativa == max_repairs {
+                    break;
+                }
+                user = format!(
+                    "TAREFA ORIGINAL:\n{prompt}\n\nERRO DE FORMATO: {erro}\n\nDevolva APENAS JSON valido no contrato."
+                );
+            }
+        }
+    }
+    Err(format!("contrato nao convergiu: {ultimo_erro}"))
+}
+
+fn cmd_validate_response(response: &Path) -> Result<(), String> {
+    let texto = fs::read_to_string(response).map_err(|e| format!("ler resposta: {e}"))?;
+    let envelope = extrair_json(&texto)?;
+    let violacoes = validar_resposta(Path::new("."), &envelope);
+    if violacoes.is_empty() {
+        println!("ok");
+        Ok(())
+    } else {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?
+        );
+        Err("contrato invalido".to_string())
+    }
+}
+
+fn cmd_apply(response: &Path, dry_run: bool) -> Result<(), String> {
+    let texto = fs::read_to_string(response).map_err(|e| format!("ler resposta: {e}"))?;
+    let envelope = extrair_json(&texto)?;
+    aplicar_envelope(Path::new("."), &envelope, dry_run)
 }
 
 fn cmd_config() {
@@ -738,6 +1167,68 @@ mod tests {
     }
 
     #[test]
+    fn extrai_json_de_fence() {
+        let env = extrair_json("```json\n{\"contract_version\":1,\"changes\":[]}\n```").unwrap();
+        assert_eq!(env.contract_version, 1);
+    }
+
+    #[test]
+    fn rejeita_path_traversal() {
+        let env = ResponseEnvelope {
+            contract_version: 1,
+            changes: vec![Change {
+                file: "../fora.rs".to_string(),
+                block_id: "x".to_string(),
+                action: "update".to_string(),
+                new_code: "fn x() {}".to_string(),
+                w5h2: W5h2::default(),
+                evidence: vec![],
+            }],
+        };
+        let violacoes = validar_resposta(Path::new("."), &env);
+        assert!(violacoes.iter().any(|v| v.code == "E-PATH-01"));
+    }
+
+    #[test]
+    fn aplica_update_no_bloco_e_gera_backup() {
+        let dir = std::env::temp_dir().join(format!(
+            "c2h-apply-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let anterior = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        std::fs::write("a.rs", "fn a() {\n    let x = 1;\n}\n").unwrap();
+        cmd_annotate(Path::new("a.rs"), false).unwrap();
+        let env = ResponseEnvelope {
+            contract_version: 1,
+            changes: vec![Change {
+                file: "a.rs".to_string(),
+                block_id: "a.rs::fn::a".to_string(),
+                action: "update".to_string(),
+                new_code: "fn a() {\n    let x = 2;\n}\n".to_string(),
+                w5h2: W5h2 {
+                    what: "atualiza x".to_string(),
+                    why: "teste".to_string(),
+                    ..W5h2::default()
+                },
+                evidence: vec!["a.rs:1".to_string()],
+            }],
+        };
+        aplicar_envelope(Path::new("."), &env, false).unwrap();
+        let texto = std::fs::read_to_string("a.rs").unwrap();
+        assert!(texto.contains("let x = 2"));
+        let side = ler_sidecar(Path::new("a.rs")).unwrap();
+        assert_eq!(side.blocks[0].w5h2.what, "atualiza x");
+        std::env::set_current_dir(anterior).unwrap();
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
     fn extrai_section_html() {
         let blocos = extrair_blocos(
             Path::new("x.html"),
@@ -755,8 +1246,23 @@ fn main() {
         Command::Blocks { file } => cmd_blocks(file, cli.json),
         Command::Annotate { file, dry_run } => cmd_annotate(file, *dry_run),
         Command::Validate { file } => cmd_validate(file.as_deref()),
+        Command::Status => cmd_status(),
         Command::Context { file, max_chars } => cmd_context(file, *max_chars),
-        Command::Ask { prompt, system } => cmd_ask(prompt, system.as_deref()),
+        Command::Ask {
+            prompt,
+            system,
+            file,
+            apply,
+            max_repairs,
+        } => cmd_ask(
+            prompt,
+            system.as_deref(),
+            file.as_deref(),
+            *apply,
+            *max_repairs,
+        ),
+        Command::ValidateResponse { response } => cmd_validate_response(response),
+        Command::Apply { response, dry_run } => cmd_apply(response, *dry_run),
         Command::Config => {
             cmd_config();
             Ok(())
