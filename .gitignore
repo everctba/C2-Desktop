@@ -9,6 +9,8 @@
 /harness/target/
 /harness/no_path/*.exe
 /harness/.c2h/
+/harness/lab/target/
+/harness/lab/.taskline.json
 
 # workspace C2 (estado e logs; a config e versionada)
 /.c2/logs/

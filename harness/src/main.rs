@@ -6,7 +6,10 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
 use tree_sitter::{Node, Parser as TsParser};
 
@@ -26,6 +29,9 @@ const CONTRACT_VERSION: u32 = 1;
 struct Cli {
     #[arg(long, global = true)]
     json: bool,
+    /// Timeline de debug em .c2h/logs
+    #[arg(long, global = true)]
+    debug: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -74,6 +80,16 @@ enum Command {
         response: PathBuf,
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Mostra os ultimos eventos da timeline de debug
+    Logs {
+        #[arg(long, default_value_t = 40)]
+        limit: usize,
+    },
+    /// Fuzzing deterministico do parser/validator de contrato
+    Fuzz {
+        #[arg(long, default_value_t = 500)]
+        iters: usize,
     },
     /// Mostra a configuracao efetiva (sem segredos)
     Config,
@@ -337,7 +353,15 @@ fn montar_contexto(file: &Path) -> Result<String, String> {
 }
 
 fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
+    log_evento(
+        "provider_request",
+        serde_json::json!({"model": model(), "system_chars": system.len(), "user_chars": user.len()}),
+    );
     if let Ok(mock) = env::var("C2H_MOCK_RESPONSE") {
+        log_evento(
+            "provider_mock",
+            serde_json::json!({"response_chars": mock.len()}),
+        );
         return Ok(mock);
     }
     let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
@@ -358,13 +382,23 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
         .send_json(body)
         .map_err(|e| format!("provider: {e}"))?;
     let json: serde_json::Value = resposta.into_json().map_err(|e| format!("json: {e}"))?;
-    json.pointer("/choices/0/message/content")
+    let content = json
+        .pointer("/choices/0/message/content")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| "resposta sem choices[0].message.content".to_string())
+        .ok_or_else(|| "resposta sem choices[0].message.content".to_string())?;
+    log_evento(
+        "provider_response",
+        serde_json::json!({"chars": content.len()}),
+    );
+    Ok(content)
 }
 
 fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> Result<(), String> {
+    log_evento(
+        "apply_start",
+        serde_json::json!({"changes": envelope.changes.len(), "dry_run": dry_run}),
+    );
     let violacoes = validar_resposta(raiz, envelope);
     if !violacoes.is_empty() {
         return Err(serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?);
@@ -418,7 +452,15 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
             fs::copy(&path, &backup).map_err(|e| format!("backup: {e}"))?;
             backups.push((path.clone(), PathBuf::from(backup)));
             fs::write(&path, &novo).map_err(|e| format!("gravar {}: {e}", path.display()))?;
+            log_evento(
+                "apply_write",
+                serde_json::json!({"file": arquivo, "chars": novo.len()}),
+            );
             if let Err(erro) = rodar_formatter(&path) {
+                log_evento(
+                    "formatter_fail",
+                    serde_json::json!({"file": arquivo, "error": erro}),
+                );
                 restaurar_backups(&backups);
                 return Err(format!("formatter falhou; rollback: {erro}"));
             }
@@ -426,9 +468,14 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
     }
     if !dry_run {
         if let Err(erro) = rodar_testes() {
+            log_evento("test_gate_fail", serde_json::json!({"error": erro}));
             restaurar_backups(&backups);
             return Err(erro);
         }
+        log_evento(
+            "test_gate_ok",
+            serde_json::json!({"files": por_arquivo.len()}),
+        );
         for (arquivo, changes) in &por_arquivo {
             cmd_annotate(Path::new(arquivo), false)?;
             atualizar_anotacoes(Path::new(arquivo), changes)?;
@@ -802,9 +849,15 @@ fn extrair_html(conteudo: &str) -> Vec<Block> {
     let mut out = Vec::new();
     for (i, linha) in linhas.iter().enumerate() {
         let t = linha.trim();
-        if !(t.starts_with("<section") || t.contains("data-c2-block")) {
+        if !t.starts_with('<') || !(t.starts_with("<section") || t.contains("data-c2-block")) {
             continue;
         }
+        let tag = t
+            .trim_start_matches('<')
+            .split(|c: char| c.is_whitespace() || c == '>')
+            .next()
+            .unwrap_or("div")
+            .to_string();
         let nome = t
             .split("data-c2-block=\"")
             .nth(1)
@@ -812,11 +865,13 @@ fn extrair_html(conteudo: &str) -> Vec<Block> {
             .or_else(|| t.split("id=\"").nth(1).and_then(|x| x.split('"').next()))
             .unwrap_or("anon")
             .to_string();
+        let abre = format!("<{tag}");
+        let fecha = format!("</{tag}>");
         let mut prof = 0i32;
         let mut fim = i + 1;
         for (j, l) in linhas.iter().enumerate().skip(i) {
-            prof += l.matches("<section").count() as i32;
-            prof -= l.matches("</section>").count() as i32;
+            prof += l.matches(&abre).count() as i32;
+            prof -= l.matches(&fecha).count() as i32;
             fim = j + 1;
             if prof <= 0 && j > i {
                 break;
@@ -938,6 +993,125 @@ fn carregar_arquivo(file: &Path) -> Result<(String, Vec<Block>), String> {
     Ok((conteudo, blocos))
 }
 
+static DEBUG_ATIVO: AtomicBool = AtomicBool::new(false);
+static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+fn iniciar_debug(flag: bool) {
+    let env_flag = env::var("C2H_DEBUG")
+        .map(|v| v == "1" || v == "true")
+        .unwrap_or(false);
+    if !(flag || env_flag) {
+        return;
+    }
+    DEBUG_ATIVO.store(true, Ordering::Relaxed);
+    let dir = Path::new(".c2h/logs");
+    if fs::create_dir_all(dir).is_ok() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let path = dir.join(format!("run-{stamp}-{}.jsonl", std::process::id()));
+        let _ = LOG_PATH.set(path);
+    }
+}
+
+fn log_evento(evento: &str, dados: serde_json::Value) {
+    if !DEBUG_ATIVO.load(Ordering::Relaxed) {
+        return;
+    }
+    let Some(path) = LOG_PATH.get() else {
+        return;
+    };
+    let linha = serde_json::json!({
+        "ts": agora_iso(),
+        "event": evento,
+        "data": dados,
+    });
+    if let Ok(mut arquivo) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(arquivo, "{linha}");
+    }
+}
+
+fn cmd_logs(limit: usize) -> Result<(), String> {
+    let dir = Path::new(".c2h/logs");
+    if !dir.is_dir() {
+        println!("sem logs em .c2h/logs");
+        return Ok(());
+    }
+    let mut arquivos: Vec<PathBuf> = fs::read_dir(dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
+    arquivos.sort();
+    let Some(ultimo) = arquivos.last() else {
+        println!("sem logs");
+        return Ok(());
+    };
+    let texto = fs::read_to_string(ultimo).map_err(|e| e.to_string())?;
+    let linhas: Vec<&str> = texto.lines().collect();
+    let inicio = linhas.len().saturating_sub(limit);
+    for linha in &linhas[inicio..] {
+        println!("{linha}");
+    }
+    Ok(())
+}
+
+fn cmd_fuzz(iters: usize) -> Result<(), String> {
+    let mut estado = 0x9E3779B97F4A7C15u64;
+    let mut ok = 0usize;
+    let mut rejeitados = 0usize;
+    for i in 0..iters {
+        estado ^= estado << 13;
+        estado ^= estado >> 7;
+        estado ^= estado << 17;
+        let escolha = estado % 8;
+        let payload = match escolha {
+            0 => "{}".to_string(),
+            1 => "{\"contract_version\":1}".to_string(),
+            2 => "{\"contract_version\":1,\"changes\":[]}".to_string(),
+            3 => "{\"contract_version\":1,\"changes\":[{\"file\":\"../x\",\"block_id\":\"x\",\"action\":\"update\",\"new_code\":\"x\"}]}".to_string(),
+            4 => format!("{{\"contract_version\":1,\"changes\":[{{\"file\":\"a.rs\",\"block_id\":\"x{},", estado),
+            5 => "```json\n{\"contract_version\":1,\"changes\":[]}\n```".to_string(),
+            6 => format!("{{\"contract_version\":{},\"changes\":[]}}", estado % 4),
+            _ => "not json at all".to_string(),
+        };
+        match extrair_json(&payload) {
+            Ok(envelope) => {
+                ok += 1;
+                let violacoes = validar_resposta(Path::new("."), &envelope);
+                if violacoes.is_empty() {
+                    log_evento("fuzz_ok", serde_json::json!({"i": i}));
+                }
+            }
+            Err(_) => rejeitados += 1,
+        }
+    }
+    log_evento(
+        "fuzz_end",
+        serde_json::json!({"iters": iters, "ok": ok, "rejeitados": rejeitados}),
+    );
+    println!("iters={iters} ok={ok} rejeitados={rejeitados}");
+    Ok(())
+}
+
+fn nome_comando(command: &Command) -> &'static str {
+    match command {
+        Command::Doctor => "doctor",
+        Command::Blocks { .. } => "blocks",
+        Command::Annotate { .. } => "annotate",
+        Command::Validate { .. } => "validate",
+        Command::Status => "status",
+        Command::Context { .. } => "context",
+        Command::Ask { .. } => "ask",
+        Command::ValidateResponse { .. } => "validate_response",
+        Command::Apply { .. } => "apply",
+        Command::Logs { .. } => "logs",
+        Command::Fuzz { .. } => "fuzz",
+        Command::Config => "config",
+    }
+}
+
 fn cmd_doctor() -> Result<(), String> {
     println!("c2h {}", env!("CARGO_PKG_VERSION"));
     println!(
@@ -1030,6 +1204,10 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
         );
     } else {
         escrever_sidecar(file, &sidecar)?;
+        log_evento(
+            "annotate",
+            serde_json::json!({"file": rel_file(file), "blocks": sidecar.blocks.len()}),
+        );
         println!("sidecar: {}", sidecar_path(file).display());
         println!("blocos: {}", sidecar.blocks.len());
     }
@@ -1192,6 +1370,10 @@ fn cmd_ask_contract(prompt: &str, file: &Path, max_repairs: usize) -> Result<(),
     let mut user = format!("{prompt}\n\nCONTEXTO:\n{contexto}");
     let mut ultimo_erro = String::new();
     for tentativa in 0..=max_repairs {
+        log_evento(
+            "contract_attempt",
+            serde_json::json!({"attempt": tentativa}),
+        );
         let resposta = chamar_provider(&system, &user)?;
         match extrair_json(&resposta) {
             Ok(envelope) => {
@@ -1217,6 +1399,10 @@ fn cmd_ask_contract(prompt: &str, file: &Path, max_repairs: usize) -> Result<(),
                 );
             }
             Err(erro) => {
+                log_evento(
+                    "contract_parse_error",
+                    serde_json::json!({"attempt": tentativa, "error": erro}),
+                );
                 ultimo_erro = erro.clone();
                 if tentativa == max_repairs {
                     break;
@@ -1361,6 +1547,11 @@ mod tests {
 
 fn main() {
     let cli = Cli::parse();
+    iniciar_debug(cli.debug);
+    log_evento(
+        "run_start",
+        serde_json::json!({"command": nome_comando(&cli.command)}),
+    );
     let resultado = match &cli.command {
         Command::Doctor => cmd_doctor(),
         Command::Blocks { file } => cmd_blocks(file, cli.json),
@@ -1383,6 +1574,8 @@ fn main() {
         ),
         Command::ValidateResponse { response } => cmd_validate_response(response),
         Command::Apply { response, dry_run } => cmd_apply(response, *dry_run),
+        Command::Logs { limit } => cmd_logs(*limit),
+        Command::Fuzz { iters } => cmd_fuzz(*iters),
         Command::Config => {
             cmd_config();
             Ok(())

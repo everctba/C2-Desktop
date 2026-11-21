@@ -17,6 +17,8 @@ MVP:
 - `validate-response <response.json>`
 - `apply <response.json> [--dry-run]`
 - `status`
+- `logs [--limit N]`
+- `fuzz [--iters N]`
 - `config`
 
 Implementado no MVP:
@@ -67,6 +69,46 @@ Cada bloco tem:
 - `evidence`.
 
 O harness é dono do timestamp e do hash. A IA não escreve timestamp.
+
+## Debug timeline
+
+```bash
+c2h --debug ask --file src/a.rs --apply "..."
+c2h logs --limit 40
+```
+
+Grava `.c2h/logs/run-<timestamp>-<pid>.jsonl` com eventos:
+
+```text
+run_start, contract_attempt, provider_request, provider_mock,
+contract_violations, contract_parse_error, apply_start, apply_write,
+formatter_fail, test_gate_ok, test_gate_fail, annotate
+```
+
+O conteúdo do prompt não é gravado; só tamanhos, códigos e métricas. Use
+`C2H_DEBUG=1` em vez de `--debug` para ativar por ambiente.
+
+## Fuzz
+
+```bash
+c2h fuzz --iters 1000
+```
+
+Gera envelopes válidos, incompletos, truncados, com path traversal e lixo.
+Não aplica patch: testa parser e validator contra panic.
+
+## Laboratório
+
+`lab/` é um projeto pequeno com um teste que falha de propósito:
+
+```bash
+cd lab
+c2h annotate src/store.rs
+c2h ask --file src/store.rs --apply "corrija titulo vazio e faca o teste passar"
+C2H_TEST_CMD="cargo test" c2h apply resposta.json
+```
+
+Ele tem Rust, Python e HTML one-page para exercitar extractors e blocos.
 
 ## Build no_path
 
