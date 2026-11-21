@@ -1,0 +1,101 @@
+Como o harness descobre blocos
+Ele usa um block extractor por tipo de arquivo:
+
+Code block
+
+
+.rs      → funções, impls, structs, módulos
+.py      → funções, classes, métodos
+.ts/.tsx → funções, componentes, classes
+.html    → sections, custom elements, data-c2-block, scripts
+.css     → rule sets / seletores
+.md      → headings
+
+
+
+Exemplo prático no one-page
+html
+
+
+<section id="hero" data-c2-block="hero">...</section>
+<section id="features" data-c2-block="features">...</section>
+<section id="pricing" data-c2-block="pricing">...</section>
+Se só pricing mudou:
+
+Code block
+
+
+hero      updated_at antigo
+features  updated_at antigo
+pricing   updated_at agora
+O arquivo inteiro mudou, mas só um bloco teve timestamp novo.
+
+
+
+E o JavaScript dentro da página?
+Separe por tipo:
+
+Code block
+
+
+HTML block: section#pricing
+JS block:   script#pricing::function atualizarPreco
+CSS block:  css rule .pricing-card
+Um script inline também pode ser um bloco próprio. O harness não deve tratar o arquivo HTML inteiro como um único hash.
+
+
+
+
+O sidecar contém os blocos:
+
+json
+
+
+[
+  {
+    "block_id": "page.html::section#hero",
+    "kind": "html-section",
+    "created_at": "...",
+    "updated_at": "...",
+    "semantic_hash": "sha256:...",
+    "w5h2": {}
+  },
+  {
+    "block_id": "page.html::section#pricing",
+    "kind": "html-section",
+    "created_at": "...",
+    "updated_at": "...",
+    "semantic_hash": "sha256:...",
+    "w5h2": {}
+  }
+]
+
+
+
+
+Um bloco pode ter dois hashes:
+
+Code block
+
+
+direct_hash     o próprio bloco mudou
+context_hash    uma dependência mudou
+Exemplo: mudou o CSS .pricing-card. O bloco pricing não foi editado, mas o contexto visual mudou. Você pode marcar:
+
+json
+
+
+{
+  "updated_at": "...",
+  "reason": "context_changed",
+  "dependency": "css:.pricing-card"
+}
+Isso evita dizer que o HTML mudou quando só a dependência mudou.
+
+
+
+
+
+
+
+
