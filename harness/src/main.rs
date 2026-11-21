@@ -8,6 +8,8 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use tree_sitter::{Node, Parser as TsParser};
+
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -319,6 +321,18 @@ fn montar_contexto(file: &Path) -> Result<String, String> {
             ));
         }
     }
+    if let Ok(saida) = std::process::Command::new("git")
+        .args(["diff", "--", &rel_file(file)])
+        .output()
+    {
+        if saida.status.success() {
+            let diff = String::from_utf8_lossy(&saida.stdout);
+            if !diff.trim().is_empty() {
+                texto.push_str("\nDIFF DESDE O ULTIMO COMMIT:\n");
+                texto.push_str(&diff);
+            }
+        }
+    }
     Ok(texto)
 }
 
@@ -355,16 +369,16 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
     if !violacoes.is_empty() {
         return Err(serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?);
     }
-    // agrupa por arquivo e aplica de baixo para cima
     let mut por_arquivo: BTreeMap<String, Vec<&Change>> = BTreeMap::new();
     for c in &envelope.changes {
         por_arquivo.entry(c.file.clone()).or_default().push(c);
     }
-    for (arquivo, changes) in por_arquivo {
-        let path = raiz.join(&arquivo);
+    let mut backups: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (arquivo, changes) in &por_arquivo {
+        let path = raiz.join(arquivo);
         let original = fs::read_to_string(&path).unwrap_or_default();
         let mut linhas: Vec<String> = original.lines().map(|l| l.to_string()).collect();
-        let (_, blocos) = carregar_arquivo(Path::new(&arquivo))?;
+        let (_, blocos) = carregar_arquivo(Path::new(arquivo))?;
         let mut ordenadas: Vec<_> = changes
             .iter()
             .filter_map(|c| {
@@ -396,24 +410,70 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
             let qtd = envelope
                 .changes
                 .iter()
-                .filter(|c| c.file == arquivo)
+                .filter(|c| &c.file == arquivo)
                 .count();
             println!("dry-run {}: {} mudancas", arquivo, qtd);
         } else {
             let backup = format!("{}.c2h.bak", path.display());
             fs::copy(&path, &backup).map_err(|e| format!("backup: {e}"))?;
+            backups.push((path.clone(), PathBuf::from(backup)));
             fs::write(&path, &novo).map_err(|e| format!("gravar {}: {e}", path.display()))?;
             if let Err(erro) = rodar_formatter(&path) {
-                let _ = fs::copy(&backup, &path);
-                let _ = fs::remove_file(&backup);
+                restaurar_backups(&backups);
                 return Err(format!("formatter falhou; rollback: {erro}"));
             }
-            let _ = fs::remove_file(&backup);
-            cmd_annotate(Path::new(&arquivo), false)?;
-            atualizar_anotacoes(Path::new(&arquivo), &changes)?;
+        }
+    }
+    if !dry_run {
+        if let Err(erro) = rodar_testes() {
+            restaurar_backups(&backups);
+            return Err(erro);
+        }
+        for (arquivo, changes) in &por_arquivo {
+            cmd_annotate(Path::new(arquivo), false)?;
+            atualizar_anotacoes(Path::new(arquivo), changes)?;
+        }
+        for (_, backup) in &backups {
+            let _ = fs::remove_file(backup);
         }
     }
     Ok(())
+}
+
+fn restaurar_backups(backups: &[(PathBuf, PathBuf)]) {
+    for (original, backup) in backups {
+        let _ = fs::copy(backup, original);
+        let _ = fs::remove_file(backup);
+    }
+}
+
+fn rodar_testes() -> Result<(), String> {
+    let Ok(comando) = env::var("C2H_TEST_CMD") else {
+        return Ok(());
+    };
+    if comando.trim().is_empty() {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", &comando]);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", &comando]);
+        c
+    };
+    let status = cmd.status().map_err(|e| format!("teste: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "testes falharam (exit {status}); rollback aplicado"
+        ))
+    }
 }
 
 fn atualizar_anotacoes(file: &Path, changes: &[&Change]) -> Result<(), String> {
@@ -520,8 +580,8 @@ fn extrair_blocos(file: &Path, conteudo: &str) -> Vec<Block> {
         .unwrap_or("")
         .to_lowercase();
     match ext.as_str() {
-        "rs" => extrair_rust(conteudo),
-        "py" => extrair_python(conteudo),
+        "rs" => extrair_rust_ast(conteudo).unwrap_or_else(|| extrair_rust(conteudo)),
+        "py" => extrair_python_ast(conteudo).unwrap_or_else(|| extrair_python(conteudo)),
         "ts" | "tsx" | "js" | "jsx" => extrair_js(conteudo),
         "html" | "htm" => extrair_html(conteudo),
         "css" => extrair_css(conteudo),
@@ -554,6 +614,66 @@ fn bloco_por_linhas(
         end_line: fim,
         semantic_hash: hash(&corpo),
     }
+}
+
+fn coletar_ast(node: Node<'_>, conteudo: &str, kinds: &[&str], path: &Path, out: &mut Vec<Block>) {
+    if kinds.contains(&node.kind()) {
+        if let Some(nome) = node
+            .child_by_field_name("name")
+            .and_then(|n| n.utf8_text(conteudo.as_bytes()).ok())
+        {
+            let inicio = node.start_position().row;
+            let fim = node.end_position().row + 1;
+            let linhas: Vec<&str> = conteudo.lines().collect();
+            let kind = match node.kind() {
+                "function_item" | "function_definition" => "fn",
+                "class_definition" => "class",
+                "struct_item" => "struct",
+                "impl_item" => "impl",
+                "mod_item" => "mod",
+                _ => "block",
+            };
+            out.push(bloco_por_linhas(path, &linhas, inicio, fim, kind, nome));
+        }
+    }
+    let mut cursor = node.walk();
+    for filho in node.children(&mut cursor) {
+        coletar_ast(filho, conteudo, kinds, path, out);
+    }
+}
+
+fn extrair_rust_ast(conteudo: &str) -> Option<Vec<Block>> {
+    let mut parser = TsParser::new();
+    parser
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
+        .ok()?;
+    let tree = parser.parse(conteudo, None)?;
+    let mut out = Vec::new();
+    coletar_ast(
+        tree.root_node(),
+        conteudo,
+        &["function_item", "struct_item", "impl_item", "mod_item"],
+        Path::new("x.rs"),
+        &mut out,
+    );
+    Some(out)
+}
+
+fn extrair_python_ast(conteudo: &str) -> Option<Vec<Block>> {
+    let mut parser = TsParser::new();
+    parser
+        .set_language(&tree_sitter_python::LANGUAGE.into())
+        .ok()?;
+    let tree = parser.parse(conteudo, None)?;
+    let mut out = Vec::new();
+    coletar_ast(
+        tree.root_node(),
+        conteudo,
+        &["function_definition", "class_definition"],
+        Path::new("x.py"),
+        &mut out,
+    );
+    Some(out)
 }
 
 fn extrair_rust(conteudo: &str) -> Vec<Block> {

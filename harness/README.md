@@ -29,8 +29,8 @@ Implementado no MVP:
 
 Ainda pendente:
 
-- extractors AST completos (hoje heurísticos);
-- testes de projeto configuráveis no gate;
+- extractors AST para Rust/Python; TS/HTML/CSS ainda heurísticos;
+- gate de testes configurável via `C2H_TEST_CMD`;
 - streaming;
 - behavior cloning/embeddings.
 
@@ -84,5 +84,5 @@ Adicione `harness/no_path` ao PATH do usuário para testar a versão atualizada.
 
 ## Nota
 
-O extractor atual é heurístico por linhas. A evolução é tree-sitter/AST e o
-contrato de resposta com validação/reparo.
+Rust e Python usam tree-sitter/AST. TS, HTML, CSS e Markdown usam
+extratores heurísticos por enquanto.
