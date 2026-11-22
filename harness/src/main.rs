@@ -1957,6 +1957,42 @@ fn executar_git(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<
     Ok(texto.chars().take(10000).collect())
 }
 
+fn detectar_bypass_shell(comando: &str) -> Option<(&'static str, String)> {
+    let c = comando.to_lowercase();
+    let leitura = [
+        "type ",
+        "cat ",
+        "more ",
+        "findstr ",
+        "grep ",
+        "rg ",
+        "get-content ",
+        "select-string ",
+        "head ",
+        "tail ",
+    ];
+    let mut file = None;
+    for token in comando.split_whitespace() {
+        let t = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ',' || ch == ';');
+        let tl = t.to_lowercase();
+        let code = [
+            "rs", "py", "js", "jsx", "ts", "tsx", "html", "htm", "css", "md",
+        ];
+        if code.iter().any(|ext| tl.ends_with(&format!(".{ext}"))) {
+            file = Some(t.to_string());
+        }
+    }
+    if let Some(f) = file {
+        if leitura.iter().any(|p| c.contains(p)) {
+            return Some(("read_code", f));
+        }
+        if c.contains('>') {
+            return Some(("write_code", f));
+        }
+    }
+    None
+}
+
 fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
     use std::io::Read;
     use std::sync::mpsc;
@@ -2035,6 +2071,17 @@ fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resul
         out.chars().take(6000).collect::<String>(),
         err.chars().take(6000).collect::<String>()
     );
+    if let Some((kind, file)) = detectar_bypass_shell(&comando) {
+        log_evento(
+            "shell_bypass",
+            serde_json::json!({
+                "kind": kind,
+                "file": file,
+                "command_chars": comando.len(),
+                "head": comando.chars().take(120).collect::<String>()
+            }),
+        );
+    }
     log_evento(
         "shell_call",
         serde_json::json!({"command_chars": comando.len(), "head": comando.chars().take(80).collect::<String>(), "exit": codigo, "timeout": inicio.elapsed().as_secs() >= timeout}),
@@ -4707,6 +4754,23 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn detecta_leitura_de_codigo_por_shell() {
+        let caso = detectar_bypass_shell("findstr /n /c:\"x\" moebius/app/server.js");
+        assert_eq!(caso.map(|(k, _)| k), Some("read_code"));
+    }
+
+    #[test]
+    fn nao_detecta_log_como_codigo() {
+        assert!(detectar_bypass_shell("type moebius-detached.log").is_none());
+    }
+
+    #[test]
+    fn detecta_redirecionamento_em_codigo() {
+        let caso = detectar_bypass_shell("echo x > src/index.js");
+        assert_eq!(caso.map(|(k, _)| k), Some("write_code"));
+    }
+
     #[test]
     fn why_generico_e_rejeitado() {
         assert!(!why_tecnico("solicitado pelo agente"));

@@ -386,6 +386,19 @@ O binario git instalado pode ser chamado sem shell:
 - cwd no root do c2h;
 - sem shell.
 
+## Bypass de contexto via shell
+
+O shell registra quando o agente usa comandos de leitura/escrita de codigo em
+vez das tools de contexto:
+
+```json
+{"event":"shell_bypass","data":{"kind":"read_code","file":"moebius/app/server.js"}}
+```
+
+Detecta `type/cat/findstr/grep/rg/Get-Content/Select-String/head/tail` sobre
+arquivos de codigo, e redirecionamento `>`/`>>` para arquivos de codigo.
+Nao bloqueia; serve para medir fuga do contexto.
+
 ## Visualizacao das tools
 
 O chat mostra o alvo da tool:
