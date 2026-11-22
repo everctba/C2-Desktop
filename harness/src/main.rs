@@ -1720,9 +1720,59 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
     Ok(format!("editado: {rel}"))
 }
 
+fn valor_toml(bruto: &str) -> Option<String> {
+    let v = bruto.trim();
+    if v.starts_with('"') && v.ends_with('"') && v.len() >= 2 {
+        return Some(
+            v[1..v.len() - 1]
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\"),
+        );
+    }
+    if v.starts_with('\'') && v.ends_with('\'') && v.len() >= 2 {
+        return Some(v[1..v.len() - 1].to_string());
+    }
+    let sem_comment = v.split(" #").next().unwrap_or(v).trim();
+    if sem_comment.is_empty() {
+        None
+    } else {
+        Some(sem_comment.to_string())
+    }
+}
+
+fn comando_toml(path: &Path, nome: &str) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+    let raw = raw.trim_start_matches('\u{feff}');
+    let mut secao = false;
+    for linha in raw.lines() {
+        let l = linha.trim();
+        if l.is_empty() || l.starts_with('#') {
+            continue;
+        }
+        if l.starts_with('[') && l.ends_with(']') {
+            secao = l[1..l.len() - 1].trim() == "commands";
+            continue;
+        }
+        if !secao {
+            continue;
+        }
+        let Some((chave, valor)) = l.split_once('=') else {
+            continue;
+        };
+        if chave.trim() == nome {
+            return valor_toml(valor);
+        }
+    }
+    None
+}
+
 fn comando_configurado(ws: &Workspace, nome: &str) -> Result<String, String> {
-    let path = ws.root.join(".c2h/commands.json");
-    if let Ok(raw) = fs::read_to_string(&path) {
+    let toml_path = ws.root.join(".c2h/commands.toml");
+    if let Some(cmd) = comando_toml(&toml_path, nome) {
+        return Ok(cmd);
+    }
+    let json_path = ws.root.join(".c2h/commands.json");
+    if let Ok(raw) = fs::read_to_string(&json_path) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
             let cmd = v
                 .get("commands")
@@ -1740,7 +1790,7 @@ fn comando_configurado(ws: &Workspace, nome: &str) -> Result<String, String> {
         }
     }
     Err(format!(
-        "comando '{nome}' nao configurado; crie .c2h/commands.json com {{\"commands\":{{\"{nome}\":\"...\"}}}}"
+        "comando '{nome}' nao configurado; crie .c2h/commands.toml com [commands]\n{nome} = \"...\" (ou commands.json)"
     ))
 }
 
@@ -4881,6 +4931,22 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn le_commands_toml() {
+        let dir = env::temp_dir().join(format!("c2h-toml-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("commands.toml");
+        fs::write(
+            &path,
+            "[commands]\ntest = \"echo oi\"\ntest_all = \"a && b\"\n",
+        )
+        .unwrap();
+        assert_eq!(comando_toml(&path, "test").as_deref(), Some("echo oi"));
+        assert_eq!(comando_toml(&path, "test_all").as_deref(), Some("a && b"));
+        assert_eq!(comando_toml(&path, "nada"), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn detecta_leitura_de_codigo_por_shell() {
         let caso = detectar_bypass_shell("findstr /n /c:\"x\" moebius/app/server.js");

@@ -458,28 +458,28 @@ Com shell off, a tool `shell` nem aparece no schema e chamadas retornam
 
 ## run_test / run_script
 
-Crie `.c2h/commands.json`:
+Crie `.c2h/commands.toml`:
 
-```json
-{
-  "commands": {
-    "test": "node tools/smoke-live.js",
-    "test_all": "node tools/smoke-mcp.js && node tools/smoke-doc-tools.js",
-    "build": "npm run build",
-    "smoke-live": "node tools/smoke-live.js"
-  }
-}
+```toml
+[commands]
+test = "node tools/smoke-live.js"
+test_all = "node tools/smoke-mcp.js && node tools/smoke-doc-tools.js"
+build = "npm run build"
+smoke-live = "node tools/smoke-live.js"
+smoke-doc = "node tools/smoke-doc-tools.js"
+draw-cli = "node tools/draw-cli.js"
 ```
 
 Tools:
 
 ```json
 {"name":"run_test","arguments":{"name":"test"}}
-{"name":"run_script","arguments":{"name":"smoke-live"}}
+{"name":"run_script","arguments":{"name":"draw-cli"}}
 ```
 
 Sem shell string livre; o harness executa o comando nomeado, no root, e loga
-`run_test`/`run_script` com exit code.
+`run_test`/`run_script` com exit code. Tambem aceita `.c2h/commands.json` como
+fallback e `C2H_TEST_CMD` para `test`. BOM UTF-8 e tolerado.
 
 ## Tool `shell` (livre)
 
