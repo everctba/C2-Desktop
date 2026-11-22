@@ -44,3 +44,10 @@ scripts/pf_*.py
 
 # fontes pesadas de arte (PSD ~21 MB); os PNGs exportados sao versionados
 ARTES/*.psd
+
+# artefatos de teste do harness lab
+/harness/lab/.c2h/
+/harness/lab/player-*.html
+/harness/lab/resposta*.json
+/harness/lab/evidencia*.json
+/harness/lab/temp/
