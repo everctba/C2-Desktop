@@ -276,6 +276,20 @@ O agente pode executar somente o binario `bd`, sem shell:
 - saida limitada a 8000 chars;
 - em YOLO, escrita roda sem confirmacao.
 
+## Limite de passos
+
+O agent loop tem limite configuravel:
+
+```powershell
+$env:C2H_MAX_STEPS="24"
+c2h
+```
+
+Padrao: 16. Se o limite chegar ao fim, o harness faz uma ultima chamada **sem
+tools** pedindo ao modelo que responda com o que ja coletou. O evento
+`agent_forced_final` registra isso. Para repos grandes, 24-32 pode ser melhor,
+mas aumenta custo/latencia.
+
 ## YOLO
 
 ```powershell

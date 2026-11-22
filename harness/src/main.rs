@@ -1859,6 +1859,11 @@ fn executar_agente(
     auto: bool,
 ) -> Result<(), String> {
     let tools = ferramentas();
+    let max_passos = env::var("C2H_MAX_STEPS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(16)
+        .clamp(2, 64);
     let mut cache_leituras: BTreeMap<String, String> = BTreeMap::new();
     let mut leituras_por_arquivo: BTreeMap<String, usize> = BTreeMap::new();
     let tarefa = historico
@@ -1868,9 +1873,25 @@ fn executar_agente(
         .and_then(|m| m.get("content").and_then(|v| v.as_str()))
         .unwrap_or("")
         .to_string();
-    for passo in 0..8 {
+    for passo in 0..max_passos {
         let mut mensagens = vec![serde_json::json!({"role":"system","content":system})];
         mensagens.extend(historico.clone());
+        if passo + 1 == max_passos {
+            mensagens.push(serde_json::json!({
+                "role": "user",
+                "content": "ORCAMENTO DE EXPLORACAO ESGOTADO. Nao chame ferramentas. Responda AGORA com o plano, as conclusoes e as lacunas usando apenas o que ja coletou."
+            }));
+            log_evento("agent_forced_final", serde_json::json!({"step": passo + 1}));
+            let msg = chamar_api(&mensagens, None)?;
+            let content = msg
+                .get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            println!("\n{content}\n");
+            historico.push(msg);
+            return Ok(());
+        }
         let msg = chamar_api(&mensagens, Some(&tools))?;
         let tool_calls = msg
             .get("tool_calls")
@@ -1975,7 +1996,7 @@ fn executar_agente(
             }));
         }
     }
-    Err("agente excedeu 8 passos".to_string())
+    Err(format!("agente excedeu {max_passos} passos"))
 }
 
 fn sidecars_do_projeto() -> Vec<Sidecar> {
@@ -2153,7 +2174,7 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = yolo
