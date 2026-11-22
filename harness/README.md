@@ -395,8 +395,17 @@ vez das tools de contexto:
 {"event":"shell_bypass","data":{"kind":"read_code","file":"moebius/app/server.js"}}
 ```
 
+Leitura de codigo por shell e bloqueada com `E-SHELL-BYPASS`:
+
+```text
+E-SHELL-BYPASS: leitura de codigo por shell bloqueada: a.rs.
+Use read_file(path="a.rs") ou find_text.
+```
+
 Detecta `type/cat/findstr/grep/rg/Get-Content/Select-String/head/tail` sobre
-arquivos de codigo. Leitura registra `read_code` (nao bloqueia).
+arquivos de codigo. Testes/build (`npm test`, `cargo test`, `node tools/smoke*`)
+sao classificados como `test_build` e permitidos. Desconhecido e permitido com
+confirmacao normal e log `shell_call.class=unknown`.
 
 Redirecionamento `>`/`>>` para arquivo de codigo e bloqueado:
 

@@ -2128,6 +2128,46 @@ fn detectar_bypass_shell(comando: &str) -> Option<(&'static str, String)> {
     None
 }
 
+fn eh_teste_ou_build(comando: &str) -> bool {
+    let c = comando.trim().to_lowercase();
+    [
+        "npm test",
+        "npm run test",
+        "npm run build",
+        "npm run lint",
+        "cargo test",
+        "cargo build",
+        "cargo check",
+        "cargo clippy",
+        "pytest",
+        "go test",
+        "go build",
+        "dotnet test",
+        "dotnet build",
+        "make test",
+        "make build",
+        "node --test",
+        "node tools/smoke",
+        "node tools\\smoke",
+        "node tools/draw-cli",
+        "node tools\\draw-cli",
+    ]
+    .iter()
+    .any(|p| c.starts_with(p) || c.contains(&format!("&& {p}")) || c.contains(&format!("& {p}")))
+}
+
+fn classe_shell(comando: &str) -> &'static str {
+    if let Some(("read_code", _)) = detectar_bypass_shell(comando) {
+        "read_code"
+    } else if let Some(("write_code", _)) = detectar_bypass_shell(comando) {
+        "write_code"
+    } else if eh_teste_ou_build(comando) {
+        "test_build"
+    } else {
+        "unknown"
+    }
+}
+
 fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
     if !SHELL_ENABLED.load(Ordering::Relaxed) {
         return Err(
@@ -2146,12 +2186,19 @@ fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resul
     if comando.trim().is_empty() {
         return Err("uso: shell({command: \"git status\"})".to_string());
     }
-    if let Some(("write_code", file)) = detectar_bypass_shell(&comando) {
+    if let Some((kind, file)) = detectar_bypass_shell(&comando) {
         log_evento(
             "shell_bypass",
-            serde_json::json!({"kind": "write_code", "file": file, "blocked": true, "head": comando.chars().take(120).collect::<String>()}),
+            serde_json::json!({"kind": kind, "file": file, "blocked": true, "head": comando.chars().take(120).collect::<String>()}),
         );
-        return Err(format!("E-SHELL-WRITE: redirecionamento para codigo bloqueado: {file}. Use write_file/replace_file."));
+        if kind == "read_code" {
+            return Err(format!(
+                "E-SHELL-BYPASS: leitura de codigo por shell bloqueada: {file}. Use read_file(path=\"{file}\") ou find_text."
+            ));
+        }
+        return Err(format!(
+            "E-SHELL-BYPASS: escrita de codigo por shell bloqueada: {file}. Use replace_file/write_file."
+        ));
     }
     let timeout = args
         .get("timeout_seconds")
@@ -2219,20 +2266,9 @@ fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resul
         out.chars().take(6000).collect::<String>(),
         err.chars().take(6000).collect::<String>()
     );
-    if let Some(("read_code", file)) = detectar_bypass_shell(&comando) {
-        log_evento(
-            "shell_bypass",
-            serde_json::json!({
-                "kind": "read_code",
-                "file": file,
-                "command_chars": comando.len(),
-                "head": comando.chars().take(120).collect::<String>()
-            }),
-        );
-    }
     log_evento(
         "shell_call",
-        serde_json::json!({"command_chars": comando.len(), "head": comando.chars().take(80).collect::<String>(), "exit": codigo, "timeout": inicio.elapsed().as_secs() >= timeout}),
+        serde_json::json!({"command_chars": comando.len(), "head": comando.chars().take(80).collect::<String>(), "exit": codigo, "class": classe_shell(&comando), "timeout": inicio.elapsed().as_secs() >= timeout}),
     );
     Ok(texto)
 }
@@ -4945,6 +4981,14 @@ mod tests {
         assert_eq!(comando_toml(&path, "test_all").as_deref(), Some("a && b"));
         assert_eq!(comando_toml(&path, "nada"), None);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn classifica_shell() {
+        assert_eq!(classe_shell("type a.rs"), "read_code");
+        assert_eq!(classe_shell("echo x > a.rs"), "write_code");
+        assert_eq!(classe_shell("node tools/smoke-live.js"), "test_build");
+        assert_eq!(classe_shell("git status"), "unknown");
     }
 
     #[test]
