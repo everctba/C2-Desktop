@@ -425,6 +425,62 @@ O chat mostra o alvo da tool:
 O log `tool_call` guarda `command_head`/`command_chars` para shell e os
 metadados redigidos, sem o conteudo completo.
 
+## Shell: opt-in
+
+O shell livre e **desligado por padrao**. Sem ele, o agente usa:
+
+```text
+read_file / find_text
+write_file / replace_file / edit_file
+run_test / run_script
+git
+bd
+```
+
+Para ligar:
+
+```powershell
+c2h --allow-shell
+# ou
+$env:C2H_ALLOW_SHELL="1"
+```
+
+No chat:
+
+```text
+/shell on
+/shell off
+/shell
+```
+
+Com shell off, a tool `shell` nem aparece no schema e chamadas retornam
+`E-SHELL-DISABLED`.
+
+## run_test / run_script
+
+Crie `.c2h/commands.json`:
+
+```json
+{
+  "commands": {
+    "test": "node tools/smoke-live.js",
+    "test_all": "node tools/smoke-mcp.js && node tools/smoke-doc-tools.js",
+    "build": "npm run build",
+    "smoke-live": "node tools/smoke-live.js"
+  }
+}
+```
+
+Tools:
+
+```json
+{"name":"run_test","arguments":{"name":"test"}}
+{"name":"run_script","arguments":{"name":"smoke-live"}}
+```
+
+Sem shell string livre; o harness executa o comando nomeado, no root, e loga
+`run_test`/`run_script` com exit code.
+
 ## Tool `shell` (livre)
 
 O agente pode executar comando de shell livre:

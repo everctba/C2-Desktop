@@ -1,3 +1,4 @@
+#![recursion_limit = "512"]
 //! C2 Harness (c2h): CLI minimo para contexto, blocos e anotacoes.
 //!
 //! O harness e dono de block_id, hashes e timestamps. A IA e usada apenas para
@@ -18,6 +19,8 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+static SHELL_ENABLED: AtomicBool = AtomicBool::new(false);
+
 const SCHEMA_VERSION: u32 = 1;
 const CONTRACT_VERSION: u32 = 1;
 
@@ -36,6 +39,9 @@ struct Cli {
     /// YOLO: nao pede confirmacao para escrita/rm/mv
     #[arg(long, global = true)]
     yolo: bool,
+    /// Habilita shell livre (desligado por padrao)
+    #[arg(long, global = true)]
+    allow_shell: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -597,7 +603,7 @@ fn chamar_api(
 }
 
 fn ferramentas() -> serde_json::Value {
-    serde_json::json!([
+    let mut tools = serde_json::json!([
         {"type":"function","function":{"name":"list_dir","description":"Lista arquivos e diretorios do projeto.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"diretorio relativo; vazio para o atual"}}}}},
         {"type":"function","function":{"name":"read_file","description":"Le um arquivo de texto, com faixa de linhas opcional.","parameters":{"type":"object","properties":{"path":{"type":"string"},"start":{"type":"integer"},"end":{"type":"integer"}},"required":["path"]}}},
         {"type":"function","function":{"name":"find_text","description":"Busca texto nos arquivos do projeto.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
@@ -607,12 +613,19 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"new_component","description":"Cria scaffold HTML/CSS/JS de um componente.","parameters":{"type":"object","properties":{"name":{"type":"string"},"html":{"type":"boolean"},"css":{"type":"boolean"},"js":{"type":"boolean"}},"required":["name"]}}},
         {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup. NAO use para substituir conteudo; use replace_file.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
-        {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"run_test","description":"Roda comando configurado em .c2h/commands.json (test/test_all/build) ou C2H_TEST_CMD.","parameters":{"type":"object","properties":{"name":{"type":"string","description":"test, test_all, build; padrao test"}}}}},
+        {"type":"function","function":{"name":"run_script","description":"Roda comando nomeado de .c2h/commands.json (ex: smoke-live).","parameters":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}}},
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa comando de shell no root. Use apenas para testes/build/git; NAO leia codigo com type/cat/findstr/grep nem redirecione > para codigo. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
-    ])
+    ]);
+    if !SHELL_ENABLED.load(Ordering::Relaxed) {
+        if let Some(lista) = tools.as_array_mut() {
+            lista.retain(|t| t["function"]["name"].as_str() != Some("shell"));
+        }
+    }
+    tools
 }
 
 #[derive(Clone)]
@@ -1707,30 +1720,73 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
     Ok(format!("editado: {rel}"))
 }
 
-fn ferramenta_test() -> Result<String, String> {
-    let Ok(comando) = env::var("C2H_TEST_CMD") else {
-        return Ok("C2H_TEST_CMD nao configurado".to_string());
-    };
+fn comando_configurado(ws: &Workspace, nome: &str) -> Result<String, String> {
+    let path = ws.root.join(".c2h/commands.json");
+    if let Ok(raw) = fs::read_to_string(&path) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+            let cmd = v
+                .get("commands")
+                .and_then(|c| c.get(nome))
+                .or_else(|| v.get(nome))
+                .and_then(|c| c.as_str());
+            if let Some(c) = cmd {
+                return Ok(c.to_string());
+            }
+        }
+    }
+    if nome == "test" || nome == "default" {
+        if let Ok(c) = env::var("C2H_TEST_CMD") {
+            return Ok(c);
+        }
+    }
+    Err(format!(
+        "comando '{nome}' nao configurado; crie .c2h/commands.json com {{\"commands\":{{\"{nome}\":\"...\"}}}}"
+    ))
+}
+
+fn rodar_comando_configurado(ws: &Workspace, nome: &str, evento: &str) -> Result<String, String> {
+    let comando = comando_configurado(ws, nome)?;
     #[cfg(windows)]
     let saida = std::process::Command::new("cmd")
         .args(["/C", &comando])
+        .current_dir(&ws.root)
         .output();
     #[cfg(not(windows))]
     let saida = std::process::Command::new("sh")
         .args(["-c", &comando])
+        .current_dir(&ws.root)
         .output();
     match saida {
         Ok(out) => {
-            let texto = format!(
-                "exit={}\nstdout:\n{}\nstderr:\n{}",
-                out.status.code().unwrap_or(-1),
-                String::from_utf8_lossy(&out.stdout),
+            let codigo = out.status.code().unwrap_or(-1);
+            log_evento(evento, serde_json::json!({"name": nome, "exit": codigo}));
+            Ok(format!(
+                "comando={nome}\nexit={codigo}\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&out.stdout)
+                    .chars()
+                    .take(7000)
+                    .collect::<String>(),
                 String::from_utf8_lossy(&out.stderr)
-            );
-            Ok(texto.chars().take(8000).collect())
+                    .chars()
+                    .take(3000)
+                    .collect::<String>()
+            ))
         }
-        Err(e) => Err(format!("teste: {e}")),
+        Err(e) => Err(format!("executar {nome}: {e}")),
     }
+}
+
+fn ferramenta_test(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let nome = args.get("name").and_then(|v| v.as_str()).unwrap_or("test");
+    rodar_comando_configurado(ws, nome, "run_test")
+}
+
+fn ferramenta_run_script(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let nome = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "run_script exige name".to_string())?;
+    rodar_comando_configurado(ws, nome, "run_script")
 }
 
 fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
@@ -2023,6 +2079,12 @@ fn detectar_bypass_shell(comando: &str) -> Option<(&'static str, String)> {
 }
 
 fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
+    if !SHELL_ENABLED.load(Ordering::Relaxed) {
+        return Err(
+            "E-SHELL-DISABLED: shell desligado. Use run_test/run_script ou abra com --allow-shell."
+                .to_string(),
+        );
+    }
     use std::io::Read;
     use std::sync::mpsc;
     use std::time::Duration;
@@ -2204,7 +2266,8 @@ fn executar_ferramenta(
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             cmd_rm(ws, path).map(|_| format!("removido: {path}"))
         }
-        "run_test" => ferramenta_test(),
+        "run_test" => ferramenta_test(ws, &args),
+        "run_script" => ferramenta_run_script(ws, &args),
         "bd" => executar_bd(ws, &args, auto),
         "shell" => executar_shell(ws, &args, auto),
         "git" => executar_git(ws, &args, auto),
@@ -2776,6 +2839,11 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     out.push_str(&format!("PROJETO: {}\n", ws.root.display()));
     out.push_str(&format!("CWD: /{cwd_rel}\n"));
     let (sistema, shell) = shell_info();
+    let shell = if SHELL_ENABLED.load(Ordering::Relaxed) {
+        shell.to_string()
+    } else {
+        "desabilitado (use run_test/run_script; /shell on ou --allow-shell)".to_string()
+    };
     out.push_str(&format!("SISTEMA OPERACIONAL: {sistema}\n"));
     out.push_str(&format!("SHELL DA TOOL: {shell}\n"));
     let nomes = nomes_do_cwd(ws);
@@ -2915,7 +2983,8 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
         }
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
-                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita
+  /shell [on|off]     liga/desliga shell livre (padrao off)\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
             );
             continue;
         }
@@ -3083,6 +3152,28 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
             auto = !auto;
             AUTO_CONFIRM.store(auto, Ordering::Relaxed);
             println!("auto={auto} (escrita sem confirmacao)");
+            continue;
+        }
+        if entrada == "/shell" || entrada.starts_with("/shell ") {
+            let arg = entrada.trim_start_matches("/shell").trim();
+            match arg {
+                "on" => {
+                    SHELL_ENABLED.store(true, Ordering::Relaxed);
+                    println!("shell ON (livre; use com cuidado)");
+                }
+                "off" => {
+                    SHELL_ENABLED.store(false, Ordering::Relaxed);
+                    println!("shell OFF (use run_test/run_script/git/bd)");
+                }
+                _ => println!(
+                    "shell={} (use /shell on|off; padrao off)",
+                    if SHELL_ENABLED.load(Ordering::Relaxed) {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                ),
+            }
             continue;
         }
         if entrada == "/tools" {
