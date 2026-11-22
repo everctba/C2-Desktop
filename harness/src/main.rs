@@ -1673,7 +1673,7 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
             "E-WHY-REVIEW: antes de editar, confronte o why atual.\nBLOCO: {block_id}\nWHY ATUAL: {why_atual}\nEnvie why_review explicando por que a edicao preserva ou muda esse why."
         ));
     }
-    if !why_tecnico(&why_atual) {
+    if !why_tem_consequencia(&why_atual) {
         return Err(format!(
             "E-WHY-REVIEW: bloco sem why tecnico; use annotate_blocks antes de editar.\nBLOCO: {block_id}\nWHY ATUAL: {why_atual}"
         ));
@@ -1765,7 +1765,7 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
         let id = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
         let what = item.get("what").and_then(|v| v.as_str()).unwrap_or("");
         let why = item.get("why").and_then(|v| v.as_str()).unwrap_or("");
-        if id.is_empty() || what.trim().is_empty() || !why_tecnico(why) {
+        if id.is_empty() || what.trim().is_empty() || !why_tem_consequencia(why) {
             erros.push(format!("bloco invalido/why fraco: {id}"));
             continue;
         }
@@ -2321,9 +2321,14 @@ fn why_tecnico(texto: &str) -> bool {
         "n/a",
         "-",
     ];
-    if genericos.iter().any(|g| t == *g || t.starts_with(g)) {
+    !genericos.iter().any(|g| t == *g || t.starts_with(g))
+}
+
+fn why_tem_consequencia(texto: &str) -> bool {
+    if !why_tecnico(texto) {
         return false;
     }
+    let t = texto.trim().to_lowercase();
     let mecanico = [
         "chama ",
         "registra ",
@@ -2572,6 +2577,9 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                 format!("{} {} {}", bloco.id, bloco.w5h2.what, bloco.w5h2.why).to_lowercase();
             score += tokens.iter().filter(|t| texto.contains(t.as_str())).count() * 25;
             score += (bloco.w5h2.why.len() / 20).min(30);
+            if why_tem_consequencia(&bloco.w5h2.why) {
+                score += 40;
+            }
             let mut linha = format!(
                 "- {}:{} — {} — {}",
                 side.file,

@@ -325,9 +325,11 @@ Blocos `confidence=low` nao entram. Cada bloco carrega
 
 ## Qualidade do W5H2
 
-O `why` precisa ser tecnico e teleologico: proposito, problema evitado,
-consequencia. Nao e descricao mecanica. Valores como `solicitado pelo agente`,
-`necessario`, `desconhecido` sao rejeitados.
+O `why` de anotacao/edicao precisa ser tecnico e teleologico: proposito,
+problema evitado, consequencia. `why_tem_consequencia` exige marcadores como
+`porque`, `evita`, `impede`, `sem isso`, `falha`, `corrompe`. `why` mecanico
+(`chama`, `registra`, `inicializa`) e rejeitado no `annotate_blocks`/`edit_file`.
+O contexto ainda inclui why tecnico sem consequencia, mas ranqueia pior.
 
 Blocos com `why` vazio nao entram no contexto nem no `read_file`. O `edit_file`
 bloqueia com `E-WHY-REVIEW` se o bloco ainda nao tem why tecnico; use
