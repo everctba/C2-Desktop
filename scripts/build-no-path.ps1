@@ -19,10 +19,20 @@ try {
     $profile = if ($Debug) { 'debug' } else { 'release' }
     $exe = Join-Path $harness "target/$profile/c2h.exe"
     if (-not (Test-Path $exe)) { throw "binario nao encontrado: $exe" }
-    Copy-Item $exe (Join-Path $outDir 'c2h.exe') -Force
-    $hash = (Get-FileHash (Join-Path $outDir 'c2h.exe') -Algorithm SHA256).Hash.ToLower()
-    "c2h: $(Join-Path $outDir 'c2h.exe')"
-    "sha256: $hash"
+    $destino = Join-Path $outDir 'c2h.exe'
+    try {
+        Copy-Item $exe $destino -Force -ErrorAction Stop
+        $hash = (Get-FileHash $destino -Algorithm SHA256).Hash.ToLower()
+        "c2h: $destino"
+        "sha256: $hash"
+    } catch {
+        $novo = Join-Path $outDir 'c2h-new.exe'
+        Copy-Item $exe $novo -Force
+        $hash = (Get-FileHash $novo -Algorithm SHA256).Hash.ToLower()
+        Write-Warning "c2h.exe esta em uso; binario novo salvo em $novo"
+        "c2h_new: $novo"
+        "sha256: $hash"
+    }
 } finally {
     Pop-Location
 }
