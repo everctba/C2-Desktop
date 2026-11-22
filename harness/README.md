@@ -122,7 +122,7 @@ Comandos:
 /rm <arquivo>
 /mv <origem> <destino>
 /preview <arquivo.html>
-/file <arquivo> /drop /clear /status /help /sair
+/file <arquivo> /drop /clear /status /doctor /logs [n] /help /sair
 ```
 
 ## Context compiler automatico
@@ -218,6 +218,9 @@ confirmacao de escrita (use com cuidado).
 
 `/write` continua disponivel como atalho explicito. `/new component` cria um
 scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
+
+`/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
+timeline sem sair do chat.
 
 `c2h chat` abre o mesmo modo explicitamente. O histórico da conversa fica em
 memória; nada é gravado em disco além dos logs de debug.

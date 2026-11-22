@@ -1843,7 +1843,7 @@ fn cmd_chat() -> Result<(), String> {
         }
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
-                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline\n  /sair              encerra\n"
             );
             continue;
         }
@@ -1855,6 +1855,25 @@ fn cmd_chat() -> Result<(), String> {
         if entrada == "/drop" {
             arquivo = None;
             println!("arquivo ativo removido");
+            continue;
+        }
+        if entrada == "/doctor" {
+            if let Err(erro) = cmd_doctor() {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if entrada == "/logs" {
+            if let Err(erro) = cmd_logs(40) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/logs ") {
+            let limite = resto.trim().parse::<usize>().unwrap_or(40);
+            if let Err(erro) = cmd_logs(limite) {
+                println!("erro: {erro}");
+            }
             continue;
         }
         if entrada == "/pwd" {
