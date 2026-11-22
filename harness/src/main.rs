@@ -1368,22 +1368,26 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
     }
     if let Some(side) = ler_sidecar(Path::new(&ws.rel(&path))) {
         if !side.blocks.is_empty() {
-            saida.push_str("\nANOTACOES DOS BLOCOS:\n");
-            for bloco in side.blocks.iter().take(20) {
-                saida.push_str(&format!(
-                    "- {} [{}] linhas {}-{}\n  what: {}\n  why: {}\n  when: {}\n  where: {}\n  who: {}\n  how: {}\n  how_much: {}\n",
-                    bloco.id,
-                    bloco.kind,
+            saida.push_str("\nANOTACOES RELEVANTES (why tecnico):\n");
+            for bloco in side
+                .blocks
+                .iter()
+                .filter(|b| why_tecnico(&b.w5h2.why))
+                .take(20)
+            {
+                let mut linha = format!(
+                    "- {}:{} [{}] {} — {}",
+                    ws.rel(&path),
                     bloco.start_line,
-                    bloco.end_line,
+                    bloco.kind,
                     bloco.w5h2.what,
-                    bloco.w5h2.why,
-                    bloco.w5h2.when,
-                    bloco.w5h2.where_,
-                    bloco.w5h2.who,
-                    bloco.w5h2.how,
-                    bloco.w5h2.how_much
-                ));
+                    bloco.w5h2.why
+                );
+                if !bloco.w5h2.how.trim().is_empty() {
+                    linha.push_str(&format!(" — how: {}", bloco.w5h2.how));
+                }
+                saida.push_str(&linha);
+                saida.push('\n');
             }
             log_evento(
                 "tool_read_annotations",
@@ -1658,15 +1662,18 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
             "E-WHY-REVIEW: antes de editar, confronte o why atual.\nBLOCO: {block_id}\nWHY ATUAL: {why_atual}\nEnvie why_review explicando por que a edicao preserva ou muda esse why."
         ));
     }
-    if why_tecnico(&why_atual) {
-        let atual = palavras_relevantes(&why_atual);
-        let review = palavras_relevantes(why_review);
-        let comuns = atual.intersection(&review).count();
-        if comuns < 2 && comuns * 2 < atual.len() {
-            return Err(format!(
-                "E-WHY-REVIEW: o why_review nao confronta o why atual.\nWHY ATUAL: {why_atual}\nReescreva citando a consequencia/problema que o bloco protege."
-            ));
-        }
+    if !why_tecnico(&why_atual) {
+        return Err(format!(
+            "E-WHY-REVIEW: bloco sem why tecnico; use annotate_blocks antes de editar.\nBLOCO: {block_id}\nWHY ATUAL: {why_atual}"
+        ));
+    }
+    let atual = palavras_relevantes(&why_atual);
+    let review = palavras_relevantes(why_review);
+    let comuns = atual.intersection(&review).count();
+    if comuns < 2 && comuns * 2 < atual.len() {
+        return Err(format!(
+            "E-WHY-REVIEW: o why_review nao confronta o why atual.\nWHY ATUAL: {why_atual}\nReescreva citando a consequencia/problema que o bloco protege."
+        ));
     }
     let violacoes = validar_resposta(Path::new("."), &envelope);
     if !violacoes.is_empty() {
@@ -2365,24 +2372,65 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
         .map(|t| t.to_string())
         .collect();
     let cwd_rel = ws.cwd.to_string_lossy().replace('\\', "/");
-    let mut sidecars = sidecars_do_projeto();
-    sidecars.sort_by_key(|s| {
-        std::cmp::Reverse({
+    let sidecars = sidecars_do_projeto();
+    let mut candidatos: Vec<(usize, String, String, String)> = Vec::new();
+    let mut stale = 0usize;
+    let mut sem_why = 0usize;
+    for side in &sidecars {
+        let Ok(fonte) = fs::read_to_string(&side.file) else {
+            continue;
+        };
+        let linhas: Vec<&str> = fonte.lines().collect();
+        for bloco in &side.blocks {
+            if bloco.start_line == 0
+                || bloco.end_line < bloco.start_line
+                || bloco.end_line > linhas.len()
+            {
+                stale += 1;
+                continue;
+            }
+            if !why_tecnico(&bloco.w5h2.why) {
+                sem_why += 1;
+                continue;
+            }
+            let corpo = normalizar_conteudo(&linhas[bloco.start_line - 1..bloco.end_line]);
+            if hash(&corpo) != bloco.semantic_hash {
+                stale += 1;
+                continue;
+            }
             let mut score = 0usize;
-            if ativo == Some(s.file.as_str()) {
+            if ativo == Some(side.file.as_str()) {
                 score += 1000;
             }
-            if !cwd_rel.is_empty() && s.file.starts_with(&cwd_rel) {
+            if !cwd_rel.is_empty() && side.file.starts_with(&cwd_rel) {
                 score += 100;
             }
-            for bloco in &s.blocks {
-                let texto =
-                    format!("{} {} {}", bloco.id, bloco.w5h2.what, bloco.w5h2.why).to_lowercase();
-                score += tokens.iter().filter(|t| texto.contains(t.as_str())).count() * 20;
+            if bloco.risk == "high" {
+                score += 80;
+            } else if bloco.risk == "medium" {
+                score += 30;
             }
-            score
-        })
-    });
+            let texto =
+                format!("{} {} {}", bloco.id, bloco.w5h2.what, bloco.w5h2.why).to_lowercase();
+            score += tokens.iter().filter(|t| texto.contains(t.as_str())).count() * 25;
+            score += (bloco.w5h2.why.len() / 20).min(30);
+            let mut linha = format!(
+                "- {}:{} — {} — {}",
+                side.file,
+                bloco.start_line,
+                bloco.w5h2.what.chars().take(160).collect::<String>(),
+                bloco.w5h2.why.chars().take(260).collect::<String>()
+            );
+            if !bloco.w5h2.how.trim().is_empty() {
+                linha.push_str(&format!(
+                    " — how: {}",
+                    bloco.w5h2.how.chars().take(120).collect::<String>()
+                ));
+            }
+            candidatos.push((score, side.file.clone(), bloco.risk.clone(), linha));
+        }
+    }
+    candidatos.sort_by_key(|(score, _, _, _)| std::cmp::Reverse(*score));
 
     let mut out = String::new();
     out.push_str("<contexto_do_harness>\n");
@@ -2400,35 +2448,6 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     }
     if let Some(ativo) = ativo {
         out.push_str(&format!("ARQUIVO ATIVO: {ativo}\n"));
-    }
-
-    let mut blocos_total = 0usize;
-    let mut arquivos = 0usize;
-    for side in sidecars.iter().take(5) {
-        if side.blocks.is_empty() {
-            continue;
-        }
-        arquivos += 1;
-        out.push_str(&format!(
-            "\nARQUIVO: {} (status: {})\n",
-            side.file, side.status
-        ));
-        for bloco in side.blocks.iter().take(12) {
-            blocos_total += 1;
-            out.push_str(&format!(
-                "- [{}] {} linhas {}-{} | what: {} | why: {} | how: {}\n",
-                bloco.kind,
-                bloco.id,
-                bloco.start_line,
-                bloco.end_line,
-                bloco.w5h2.what,
-                bloco.w5h2.why,
-                bloco.w5h2.how
-            ));
-        }
-    }
-
-    if let Some(ativo) = ativo {
         if let Ok(texto) = fs::read_to_string(ativo) {
             let ext = Path::new(ativo)
                 .extension()
@@ -2436,7 +2455,7 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                 .unwrap_or("");
             let imports = importacoes(&texto, ext);
             if !imports.is_empty() {
-                out.push_str("\nIMPORTS DO ARQUIVO ATIVO:\n");
+                out.push_str("IMPORTS DO ARQUIVO ATIVO:\n");
                 for imp in imports.iter().take(20) {
                     out.push_str(&format!("- {imp}\n"));
                 }
@@ -2444,6 +2463,35 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
         }
     }
 
+    let mut vistos = std::collections::BTreeSet::new();
+    let mut arquivos = 0usize;
+    for (_, file, _, _) in &candidatos {
+        if arquivos >= 2 || !vistos.insert(file.clone()) {
+            continue;
+        }
+        if let Ok(fonte) = fs::read_to_string(file) {
+            let comentarios = extrair_comentarios(&fonte, 12);
+            if !comentarios.trim().is_empty() {
+                out.push_str(&format!("\nCOMENTARIOS ({file}):\n{comentarios}"));
+                arquivos += 1;
+            }
+        }
+    }
+
+    let mut blocos = 0usize;
+    let mut bytes_blocos = 0usize;
+    let mut arquivos_blocos = std::collections::BTreeSet::new();
+    out.push_str("\nBLOCOS RELEVANTES (why tecnico + hash valido):\n");
+    for (_, file, _, linha) in &candidatos {
+        if bytes_blocos + linha.len() > 5000 || blocos >= 40 {
+            break;
+        }
+        bytes_blocos += linha.len();
+        blocos += 1;
+        arquivos_blocos.insert(file.clone());
+        out.push_str(linha);
+        out.push('\n');
+    }
     if let Ok(saida) = std::process::Command::new("git")
         .args(["diff", "--stat"])
         .output()
@@ -2460,7 +2508,14 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     let truncado: String = out.chars().take(10000).collect();
     log_evento(
         "context_compiled",
-        serde_json::json!({"chars": truncado.len(), "files": arquivos, "blocks": blocos_total, "active": ativo}),
+        serde_json::json!({
+            "chars": truncado.len(),
+            "files": arquivos_blocos.len(),
+            "blocks": blocos,
+            "stale_skipped": stale,
+            "empty_why_skipped": sem_why,
+            "active": ativo
+        }),
     );
     truncado
 }

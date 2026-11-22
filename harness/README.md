@@ -143,7 +143,21 @@ O annotation pass tem cache por `source_hash` em
 `.c2h/cache/annotations/<hash>.json`; arquivo inalterado reaproveita os blocos.
 
 O contexto entra no system message; nao depende mais de `/file`. Ele inclui
-`ARQUIVOS NO CWD` reais e ignora sidecars de arquivos removidos. O log registra
+`ARQUIVOS NO CWD` reais e ignora sidecars de arquivos removidos.
+
+Politica de injecao:
+
+```text
+so bloco com why tecnico
+so bloco com semantic_hash igual ao conteudo atual
+blocos stale nao entram
+ranking: ativo > cwd > risk high > match da tarefa > densidade de why
+uma linha por bloco: arquivo:linha — what — why [— how]
+comentarios apenas dos 2 arquivos mais bem ranqueados
+budget ~5000 chars de blocos
+```
+
+O log `context_compiled` traz `stale_skipped` e `empty_why_skipped`. O log registra
 `context_compiled` com arquivos, blocos e caracteres.
 
 Se `read_file` receber caminho inexistente, o erro volta como resultado de
@@ -282,6 +296,10 @@ Fluxo: valida path, backup, tmp, rename atomico, sidecar e gates.
 O `why` precisa ser tecnico e teleologico: proposito, problema evitado,
 consequencia. Nao e descricao mecanica. Valores como `solicitado pelo agente`,
 `necessario`, `desconhecido` sao rejeitados.
+
+Blocos com `why` vazio nao entram no contexto nem no `read_file`. O `edit_file`
+bloqueia com `E-WHY-REVIEW` se o bloco ainda nao tem why tecnico; use
+`annotate_blocks` primeiro.
 
 O agente pode atualizar anotacoes sem tocar no codigo:
 
