@@ -92,6 +92,35 @@ Cada bloco tem:
 
 O harness é dono do timestamp e do hash. A IA não escreve timestamp.
 
+## Modo interativo
+
+```bash
+c2h
+```
+
+Abre um chat no terminal:
+
+```text
+Bom dia! Sou o c2h...
+projeto: ...
+modelo: ...
+c2h>
+```
+
+Comandos:
+
+```text
+/file <arquivo>   anexa contexto de um arquivo
+/drop             remove o arquivo ativo
+/clear            limpa o historico
+/status           mostra projeto/modelo
+/help             ajuda
+/sair             encerra
+```
+
+`c2h chat` abre o mesmo modo explicitamente. O histórico da conversa fica em
+memória; nada é gravado em disco além dos logs de debug.
+
 ## Debug timeline
 
 ```bash

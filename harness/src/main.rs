@@ -34,11 +34,13 @@ struct Cli {
     #[arg(long, global = true)]
     debug: bool,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Abre o modo interativo (padrao quando nao ha comando)
+    Chat,
     /// Diagnostico do harness e do projeto
     Doctor,
     /// Mostra os blocos extraidos de um arquivo
@@ -432,9 +434,20 @@ impl Drop for Spinner {
 }
 
 fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
+    let mensagens = vec![
+        serde_json::json!({"role": "system", "content": system}),
+        serde_json::json!({"role": "user", "content": user}),
+    ];
+    chamar_provider_mensagens(system, &mensagens)
+}
+
+fn chamar_provider_mensagens(
+    system: &str,
+    mensagens: &[serde_json::Value],
+) -> Result<String, String> {
     log_evento(
         "provider_request",
-        serde_json::json!({"model": model(), "system_chars": system.len(), "user_chars": user.len()}),
+        serde_json::json!({"model": model(), "system_chars": system.len(), "messages": mensagens.len()}),
     );
     if let Ok(mock) = env::var("C2H_MOCK_RESPONSE") {
         log_evento(
@@ -447,11 +460,8 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
     let _spinner = Spinner::novo("IA pensando");
     let body = serde_json::json!({
         "model": model(),
-        "messages": [
-            {"role":"system","content":system},
-            {"role":"user","content":user}
-        ],
-        "temperature": 0.1,
+        "messages": mensagens,
+        "temperature": 0.2,
         "stream": false
     });
     let url = format!("{}/chat/completions", base_url().trim_end_matches('/'));
@@ -482,6 +492,110 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
         serde_json::json!({"chars": content.len()}),
     );
     Ok(content)
+}
+
+fn cmd_chat() -> Result<(), String> {
+    use std::io::BufRead;
+    if !std::io::stdin().is_terminal() {
+        return Err("modo interativo exige um terminal; use um subcomando".to_string());
+    }
+    let raiz = env::current_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    println!("Bom dia! Sou o c2h, seu harness de contexto por blocos.");
+    println!("projeto: {raiz}");
+    println!("modelo: {} · provider: {}", model(), base_url());
+    if api_key().is_none() {
+        println!("aviso: api_key ausente; configure config.json antes de conversar.");
+    }
+    println!("digite /help para comandos; /sair para encerrar.\n");
+
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Quando receber contexto de arquivo, use-o antes de sugerir mudancas. Nao invente arquivos ou APIs.";
+    let mut historico: Vec<serde_json::Value> = Vec::new();
+    let mut arquivo: Option<PathBuf> = None;
+    let stdin = std::io::stdin();
+    loop {
+        print!("c2h> ");
+        let _ = std::io::stdout().flush();
+        let mut linha = String::new();
+        if stdin
+            .lock()
+            .read_line(&mut linha)
+            .map_err(|e| e.to_string())?
+            == 0
+        {
+            break;
+        }
+        let entrada = linha.trim();
+        if entrada.is_empty() {
+            continue;
+        }
+        match entrada {
+            "/sair" | "/exit" | "/quit" => break,
+            "/help" | "/ajuda" => {
+                println!(
+                    "\nComandos:\n  /file <arquivo>  anexa contexto de um arquivo\n  /drop            remove o arquivo ativo\n  /clear           limpa o historico\n  /status          mostra projeto/modelo\n  /help            esta ajuda\n  /sair            encerra\n"
+                );
+                continue;
+            }
+            "/clear" => {
+                historico.clear();
+                println!("historico limpo");
+                continue;
+            }
+            "/status" => {
+                println!("projeto: {raiz}");
+                println!("modelo: {} · provider: {}", model(), base_url());
+                println!(
+                    "arquivo ativo: {}",
+                    arquivo
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "nenhum".to_string())
+                );
+                println!("mensagens: {}", historico.len());
+                continue;
+            }
+            "/drop" => {
+                arquivo = None;
+                println!("arquivo ativo removido");
+                continue;
+            }
+            _ if entrada.starts_with("/file ") => {
+                let path = PathBuf::from(entrada.trim_start_matches("/file ").trim());
+                match montar_contexto(&path) {
+                    Ok(_) => {
+                        arquivo = Some(path.clone());
+                        println!("contexto anexado: {}", path.display());
+                    }
+                    Err(erro) => println!("erro: {erro}"),
+                }
+                continue;
+            }
+            _ => {}
+        }
+        let contexto = match &arquivo {
+            Some(path) => match montar_contexto(path) {
+                Ok(texto) => format!("\n\nCONTEXTO ATIVO:\n{texto}"),
+                Err(erro) => format!("\n\n[contexto indisponivel: {erro}]"),
+            },
+            None => String::new(),
+        };
+        let system = format!("{system_base}{contexto}");
+        historico.push(serde_json::json!({"role":"user","content":entrada}));
+        match chamar_provider_mensagens(&system, &historico) {
+            Ok(resposta) => {
+                println!("\n{resposta}\n");
+                historico.push(serde_json::json!({"role":"assistant","content":resposta}));
+                while historico.len() > 24 {
+                    historico.remove(0);
+                }
+            }
+            Err(erro) => println!("\nerro: {erro}\n"),
+        }
+    }
+    println!("ate mais.");
+    Ok(())
 }
 
 fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> Result<(), String> {
@@ -1185,20 +1299,21 @@ fn cmd_fuzz(iters: usize) -> Result<(), String> {
     Ok(())
 }
 
-fn nome_comando(command: &Command) -> &'static str {
+fn nome_comando(command: Option<&Command>) -> &'static str {
     match command {
-        Command::Doctor => "doctor",
-        Command::Blocks { .. } => "blocks",
-        Command::Annotate { .. } => "annotate",
-        Command::Validate { .. } => "validate",
-        Command::Status => "status",
-        Command::Context { .. } => "context",
-        Command::Ask { .. } => "ask",
-        Command::ValidateResponse { .. } => "validate_response",
-        Command::Apply { .. } => "apply",
-        Command::Logs { .. } => "logs",
-        Command::Fuzz { .. } => "fuzz",
-        Command::Config => "config",
+        None | Some(Command::Chat) => "chat",
+        Some(Command::Doctor) => "doctor",
+        Some(Command::Blocks { .. }) => "blocks",
+        Some(Command::Annotate { .. }) => "annotate",
+        Some(Command::Validate { .. }) => "validate",
+        Some(Command::Status) => "status",
+        Some(Command::Context { .. }) => "context",
+        Some(Command::Ask { .. }) => "ask",
+        Some(Command::ValidateResponse { .. }) => "validate_response",
+        Some(Command::Apply { .. }) => "apply",
+        Some(Command::Logs { .. }) => "logs",
+        Some(Command::Fuzz { .. }) => "fuzz",
+        Some(Command::Config) => "config",
     }
 }
 
@@ -1827,39 +1942,40 @@ fn main() {
     iniciar_debug(cli.debug);
     log_evento(
         "run_start",
-        serde_json::json!({"command": nome_comando(&cli.command)}),
+        serde_json::json!({"command": nome_comando(cli.command.as_ref())}),
     );
     let resultado = match &cli.command {
-        Command::Doctor => cmd_doctor(),
-        Command::Blocks { file } => cmd_blocks(file, cli.json),
-        Command::Annotate { file, dry_run, ai } => {
+        None | Some(Command::Chat) => cmd_chat(),
+        Some(Command::Doctor) => cmd_doctor(),
+        Some(Command::Blocks { file }) => cmd_blocks(file, cli.json),
+        Some(Command::Annotate { file, dry_run, ai }) => {
             if *ai {
                 cmd_annotate_ai(file, *dry_run)
             } else {
                 cmd_annotate(file, *dry_run)
             }
         }
-        Command::Validate { file } => cmd_validate(file.as_deref()),
-        Command::Status => cmd_status(),
-        Command::Context { file, max_chars } => cmd_context(file, *max_chars),
-        Command::Ask {
+        Some(Command::Validate { file }) => cmd_validate(file.as_deref()),
+        Some(Command::Status) => cmd_status(),
+        Some(Command::Context { file, max_chars }) => cmd_context(file, *max_chars),
+        Some(Command::Ask {
             prompt,
             system,
             file,
             apply,
             max_repairs,
-        } => cmd_ask(
+        }) => cmd_ask(
             prompt,
             system.as_deref(),
             file.as_deref(),
             *apply,
             *max_repairs,
         ),
-        Command::ValidateResponse { response } => cmd_validate_response(response),
-        Command::Apply { response, dry_run } => cmd_apply(response, *dry_run),
-        Command::Logs { limit } => cmd_logs(*limit),
-        Command::Fuzz { iters } => cmd_fuzz(*iters),
-        Command::Config => {
+        Some(Command::ValidateResponse { response }) => cmd_validate_response(response),
+        Some(Command::Apply { response, dry_run }) => cmd_apply(response, *dry_run),
+        Some(Command::Logs { limit }) => cmd_logs(*limit),
+        Some(Command::Fuzz { iters }) => cmd_fuzz(*iters),
+        Some(Command::Config) => {
             cmd_config();
             Ok(())
         }
