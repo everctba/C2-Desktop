@@ -418,7 +418,7 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
         return Ok(mock);
     }
     let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
-    let mut spinner = Spinner::novo("IA pensando");
+    let _spinner = Spinner::novo("IA pensando");
     let body = serde_json::json!({
         "model": model(),
         "messages": [
