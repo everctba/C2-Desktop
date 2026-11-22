@@ -978,6 +978,12 @@ fn validar_novo(
     if envelope.content.len() > 200_000 {
         return Err("arquivo grande demais (max 200 KB)".to_string());
     }
+    let linhas = envelope.content.lines().count();
+    if linhas > 150 {
+        println!(
+            "aviso estrutural: {linhas} linhas; prefira <= 150 e divida em componentes/secoes"
+        );
+    }
     let ext = requisitado
         .extension()
         .and_then(|e| e.to_str())
@@ -1075,6 +1081,11 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
     validar_novo(ws, &alvo, &envelope, instrucao)?;
     revisar_requisitos(&envelope.content, instrucao)?;
     let linhas = envelope.content.lines().count();
+    if linhas > 150 {
+        if let Err(erro) = sugerir_divisao(&envelope.content, instrucao) {
+            println!("aviso: sugestao de divisao falhou: {erro}");
+        }
+    }
     println!("\n--- preview {} ({} linhas) ---", ws.rel(&alvo), linhas);
     for (i, linha) in envelope.content.lines().take(200).enumerate() {
         println!("{:>4}: {linha}", i + 1);
@@ -1408,14 +1419,17 @@ fn ferramenta_write(
         }
         escrever_sidecar(Path::new(rel), &side)?;
     }
+    let avisos = marcar_qualidade(Path::new(rel));
     log_evento(
         "tool_write",
         serde_json::json!({"path": rel, "lines": content.lines().count()}),
     );
-    Ok(format!(
-        "arquivo criado: {rel} ({} linhas)",
-        content.lines().count()
-    ))
+    let mut resultado = format!("arquivo criado: {rel} ({} linhas)", content.lines().count());
+    if !avisos.is_empty() {
+        resultado.push_str("\nAVISOS ESTRUTURAIS:\n");
+        resultado.push_str(&avisos.join("\n"));
+    }
+    Ok(resultado)
 }
 
 fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
@@ -1715,6 +1729,7 @@ fn cmd_chat() -> Result<(), String> {
                             Err(erro) => println!("annotation pass falhou: {erro}"),
                         }
                     }
+                    marcar_qualidade(Path::new(&rel));
                     println!("anotado: {rel}");
                 }
                 Err(erro) => println!("erro: {erro}"),
@@ -2675,6 +2690,82 @@ fn precisa_anotacao(file: &Path) -> bool {
     blocos
         .iter()
         .any(|b| b.end_line.saturating_sub(b.start_line) > 150)
+}
+
+fn avaliar_granularidade(file: &Path) -> Vec<String> {
+    let linhas = fs::read_to_string(file)
+        .map(|t| t.lines().count())
+        .unwrap_or(0);
+    let blocos = ler_sidecar(file).map(|s| s.blocks).unwrap_or_default();
+    let mut avisos = Vec::new();
+    if linhas > 150 {
+        avisos.push(format!(
+            "arquivo tem {linhas} linhas; prefira <= 150 e divida em componentes/secoes"
+        ));
+    }
+    if blocos.len() < 2 && linhas > 120 {
+        avisos.push(format!(
+            "apenas {} bloco(s) para {linhas} linhas; granularidade baixa",
+            blocos.len()
+        ));
+    }
+    if let Some(maior) = blocos
+        .iter()
+        .map(|b| b.end_line.saturating_sub(b.start_line))
+        .max()
+    {
+        if maior > 150 {
+            avisos.push(format!(
+                "maior bloco cobre {maior} linhas; divida a responsabilidade"
+            ));
+        }
+    }
+    avisos
+}
+
+fn sugerir_divisao(conteudo: &str, tarefa: &str) -> Result<(), String> {
+    if env::var("C2H_SKIP_REVIEW").is_ok() || env::var("C2H_MOCK_RESPONSE").is_ok() {
+        return Ok(());
+    }
+    let system = "Um arquivo ficou grande. Sugira uma divisao em componentes/secoes pequenos. Responda APENAS JSON: {\"components\":[{\"path\":\"...\",\"responsibility\":\"...\"}]}. Nao escreva codigo, apenas o plano.";
+    let user = format!(
+        "PEDIDO:\n{tarefa}\n\nARQUIVO ({} linhas):\n{}",
+        conteudo.lines().count(),
+        conteudo.chars().take(8000).collect::<String>()
+    );
+    let resposta = chamar_provider(system, &user)?;
+    let json = extrair_json_valor(&resposta)?;
+    if let Some(lista) = json.get("components").and_then(|v| v.as_array()) {
+        println!("reparo sugerido: dividir em {} componentes", lista.len());
+        for item in lista {
+            let path = item.get("path").and_then(|v| v.as_str()).unwrap_or("?");
+            let resp = item
+                .get("responsibility")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            println!("  - {path}: {resp}");
+        }
+    }
+    Ok(())
+}
+
+fn marcar_qualidade(file: &Path) -> Vec<String> {
+    let avisos = avaliar_granularidade(file);
+    if avisos.is_empty() {
+        return avisos;
+    }
+    if let Some(mut side) = ler_sidecar(file) {
+        side.status = "weak".to_string();
+        let _ = escrever_sidecar(file, &side);
+    }
+    for aviso in &avisos {
+        println!("aviso estrutural: {aviso}");
+    }
+    log_evento(
+        "granularity_warning",
+        serde_json::json!({"file": rel_file(file), "warnings": avisos}),
+    );
+    avisos
 }
 
 fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {

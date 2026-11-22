@@ -144,6 +144,21 @@ Cada bloco guarda `start_line`/`end_line`, hash, W5H2 e timestamps. O `/edit`
 funciona com esses blocos e, se o sidecar estiver vazio, dispara a descoberta
 antes.
 
+Gatilhos do annotation pass:
+
+```text
+blocks vazio
+arquivo > 120 linhas com 1 bloco
+arquivo > 150 linhas com menos de 2 blocos
+bloco cobrindo > 150 linhas
+```
+
+Qualidade estrutural:
+
+- arquivo > 150 linhas gera warning;
+- `/write` sugere divisão em componentes quando passa de 150 linhas;
+- blocos grandes demais marcam o sidecar como `status: weak`.
+
 Comandos:
 
 ```text
