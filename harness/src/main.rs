@@ -4053,7 +4053,6 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string(),
-                            ..W5h2::default()
                         },
                         evidence: vec![format!("{}:{}", rel_file(file), start)],
                     });
