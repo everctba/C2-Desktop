@@ -1567,6 +1567,24 @@ fn ferramenta_test() -> Result<String, String> {
     }
 }
 
+fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
+    let mut resumo = serde_json::Map::new();
+    for chave in [
+        "path", "file", "from", "to", "name", "query", "start", "end", "block_id",
+    ] {
+        if let Some(valor) = args.get(chave) {
+            resumo.insert(chave.to_string(), valor.clone());
+        }
+    }
+    for chave in ["content", "new_code"] {
+        if let Some(texto) = args.get(chave).and_then(|v| v.as_str()) {
+            resumo.insert(format!("{chave}_chars"), serde_json::json!(texto.len()));
+            resumo.insert(format!("{chave}_hash"), serde_json::json!(hash(texto)));
+        }
+    }
+    serde_json::Value::Object(resumo)
+}
+
 fn executar_ferramenta(
     ws: &Workspace,
     auto: bool,
@@ -1576,7 +1594,10 @@ fn executar_ferramenta(
 ) -> Result<String, String> {
     let args: serde_json::Value =
         serde_json::from_str(argumentos).unwrap_or_else(|_| serde_json::json!({}));
-    log_evento("tool_call", serde_json::json!({"name": nome, "args": args}));
+    log_evento(
+        "tool_call",
+        serde_json::json!({"name": nome, "args": resumir_args_tool(&args)}),
+    );
     let resultado = match nome {
         "list_dir" => texto_listar(ws, &args),
         "read_file" => texto_ler(ws, &args),
@@ -1720,7 +1741,7 @@ fn executar_agente(
             };
             log_evento(
                 "tool_result_preview",
-                serde_json::json!({"name": nome, "preview": truncado.chars().take(500).collect::<String>()}),
+                serde_json::json!({"name": nome, "preview": truncado.chars().take(240).collect::<String>()}),
             );
             historico.push(serde_json::json!({
                 "role": "tool",
@@ -3061,9 +3082,37 @@ fn marcar_qualidade(file: &Path) -> Vec<String> {
     avisos
 }
 
+fn caminho_cache_anotacao(conteudo: &str) -> PathBuf {
+    let digest = hash(conteudo).replace("sha256:", "");
+    PathBuf::from(".c2h/cache/annotations").join(format!("{digest}.json"))
+}
+
 fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
     let conteudo = fs::read_to_string(file).map_err(|e| e.to_string())?;
     let linhas: Vec<&str> = conteudo.lines().collect();
+    let cache_path = caminho_cache_anotacao(&conteudo);
+    if let Ok(texto) = fs::read_to_string(&cache_path) {
+        if let Ok(blocos) = serde_json::from_str::<Vec<SidecarBlock>>(&texto) {
+            if !blocos.is_empty() {
+                let sidecar = Sidecar {
+                    schema_version: SCHEMA_VERSION,
+                    contract_version: CONTRACT_VERSION,
+                    file: rel_file(file),
+                    status: "annotated".to_string(),
+                    source_hash: hash(&conteudo),
+                    generated_by: "c2h-cache".to_string(),
+                    blocks: blocos,
+                };
+                escrever_sidecar(file, &sidecar)?;
+                log_evento(
+                    "annotation_cache_hit",
+                    serde_json::json!({"file": rel_file(file), "blocks": sidecar.blocks.len()}),
+                );
+                println!("annotation pass: cache reaproveitado");
+                return Ok(true);
+            }
+        }
+    }
     let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"...\",\"how\":\"...\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. Nao escreva timestamp.";
     let mut user = format!(
         "ARQUIVO: {}\nTotal de linhas: {}\nConteudo:\n{}",
@@ -3168,6 +3217,12 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                     blocks: blocos,
                 };
                 escrever_sidecar(file, &sidecar)?;
+                if let Some(pai) = cache_path.parent() {
+                    let _ = fs::create_dir_all(pai);
+                }
+                if let Ok(texto_cache) = serde_json::to_string_pretty(&sidecar.blocks) {
+                    let _ = fs::write(&cache_path, texto_cache);
+                }
                 log_evento(
                     "annotate_blocks_ai",
                     serde_json::json!({"file": rel_file(file), "blocks": sidecar.blocks.len()}),

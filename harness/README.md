@@ -136,6 +136,12 @@ imports do arquivo ativo
 git diff --stat
 ```
 
+Logs de tool sao redigidos: `content`/`new_code` viram `*_chars` + `*_hash`,
+nunca o conteudo completo. `tool_result_preview` e limitado a 240 chars.
+
+O annotation pass tem cache por `source_hash` em
+`.c2h/cache/annotations/<hash>.json`; arquivo inalterado reaproveita os blocos.
+
 O contexto entra no system message; nao depende mais de `/file`. Ele inclui
 `ARQUIVOS NO CWD` reais e ignora sidecars de arquivos removidos. O log registra
 `context_compiled` com arquivos, blocos e caracteres.
