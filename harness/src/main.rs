@@ -138,6 +138,8 @@ struct SidecarBlock {
     kind: String,
     name: String,
     #[serde(default)]
+    origin: String,
+    #[serde(default)]
     start_line: usize,
     #[serde(default)]
     end_line: usize,
@@ -590,7 +592,8 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
-        {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}}
+        {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why tecnico causa->efeito.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
 }
 
@@ -1123,12 +1126,7 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
             println!("aviso: annotation pass falhou: {erro}");
         }
     }
-    if let Some(mut side) = ler_sidecar(Path::new(&ws.rel(&alvo))) {
-        if let Some(primeiro) = side.blocks.first_mut() {
-            primeiro.w5h2 = envelope.w5h2.clone();
-        }
-        escrever_sidecar(Path::new(&ws.rel(&alvo)), &side)?;
-    }
+    let _ = ler_sidecar(Path::new(&ws.rel(&alvo)));
     log_evento(
         "write_file",
         serde_json::json!({"path": ws.rel(&alvo), "lines": linhas}),
@@ -1463,7 +1461,7 @@ fn ferramenta_write(
         summary: summary.to_string(),
         w5h2: W5h2 {
             what: summary.to_string(),
-            why: "solicitado pelo agente".to_string(),
+            why: "desconhecido".to_string(),
             ..W5h2::default()
         },
     };
@@ -1486,12 +1484,7 @@ fn ferramenta_write(
             println!("aviso: annotation pass falhou: {erro}");
         }
     }
-    if let Some(mut side) = ler_sidecar(Path::new(rel)) {
-        if let Some(primeiro) = side.blocks.first_mut() {
-            primeiro.w5h2 = envelope.w5h2.clone();
-        }
-        escrever_sidecar(Path::new(rel), &side)?;
-    }
+    let _ = ler_sidecar(Path::new(rel));
     let avisos = marcar_qualidade(Path::new(rel));
     log_evento(
         "tool_write",
@@ -1586,6 +1579,9 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
             resumo.insert(chave.to_string(), valor.clone());
         }
     }
+    if let Some(lista) = args.get("blocks").and_then(|v| v.as_array()) {
+        resumo.insert("blocks_count".to_string(), serde_json::json!(lista.len()));
+    }
     if let Some(lista) = args.get("args").and_then(|v| v.as_array()) {
         resumo.insert("args_count".to_string(), serde_json::json!(lista.len()));
         if let Some(primeiro) = lista.first().and_then(|v| v.as_str()) {
@@ -1599,6 +1595,93 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
         }
     }
     serde_json::Value::Object(resumo)
+}
+
+fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> {
+    let lista = args
+        .get("blocks")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "use annotate_blocks({blocks:[...]})".to_string())?;
+    if lista.is_empty() {
+        return Err("blocks vazio".to_string());
+    }
+    let mut sidecars = sidecars_do_projeto();
+    let mut updates: Vec<(String, W5h2, Vec<String>)> = Vec::new();
+    let mut erros = Vec::new();
+    for item in lista {
+        let id = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
+        let what = item.get("what").and_then(|v| v.as_str()).unwrap_or("");
+        let why = item.get("why").and_then(|v| v.as_str()).unwrap_or("");
+        if id.is_empty() || what.trim().is_empty() || !why_tecnico(why) {
+            erros.push(format!("bloco invalido/why fraco: {id}"));
+            continue;
+        }
+        let existe = sidecars.iter().any(|s| s.blocks.iter().any(|b| b.id == id));
+        if !existe {
+            erros.push(format!("block_id desconhecido: {id}"));
+            continue;
+        }
+        let w5h2 = W5h2 {
+            what: what.to_string(),
+            why: why.to_string(),
+            when: item
+                .get("when")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            where_: item
+                .get("where")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            who: item
+                .get("who")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            how: item
+                .get("how")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            how_much: item
+                .get("how_much")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+        };
+        let ev = item
+            .get("evidence")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        updates.push((id.to_string(), w5h2, ev));
+    }
+    if !erros.is_empty() {
+        return Err(format!("annotate_blocks rejeitado:\n{}", erros.join("\n")));
+    }
+    let mut total = 0usize;
+    for side in &mut sidecars {
+        for (id, w5h2, ev) in &updates {
+            if let Some(bloco) = side.blocks.iter_mut().find(|b| &b.id == id) {
+                bloco.w5h2 = w5h2.clone();
+                if !ev.is_empty() {
+                    bloco.evidence = ev.clone();
+                }
+                bloco.origin = "agent_annotation".to_string();
+                total += 1;
+            }
+        }
+        if total > 0 {
+            escrever_sidecar(Path::new(&side.file), side)?;
+        }
+    }
+    log_evento("annotate_blocks", serde_json::json!({"blocks": total}));
+    Ok(format!("annotate_blocks: {total} blocos atualizados"))
 }
 
 fn executar_git(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
@@ -1843,6 +1926,7 @@ fn executar_ferramenta(
         "bd" => executar_bd(ws, &args, auto),
         "shell" => executar_shell(ws, &args, auto),
         "git" => executar_git(ws, &args, auto),
+        "annotate_blocks" => executar_annotate_blocks(&args),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(
@@ -2011,6 +2095,49 @@ fn sidecars_do_projeto() -> Vec<Sidecar> {
         .filter_map(|t| serde_json::from_str::<Sidecar>(&t).ok())
         .filter(|s| Path::new(&s.file).is_file())
         .collect()
+}
+
+fn why_tecnico(texto: &str) -> bool {
+    let t = texto.trim().to_lowercase();
+    if t.len() < 15 {
+        return false;
+    }
+    let genericos = [
+        "solicitado pelo agente",
+        "necessario",
+        "necessário",
+        "melhor pratica",
+        "melhor prática",
+        "desconhecido",
+        "unknown",
+        "n/a",
+        "-",
+    ];
+    if genericos.iter().any(|g| t == *g || t.starts_with(g)) {
+        return false;
+    }
+    true
+}
+
+fn extrair_comentarios(conteudo: &str, max_linhas: usize) -> String {
+    let mut saida = String::new();
+    let mut usadas = 0usize;
+    for (i, linha) in conteudo.lines().enumerate() {
+        let t = linha.trim();
+        let comentario = t.starts_with("//")
+            || t.starts_with("#")
+            || t.starts_with("/*")
+            || t.starts_with('*')
+            || t.starts_with("--");
+        if comentario {
+            saida.push_str(&format!("{}: {}\n", i + 1, t));
+            usadas += 1;
+            if usadas >= max_linhas {
+                break;
+            }
+        }
+    }
+    saida
 }
 
 fn nomes_do_cwd(ws: &Workspace) -> Vec<String> {
@@ -3388,11 +3515,13 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
             }
         }
     }
-    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"...\",\"how\":\"...\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. Nao escreva timestamp.";
+    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. O why deve explicar a causa tecnica, nunca \"solicitado pelo agente\". Nao escreva timestamp.";
+    let comentarios = extrair_comentarios(&conteudo, 60);
     let mut user = format!(
-        "ARQUIVO: {}\nTotal de linhas: {}\nConteudo:\n{}",
+        "ARQUIVO: {}\nTotal de linhas: {}\nCOMENTARIOS/DOCSTRINGS:\n{}\nConteudo:\n{}",
         rel_file(file),
         linhas.len(),
+        comentarios,
         conteudo.chars().take(16000).collect::<String>()
     );
     let mut ultimo_erro = String::new();
@@ -3449,6 +3578,7 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                         id: id.clone(),
                         kind,
                         name: id.split("::").last().unwrap_or(&id).to_string(),
+                        origin: "annotation".to_string(),
                         start_line: start,
                         end_line: end,
                         created_at: agora_iso(),
@@ -3539,6 +3669,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 id: bloco.id.clone(),
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
+                origin: "structural".to_string(),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: old.created_at.clone(),
@@ -3556,6 +3687,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 id: bloco.id.clone(),
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
+                origin: "structural".to_string(),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: agora.clone(),
@@ -4009,6 +4141,23 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn why_generico_e_rejeitado() {
+        assert!(!why_tecnico("solicitado pelo agente"));
+        assert!(!why_tecnico("necessario"));
+        assert!(why_tecnico(
+            "read_file e assincrona porque devolve dados comprimidos"
+        ));
+    }
+
+    #[test]
+    fn extrai_comentarios_do_codigo() {
+        let texto = "// why: assincrono para descomprimir\nfn a() {}\n# comentario\n";
+        let c = extrair_comentarios(texto, 10);
+        assert!(c.contains("assincrono"));
+        assert!(c.contains("comentario"));
+    }
+
     #[test]
     fn politica_bloqueia_script_quando_sem_js() {
         let erros = violacoes_politica("<html><script>alert(1)</script></html>", "sem JavaScript");

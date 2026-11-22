@@ -231,6 +231,26 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## Qualidade do W5H2
+
+O `why` precisa ser tecnico (causa->efeito). Valores como
+`solicitado pelo agente`, `necessario`, `desconhecido` sao rejeitados.
+
+O agente pode atualizar anotacoes sem tocar no codigo:
+
+```json
+{"name":"annotate_blocks","args":{"blocks":[
+  {"block_id":"doc.js::lib","what":"...","why":"read_file e async porque descomprime dados","when":"...","where":"...","who":"...","how":"...","how_much":"...","evidence":["doc.js:4-10"]}
+]}}
+```
+
+Cada bloco tem `origin`: `structural`, `annotation`, `write_file` ou
+`agent_annotation`.
+
+O context compiler inclui comentarios/docstrings relevantes do arquivo, nao
+apenas o W5H2. O annotation pass tambem recebe esses comentarios e pede why
+tecnico.
+
 ## Tool `git`
 
 O binario git instalado pode ser chamado sem shell:
