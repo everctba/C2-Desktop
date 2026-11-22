@@ -1303,10 +1303,18 @@ fn texto_listar(ws: &Workspace, args: &serde_json::Value) -> Result<String, Stri
 }
 
 fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
-    let path = ws.resolver(
-        args.get("path").and_then(|v| v.as_str()).unwrap_or(""),
-        true,
-    )?;
+    let entrada = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let path = match ws.resolver(entrada, true) {
+        Ok(p) => p,
+        Err(erro) => {
+            let nomes = nomes_do_cwd(ws);
+            return Err(format!(
+                "{erro}\nARQUIVOS DISPONIVEIS EM /{}: {}",
+                ws.cwd.to_string_lossy().replace('\\', "/"),
+                nomes.join(", ")
+            ));
+        }
+    };
     let bytes = fs::read(&path).map_err(|e| e.to_string())?;
     if bytes.iter().take(2048).any(|b| *b == 0) {
         return Err("arquivo binario".to_string());
@@ -1635,8 +1643,15 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
             println!("  -> {nome}");
-            let resultado = executar_ferramenta(ws, auto, &tarefa, nome, argumentos)?;
-            let truncado: String = resultado.chars().take(1200).collect();
+            let resultado = match executar_ferramenta(ws, auto, &tarefa, nome, argumentos) {
+                Ok(texto) => texto,
+                Err(erro) => format!("ERRO DA FERRAMENTA: {erro}"),
+            };
+            let truncado: String = resultado.chars().take(1600).collect();
+            log_evento(
+                "tool_result_preview",
+                serde_json::json!({"name": nome, "preview": truncado.chars().take(500).collect::<String>()}),
+            );
             historico.push(serde_json::json!({
                 "role": "tool",
                 "tool_call_id": id,
@@ -1657,7 +1672,30 @@ fn sidecars_do_projeto() -> Vec<Sidecar> {
         .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json"))
         .filter_map(|p| fs::read_to_string(p).ok())
         .filter_map(|t| serde_json::from_str::<Sidecar>(&t).ok())
+        .filter(|s| Path::new(&s.file).is_file())
         .collect()
+}
+
+fn nomes_do_cwd(ws: &Workspace) -> Vec<String> {
+    let mut nomes: Vec<String> = fs::read_dir(ws.cwd_abs())
+        .map(|itens| {
+            itens
+                .filter_map(|e| e.ok())
+                .map(|e| {
+                    let nome = e.file_name().to_string_lossy().to_string();
+                    let dir = e.metadata().map(|m| m.is_dir()).unwrap_or(false);
+                    if dir {
+                        format!("{nome}/")
+                    } else {
+                        nome
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    nomes.sort();
+    nomes.truncate(60);
+    nomes
 }
 
 fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> String {
@@ -1691,6 +1729,13 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     out.push_str("<contexto_do_harness>\n");
     out.push_str(&format!("PROJETO: {}\n", ws.root.display()));
     out.push_str(&format!("CWD: /{cwd_rel}\n"));
+    let nomes = nomes_do_cwd(ws);
+    if !nomes.is_empty() {
+        out.push_str("ARQUIVOS NO CWD:\n");
+        for nome in &nomes {
+            out.push_str(&format!("- {nome}\n"));
+        }
+    }
     if let Some(ativo) = ativo {
         out.push_str(&format!("ARQUIVO ATIVO: {ativo}\n"));
     }
@@ -1772,7 +1817,7 @@ fn cmd_chat() -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = false;

@@ -136,8 +136,13 @@ imports do arquivo ativo
 git diff --stat
 ```
 
-O contexto entra no system message; nao depende mais de `/file`. O log registra
+O contexto entra no system message; nao depende mais de `/file`. Ele inclui
+`ARQUIVOS NO CWD` reais e ignora sidecars de arquivos removidos. O log registra
 `context_compiled` com arquivos, blocos e caracteres.
+
+Se `read_file` receber caminho inexistente, o erro volta como resultado de
+ferramenta com a lista de arquivos disponiveis; o agente pode tentar de novo em
+vez de abortar.
 
 Ferramentas `read_file`/`list_dir` tambem devolvem anotacoes/status do sidecar:
 
