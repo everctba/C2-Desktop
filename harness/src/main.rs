@@ -6,10 +6,11 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use tree_sitter::{Node, Parser as TsParser};
 
@@ -355,6 +356,55 @@ fn montar_contexto(file: &Path) -> Result<String, String> {
     Ok(texto)
 }
 
+struct Spinner {
+    ativo: std::sync::Arc<AtomicBool>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Spinner {
+    fn novo(mensagem: &str) -> Self {
+        let ativo = std::sync::Arc::new(AtomicBool::new(true));
+        let handle = if std::io::stderr().is_terminal() {
+            let ativo_thread = ativo.clone();
+            let mensagem = mensagem.to_string();
+            Some(std::thread::spawn(move || {
+                let frames = ["|", "/", "-", "\\"];
+                let inicio = Instant::now();
+                let mut i = 0usize;
+                while ativo_thread.load(Ordering::Relaxed) {
+                    eprint!(
+                        "\r{} {} {}s",
+                        frames[i % frames.len()],
+                        mensagem,
+                        inicio.elapsed().as_secs()
+                    );
+                    let _ = std::io::stderr().flush();
+                    i += 1;
+                    std::thread::sleep(Duration::from_millis(120));
+                }
+                eprint!("\r{}\r", " ".repeat(72));
+                let _ = std::io::stderr().flush();
+            }))
+        } else {
+            None
+        };
+        Self { ativo, handle }
+    }
+
+    fn parar(&mut self) {
+        self.ativo.store(false, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for Spinner {
+    fn drop(&mut self) {
+        self.parar();
+    }
+}
+
 fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
     log_evento(
         "provider_request",
@@ -368,6 +418,7 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
         return Ok(mock);
     }
     let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
+    let mut spinner = Spinner::novo("IA pensando");
     let body = serde_json::json!({
         "model": model(),
         "messages": [
@@ -1283,6 +1334,7 @@ fn cmd_annotate_ai(file: &Path, dry_run: bool) -> Result<(), String> {
             linhas[inicio..fim].join("\n")
         ));
     }
+    eprintln!("enviando {} blocos para a IA...", blocos.len());
     let resposta = chamar_provider(
         "Voce preenche anotacoes 5W2H de blocos de codigo. Nao invente; use unknown. Responda somente JSON.",
         &pedido,
