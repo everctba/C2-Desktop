@@ -396,8 +396,18 @@ vez das tools de contexto:
 ```
 
 Detecta `type/cat/findstr/grep/rg/Get-Content/Select-String/head/tail` sobre
-arquivos de codigo, e redirecionamento `>`/`>>` para arquivos de codigo.
-Nao bloqueia; serve para medir fuga do contexto.
+arquivos de codigo. Leitura registra `read_code` (nao bloqueia).
+
+Redirecionamento `>`/`>>` para arquivo de codigo e bloqueado:
+
+```text
+E-SHELL-WRITE: redirecionamento para codigo bloqueado: a.rs.
+Use write_file/replace_file.
+```
+
+Redirecionar para `tmp/*.log` continua permitido; `node tools/smoke.js > tmp/reg.log`
+nao e classificado como escrita de codigo. O system prompt avisa para nao usar
+shell na leitura/escrita de codigo.
 
 ## Visualizacao das tools
 

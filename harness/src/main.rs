@@ -609,7 +609,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup. NAO use para substituir conteudo; use replace_file.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
         {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
+        {"type":"function","function":{"name":"shell","description":"PERIGO: executa comando de shell no root. Use apenas para testes/build/git; NAO leia codigo com type/cat/findstr/grep nem redirecione > para codigo. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
@@ -1957,6 +1957,43 @@ fn executar_git(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<
     Ok(texto.chars().take(10000).collect())
 }
 
+fn extensao_codigo(path: &str) -> bool {
+    let p = path.trim_matches(|c| c == '"' || c == '\'').to_lowercase();
+    [
+        "rs", "py", "js", "jsx", "ts", "tsx", "html", "htm", "css", "md",
+    ]
+    .iter()
+    .any(|ext| p.ends_with(&format!(".{ext}")))
+}
+
+fn alvo_redirecionamento(comando: &str) -> Option<String> {
+    let bytes = comando.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'>' {
+            let mut j = i + 1;
+            if j < bytes.len() && bytes[j] == b'>' {
+                j += 1;
+            }
+            while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            let inicio = j;
+            while j < bytes.len() && !bytes[j].is_ascii_whitespace() && bytes[j] != b';' {
+                j += 1;
+            }
+            let alvo = comando[inicio..j].trim_matches(|c| c == '"' || c == '\'');
+            if extensao_codigo(alvo) {
+                return Some(alvo.to_string());
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
 fn detectar_bypass_shell(comando: &str) -> Option<(&'static str, String)> {
     let c = comando.to_lowercase();
     let leitura = [
@@ -1971,24 +2008,16 @@ fn detectar_bypass_shell(comando: &str) -> Option<(&'static str, String)> {
         "head ",
         "tail ",
     ];
-    let mut file = None;
-    for token in comando.split_whitespace() {
-        let t = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ',' || ch == ';');
-        let tl = t.to_lowercase();
-        let code = [
-            "rs", "py", "js", "jsx", "ts", "tsx", "html", "htm", "css", "md",
-        ];
-        if code.iter().any(|ext| tl.ends_with(&format!(".{ext}"))) {
-            file = Some(t.to_string());
+    if leitura.iter().any(|p| c.contains(p)) {
+        for token in comando.split_whitespace() {
+            let t = token.trim_matches(|ch| ch == '"' || ch == '\'' || ch == ',' || ch == ';');
+            if extensao_codigo(t) {
+                return Some(("read_code", t.to_string()));
+            }
         }
     }
-    if let Some(f) = file {
-        if leitura.iter().any(|p| c.contains(p)) {
-            return Some(("read_code", f));
-        }
-        if c.contains('>') {
-            return Some(("write_code", f));
-        }
+    if let Some(alvo) = alvo_redirecionamento(comando) {
+        return Some(("write_code", alvo));
     }
     None
 }
@@ -2004,6 +2033,13 @@ fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resul
         .to_string();
     if comando.trim().is_empty() {
         return Err("uso: shell({command: \"git status\"})".to_string());
+    }
+    if let Some(("write_code", file)) = detectar_bypass_shell(&comando) {
+        log_evento(
+            "shell_bypass",
+            serde_json::json!({"kind": "write_code", "file": file, "blocked": true, "head": comando.chars().take(120).collect::<String>()}),
+        );
+        return Err(format!("E-SHELL-WRITE: redirecionamento para codigo bloqueado: {file}. Use write_file/replace_file."));
     }
     let timeout = args
         .get("timeout_seconds")
@@ -2071,11 +2107,11 @@ fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resul
         out.chars().take(6000).collect::<String>(),
         err.chars().take(6000).collect::<String>()
     );
-    if let Some((kind, file)) = detectar_bypass_shell(&comando) {
+    if let Some(("read_code", file)) = detectar_bypass_shell(&comando) {
         log_evento(
             "shell_bypass",
             serde_json::json!({
-                "kind": kind,
+                "kind": "read_code",
                 "file": file,
                 "command_chars": comando.len(),
                 "head": comando.chars().take(120).collect::<String>()
@@ -2846,7 +2882,7 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao invente arquivos ou APIs. NUNCA use shell para ler codigo (type/cat/findstr/grep/Get-Content) nem para redirecionar (>,>>) para arquivo de codigo; use read_file/find_text/write_file/replace_file/edit_file. Shell e apenas para executar comandos.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = yolo
@@ -4769,6 +4805,11 @@ mod tests {
     fn detecta_redirecionamento_em_codigo() {
         let caso = detectar_bypass_shell("echo x > src/index.js");
         assert_eq!(caso.map(|(k, _)| k), Some("write_code"));
+    }
+
+    #[test]
+    fn nao_confunde_log_com_redirecionamento_de_codigo() {
+        assert!(detectar_bypass_shell("node tools/smoke.js > tmp/reg.log").is_none());
     }
 
     #[test]
