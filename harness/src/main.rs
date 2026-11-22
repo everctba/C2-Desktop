@@ -1294,7 +1294,7 @@ fn texto_listar(ws: &Workspace, args: &serde_json::Value) -> Result<String, Stri
         } else {
             let rel = ws.rel(&item.path());
             let status = ler_sidecar(Path::new(&rel))
-                .map(|s| format!(" [sidecar:{} {} blocos]", s.status, s.blocks.len()))
+                .map(|s| format!(" [sidecar status={} blocks={}]", s.status, s.blocks.len()))
                 .unwrap_or_default();
             saida.push_str(&format!("{nome}{status}\n"));
         }
@@ -1337,8 +1337,18 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
             saida.push_str("\nANOTACOES DOS BLOCOS:\n");
             for bloco in side.blocks.iter().take(20) {
                 saida.push_str(&format!(
-                    "- {} [{}] what: {} | why: {} | how: {}\n",
-                    bloco.id, bloco.kind, bloco.w5h2.what, bloco.w5h2.why, bloco.w5h2.how
+                    "- {} [{}] linhas {}-{}\n  what: {}\n  why: {}\n  when: {}\n  where: {}\n  who: {}\n  how: {}\n  how_much: {}\n",
+                    bloco.id,
+                    bloco.kind,
+                    bloco.start_line,
+                    bloco.end_line,
+                    bloco.w5h2.what,
+                    bloco.w5h2.why,
+                    bloco.w5h2.when,
+                    bloco.w5h2.where_,
+                    bloco.w5h2.who,
+                    bloco.w5h2.how,
+                    bloco.w5h2.how_much
                 ));
             }
             log_evento(
@@ -3584,6 +3594,41 @@ mod tests {
     fn extrai_json_de_fence() {
         let env = extrair_json("```json\n{\"contract_version\":1,\"changes\":[]}\n```").unwrap();
         assert_eq!(env.contract_version, 1);
+    }
+
+    #[test]
+    fn exige_evidencia_em_toda_mudanca() {
+        let _cwd = CWD_LOCK.lock().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "c2h-evid-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let anterior = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        std::fs::write("a.rs", "fn a() {}\n").unwrap();
+        let env = ResponseEnvelope {
+            contract_version: 1,
+            changes: vec![Change {
+                file: "a.rs".to_string(),
+                block_id: "x".to_string(),
+                action: "update".to_string(),
+                new_code: "fn a() {}\n".to_string(),
+                w5h2: W5h2 {
+                    what: "a".to_string(),
+                    ..W5h2::default()
+                },
+                evidence: vec![],
+            }],
+        };
+        let violacoes = validar_resposta(Path::new("."), &env);
+        assert!(violacoes.iter().any(|v| v.code == "E-EVID-00"));
+        std::env::set_current_dir(anterior).unwrap();
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

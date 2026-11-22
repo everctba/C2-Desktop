@@ -139,8 +139,13 @@ git diff --stat
 O contexto entra no system message; nao depende mais de `/file`. O log registra
 `context_compiled` com arquivos, blocos e caracteres.
 
-Ferramentas `read_file`/`list_dir` tambem devolvem anotacoes/status do sidecar.
-Toda mudanca no contrato exige `evidence` com `arquivo:linha`.
+Ferramentas `read_file`/`list_dir` tambem devolvem anotacoes/status do sidecar:
+
+- `read_file`: codigo + W5H2 completo (what/why/when/where/who/how/how_much);
+- `list_dir`: nome + `[sidecar status=... blocks=...]`.
+
+Toda mudanca no contrato exige `evidence` com `arquivo:linha`; sem isso o
+validator retorna `E-EVID-00`.
 
 ## Annotation pass e sidecar
 
