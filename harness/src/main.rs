@@ -308,14 +308,40 @@ fn validar_resposta(raiz: &Path, resposta: &ResponseEnvelope) -> Vec<Violation> 
             );
         }
         for ev in &change.evidence {
-            let caminho = ev.split(':').next().unwrap_or(ev);
-            if !raiz.join(caminho).exists() {
+            let mut partes = ev.splitn(2, ':');
+            let caminho = partes.next().unwrap_or(ev);
+            let linha = partes.next();
+            let arquivo_ev = raiz.join(caminho);
+            if !arquivo_ev.exists() {
                 erro(
                     "E-EVID-01",
                     Some(&change.block_id),
                     "evidencia nao existe",
                     "use arquivo:linha existente",
                 );
+                continue;
+            }
+            if let Some(numero) = linha {
+                let Ok(numero) = numero.parse::<usize>() else {
+                    erro(
+                        "E-EVID-02",
+                        Some(&change.block_id),
+                        "linha da evidencia nao e numerica",
+                        "use arquivo:linha com numero real",
+                    );
+                    continue;
+                };
+                let total = fs::read_to_string(&arquivo_ev)
+                    .map(|t| t.lines().count())
+                    .unwrap_or(0);
+                if numero == 0 || numero > total {
+                    erro(
+                        "E-EVID-02",
+                        Some(&change.block_id),
+                        "linha da evidencia fora do arquivo",
+                        "use uma linha existente",
+                    );
+                }
             }
         }
     }
@@ -1669,6 +1695,8 @@ fn cmd_config() {
 mod tests {
     use super::*;
 
+    static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn extrai_funcoes_rust() {
         let blocos = extrair_blocos(Path::new("x.rs"), "fn a() {\n  let x = 1;\n}\nfn b() {}\n");
@@ -1692,6 +1720,41 @@ mod tests {
     }
 
     #[test]
+    fn rejeita_evidencia_com_linha_invalida() {
+        let _cwd = CWD_LOCK.lock().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "c2h-ev-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let anterior = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        std::fs::write("a.rs", "fn a() {}\n").unwrap();
+        let env = ResponseEnvelope {
+            contract_version: 1,
+            changes: vec![Change {
+                file: "a.rs".to_string(),
+                block_id: "x".to_string(),
+                action: "update".to_string(),
+                new_code: "fn a() {}\n".to_string(),
+                w5h2: W5h2 {
+                    what: "a".to_string(),
+                    ..W5h2::default()
+                },
+                evidence: vec!["a.rs:unknown".to_string()],
+            }],
+        };
+        let violacoes = validar_resposta(Path::new("."), &env);
+        assert!(violacoes.iter().any(|v| v.code == "E-EVID-02"));
+        std::env::set_current_dir(anterior).unwrap();
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
     fn rejeita_path_traversal() {
         let env = ResponseEnvelope {
             contract_version: 1,
@@ -1710,6 +1773,7 @@ mod tests {
 
     #[test]
     fn aplica_update_no_bloco_e_gera_backup() {
+        let _cwd = CWD_LOCK.lock().unwrap();
         let dir = std::env::temp_dir().join(format!(
             "c2h-apply-{}-{}",
             std::process::id(),
