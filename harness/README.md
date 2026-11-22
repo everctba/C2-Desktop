@@ -29,10 +29,14 @@ Implementado no MVP:
 - persistência de W5H2/evidence no sidecar;
 - `C2H_MOCK_RESPONSE` para testar sem API.
 
+- navegacao e escrita interativa (`/ls`, `/read`, `/write`, `/new component`,
+  `/edit`, `/rm`, `/mv`).
+
 Ainda pendente:
 
 - extractors AST para Rust/Python; TS/HTML/CSS ainda heurísticos;
-- gate de testes configurável via `C2H_TEST_CMD`;
+- atualizacao automatica de imports em `/mv`;
+- preview com screenshot.
 - streaming;
 - behavior cloning/embeddings.
 
@@ -110,13 +114,20 @@ c2h>
 Comandos:
 
 ```text
-/file <arquivo>   anexa contexto de um arquivo
-/drop             remove o arquivo ativo
-/clear            limpa o historico
-/status           mostra projeto/modelo
-/help             ajuda
-/sair             encerra
+/pwd /ls [dir] /cd <dir> /tree [n] /read <f> [a:b] /find <texto>
+/imports <arquivo>
+/write <arquivo> "instrucao"
+/new component <Nome> [--html] [--css] [--js]
+/edit <arquivo> "instrucao"
+/rm <arquivo>
+/mv <origem> <destino>
+/preview <arquivo.html>
+/file <arquivo> /drop /clear /status /help /sair
 ```
+
+`/write` usa a IA com um contrato de arquivo novo, mostra preview, pede
+confirmacao e grava atomicamente. `/new component` cria um scaffold HTML/CSS/JS.
+`/edit` reutiliza o contrato de blocos e o test gate.
 
 `c2h chat` abre o mesmo modo explicitamente. O histórico da conversa fica em
 memória; nada é gravado em disco além dos logs de debug.

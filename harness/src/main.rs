@@ -169,6 +169,18 @@ struct Change {
     evidence: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WriteEnvelope {
+    path: String,
+    content: String,
+    #[serde(default)]
+    imports: Vec<String>,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    w5h2: W5h2,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct Violation {
     code: String,
@@ -494,17 +506,671 @@ fn chamar_provider_mensagens(
     Ok(content)
 }
 
+#[derive(Clone)]
+struct Workspace {
+    root: PathBuf,
+    root_canon: PathBuf,
+    cwd: PathBuf,
+}
+
+impl Workspace {
+    fn novo() -> Result<Self, String> {
+        let root = env::current_dir().map_err(|e| e.to_string())?;
+        let root_canon = fs::canonicalize(&root).map_err(|e| e.to_string())?;
+        Ok(Self {
+            root,
+            root_canon,
+            cwd: PathBuf::new(),
+        })
+    }
+
+    fn resolver(&self, entrada: &str, existir: bool) -> Result<PathBuf, String> {
+        if entrada.trim().is_empty() {
+            return Err("caminho vazio".to_string());
+        }
+        let bruto = Path::new(entrada);
+        if bruto.is_absolute() || entrada.contains('\\') {
+            return Err("use caminho relativo com /".to_string());
+        }
+        if bruto
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err("path traversal bloqueado: ..".to_string());
+        }
+        let rel = self.cwd.join(bruto);
+        let mut limpo = PathBuf::new();
+        for c in rel.components() {
+            match c {
+                std::path::Component::Normal(v) => limpo.push(v),
+                std::path::Component::CurDir => {}
+                _ => return Err("caminho invalido".to_string()),
+            }
+        }
+        let full = self.root.join(&limpo);
+        if existir {
+            let canon = fs::canonicalize(&full).map_err(|_| format!("nao existe: {entrada}"))?;
+            if !canon.starts_with(&self.root_canon) {
+                return Err("caminho fora do projeto".to_string());
+            }
+            Ok(canon)
+        } else {
+            let mut ancestral = full.parent().ok_or_else(|| "caminho sem pai".to_string())?;
+            while !ancestral.exists() {
+                ancestral = ancestral
+                    .parent()
+                    .ok_or_else(|| "caminho sem ancestral existente".to_string())?;
+            }
+            let ancestral_canon = fs::canonicalize(ancestral).map_err(|e| e.to_string())?;
+            if !ancestral_canon.starts_with(&self.root_canon) {
+                return Err("caminho fora do projeto".to_string());
+            }
+            Ok(full)
+        }
+    }
+
+    fn rel(&self, full: &Path) -> String {
+        full.strip_prefix(&self.root)
+            .or_else(|_| full.strip_prefix(&self.root_canon))
+            .unwrap_or(full)
+            .to_string_lossy()
+            .replace('\\', "/")
+    }
+
+    fn cwd_abs(&self) -> PathBuf {
+        self.root.join(&self.cwd)
+    }
+
+    fn entrar(&mut self, entrada: &str) -> Result<(), String> {
+        let texto = entrada.trim();
+        if texto.is_empty() || texto == "/" || texto == "~" {
+            self.cwd = PathBuf::new();
+            return Ok(());
+        }
+        let mut rel = self.cwd.clone();
+        for comp in Path::new(texto).components() {
+            match comp {
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    rel.pop();
+                }
+                std::path::Component::RootDir => rel.clear(),
+                std::path::Component::Normal(v) => rel.push(v),
+                _ => return Err("caminho invalido".to_string()),
+            }
+        }
+        let alvo = self.root.join(&rel);
+        let canon = fs::canonicalize(&alvo).map_err(|_| format!("nao existe: {entrada}"))?;
+        if !canon.starts_with(&self.root_canon) || !canon.is_dir() {
+            return Err("diretorio fora do projeto ou invalido".to_string());
+        }
+        self.cwd = canon
+            .strip_prefix(&self.root_canon)
+            .map_err(|_| "fora do projeto".to_string())?
+            .to_path_buf();
+        Ok(())
+    }
+}
+
+fn listar_dir(ws: &Workspace, entrada: Option<&str>) -> Result<(), String> {
+    let dir = match entrada {
+        Some(e) => ws.resolver(e, true)?,
+        None => ws.cwd_abs(),
+    };
+    let mut itens: Vec<_> = fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok())
+        .collect();
+    itens.sort_by_key(|e| e.file_name());
+    for item in itens {
+        let nome = item.file_name().to_string_lossy().to_string();
+        let meta = item.metadata().ok();
+        if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
+            println!("{nome}/");
+        } else {
+            let tam = meta.map(|m| m.len()).unwrap_or(0);
+            println!("{nome}  {tam} B");
+        }
+    }
+    Ok(())
+}
+
+fn ler_arquivo_chat(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let partes: Vec<&str> = entrada.split_whitespace().collect();
+    if partes.is_empty() {
+        return Err("uso: /read <arquivo> [inicio:fim]".to_string());
+    }
+    let path = ws.resolver(partes[0], true)?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    if bytes.iter().take(2048).any(|b| *b == 0) {
+        return Err("arquivo binario".to_string());
+    }
+    let texto = String::from_utf8_lossy(&bytes);
+    let linhas: Vec<&str> = texto.lines().collect();
+    let (ini, fim) = if let Some(faixa) = partes.get(1) {
+        let mut it = faixa.split(':');
+        let a = it
+            .next()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(1)
+            .max(1);
+        let b = it
+            .next()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(linhas.len())
+            .min(linhas.len());
+        (a, b)
+    } else {
+        (1, linhas.len().min(400))
+    };
+    for (i, linha) in linhas
+        .iter()
+        .enumerate()
+        .skip(ini.saturating_sub(1))
+        .take(fim.saturating_sub(ini) + 1)
+    {
+        println!("{:>5}: {linha}", i + 1);
+    }
+    if linhas.len() > fim {
+        println!("... ({} linhas no total)", linhas.len());
+    }
+    Ok(())
+}
+
+fn arvore(ws: &Workspace, max_depth: usize) -> Result<(), String> {
+    fn andar(dir: &Path, prefixo: &str, nivel: usize, max: usize) {
+        if nivel > max {
+            return;
+        }
+        let Ok(entradas) = fs::read_dir(dir) else {
+            return;
+        };
+        let mut itens: Vec<_> = entradas.filter_map(|e| e.ok()).collect();
+        itens.sort_by_key(|e| e.file_name());
+        for item in itens {
+            let nome = item.file_name().to_string_lossy().to_string();
+            if matches!(nome.as_str(), "target" | ".git" | "node_modules" | ".c2h") {
+                continue;
+            }
+            let path = item.path();
+            let is_dir = path.is_dir();
+            println!("{prefixo}{nome}{}", if is_dir { "/" } else { "" });
+            if is_dir && nivel < max {
+                andar(&path, &format!("{prefixo}  "), nivel + 1, max);
+            }
+        }
+    }
+    andar(&ws.cwd_abs(), "", 0, max_depth.min(6));
+    Ok(())
+}
+
+fn buscar_texto(ws: &Workspace, termo: &str) -> Result<(), String> {
+    if termo.trim().is_empty() {
+        return Err("uso: /find <texto>".to_string());
+    }
+    let termo_lower = termo.to_lowercase();
+    let mut achados = 0usize;
+    fn andar(ws: &Workspace, dir: &Path, termo: &str, achados: &mut usize) {
+        let Ok(entradas) = fs::read_dir(dir) else {
+            return;
+        };
+        for item in entradas.filter_map(|e| e.ok()) {
+            if *achados >= 100 {
+                return;
+            }
+            let nome = item.file_name().to_string_lossy().to_string();
+            if matches!(nome.as_str(), "target" | ".git" | "node_modules" | ".c2h") {
+                continue;
+            }
+            let path = item.path();
+            if path.is_dir() {
+                andar(ws, &path, termo, achados);
+                continue;
+            }
+            let Ok(meta) = item.metadata() else {
+                continue;
+            };
+            if meta.len() > 1_500_000 {
+                continue;
+            }
+            let Ok(texto) = fs::read_to_string(&path) else {
+                continue;
+            };
+            for (i, linha) in texto.lines().enumerate() {
+                if linha.to_lowercase().contains(&termo.to_lowercase()) {
+                    println!("{}:{}: {}", ws.rel(&path), i + 1, linha.trim());
+                    *achados += 1;
+                    if *achados >= 100 {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    andar(ws, &ws.cwd_abs(), &termo_lower, &mut achados);
+    println!("{achados} resultado(s)");
+    Ok(())
+}
+
+fn importacoes(conteudo: &str, ext: &str) -> Vec<String> {
+    let mut saida = Vec::new();
+    for linha in conteudo.lines() {
+        let t = linha.trim();
+        match ext {
+            "html" | "htm" => {
+                for marcador in ["href=\"", "src=\""] {
+                    if let Some(resto) = t.split(marcador).nth(1) {
+                        if let Some(fim) = resto.find('"') {
+                            saida.push(resto[..fim].to_string());
+                        }
+                    }
+                }
+            }
+            "css" => {
+                if let Some(resto) = t.split("@import").nth(1) {
+                    if let Some(v) = resto.split('"').nth(1) {
+                        saida.push(v.to_string());
+                    }
+                }
+                if let Some(resto) = t.split("url(").nth(1) {
+                    if let Some(v) = resto.split(')').next() {
+                        saida.push(v.trim_matches(|c| c == '"' || c == '\'').to_string());
+                    }
+                }
+            }
+            "js" | "ts" | "tsx" => {
+                if let Some(resto) = t.split(" from ").nth(1) {
+                    if let Some(v) = resto.split('"').nth(1) {
+                        saida.push(v.to_string());
+                    }
+                }
+                if let Some(resto) = t.split("require(").nth(1) {
+                    if let Some(v) = resto.split('"').nth(1) {
+                        saida.push(v.to_string());
+                    }
+                }
+            }
+            "rs" => {
+                if let Some(resto) = t.strip_prefix("mod ") {
+                    if let Some(nome) = resto.trim_end_matches(';').split_whitespace().next() {
+                        saida.push(format!("{nome}.rs"));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    saida
+}
+
+fn cmd_imports(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let path = ws.resolver(entrada.trim(), true)?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let texto = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let base = path.parent().unwrap_or(&ws.root);
+    for imp in importacoes(&texto, &ext) {
+        if imp.starts_with("http") || imp.starts_with('#') || imp.starts_with("data:") {
+            continue;
+        }
+        let alvo = base.join(&imp);
+        let status = if alvo.exists() { "ok" } else { "FALTANDO" };
+        println!("{status}  {imp}");
+    }
+    Ok(())
+}
+
+fn confirmar(pergunta: &str) -> Result<bool, String> {
+    use std::io::BufRead;
+    print!("{pergunta} [s/N] ");
+    let _ = std::io::stdout().flush();
+    let mut linha = String::new();
+    std::io::stdin()
+        .lock()
+        .read_line(&mut linha)
+        .map_err(|e| e.to_string())?;
+    Ok(matches!(
+        linha.trim().to_lowercase().as_str(),
+        "s" | "sim" | "y" | "yes"
+    ))
+}
+
+fn escrever_atomico(path: &Path, texto: &str) -> Result<(), String> {
+    if let Some(pai) = path.parent() {
+        fs::create_dir_all(pai).map_err(|e| format!("criar diretorio: {e}"))?;
+    }
+    let tmp = path.with_extension(format!("c2h-{}.tmp", std::process::id()));
+    fs::write(&tmp, texto).map_err(|e| format!("gravar tmp: {e}"))?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("rename: {e}")
+    })
+}
+
+fn backup(ws: &Workspace, path: &Path) -> Result<PathBuf, String> {
+    let nome = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("arquivo");
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let dir = ws.root.join(".c2h/backup");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let destino = dir.join(format!("{stamp}-{nome}"));
+    fs::copy(path, &destino).map_err(|e| format!("backup: {e}"))?;
+    Ok(destino)
+}
+
+fn contexto_vizinhanca(ws: &Workspace, path: &Path) -> String {
+    let dir = path.parent().unwrap_or(&ws.root);
+    let mut texto = format!(
+        "ARQUIVO NOVO: {}\nDIRETORIO: {}\n",
+        ws.rel(path),
+        ws.rel(dir)
+    );
+    if let Ok(entradas) = fs::read_dir(dir) {
+        texto.push_str("IRMAOS:\n");
+        let mut nomes: Vec<String> = entradas
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        nomes.sort();
+        for nome in nomes.into_iter().take(40) {
+            texto.push_str(&format!("- {nome}\n"));
+        }
+    }
+    let readme = ws.root.join("README.md");
+    if let Ok(conteudo) = fs::read_to_string(readme) {
+        texto.push_str("README (inicio):\n");
+        texto.push_str(&conteudo.lines().take(40).collect::<Vec<_>>().join("\n"));
+        texto.push('\n');
+    }
+    texto
+}
+
+fn validar_novo(
+    ws: &Workspace,
+    requisitado: &Path,
+    envelope: &WriteEnvelope,
+    instrucao: &str,
+) -> Result<(), String> {
+    if envelope.content.trim().is_empty() {
+        return Err("conteudo vazio".to_string());
+    }
+    if envelope.content.len() > 200_000 {
+        return Err("arquivo grande demais (max 200 KB)".to_string());
+    }
+    let ext = requisitado
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !matches!(
+        ext.as_str(),
+        "html" | "htm" | "css" | "js" | "ts" | "tsx" | "md" | "json" | "rs" | "py" | "txt"
+    ) {
+        return Err(format!("extensao nao permitida: {ext}"));
+    }
+    let instr = instrucao.to_lowercase();
+    if (instr.contains("sem javascript") || instr.contains("sem js"))
+        && (envelope.content.to_lowercase().contains("<script")
+            || envelope.content.to_lowercase().contains("javascript:"))
+    {
+        return Err("o pedido era sem JavaScript".to_string());
+    }
+    for imp in &envelope.imports {
+        if imp.starts_with("http") {
+            return Err(format!("import externo nao permitido: {imp}"));
+        }
+        let alvo = requisitado.parent().unwrap_or(&ws.root).join(imp);
+        if !alvo.exists() {
+            return Err(format!("import nao encontrado: {imp}"));
+        }
+    }
+    let baixo = envelope.content.to_lowercase();
+    for segredo in ["sk-", "api_key=", "password=", "secret="] {
+        if baixo.contains(segredo) {
+            return Err("possivel segredo no conteudo".to_string());
+        }
+    }
+    if envelope.content.contains("http://") || envelope.content.contains("https://") {
+        println!("aviso: conteudo contem URL externa");
+    }
+    if ws.rel(requisitado) != envelope.path.replace('\\', "/") {
+        println!(
+            "aviso: path do contrato difere do pedido; usando {}",
+            ws.rel(requisitado)
+        );
+    }
+    Ok(())
+}
+
+fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
+    let mut rest = rest.trim();
+    let mut sim = false;
+    let mut force = false;
+    loop {
+        if let Some(r) = rest.strip_prefix("--yes") {
+            sim = true;
+            rest = r.trim();
+            continue;
+        }
+        if let Some(r) = rest.strip_prefix("--force") {
+            force = true;
+            rest = r.trim();
+            continue;
+        }
+        break;
+    }
+    let (alvo_txt, instrucao) = match rest.split_once(char::is_whitespace) {
+        Some((a, b)) => (a.trim(), b.trim().trim_matches('"')),
+        None => (rest, ""),
+    };
+    if alvo_txt.is_empty() {
+        return Err("uso: /write <arquivo> \"instrucao\"".to_string());
+    }
+    let alvo = ws.resolver(alvo_txt, false)?;
+    if alvo.exists() && !force {
+        return Err("arquivo ja existe; use /edit ou --force".to_string());
+    }
+    if alvo.exists() {
+        backup(ws, &alvo)?;
+    }
+    let contexto = contexto_vizinhanca(ws, &alvo);
+    let system = "Voce cria um arquivo pequeno e focado. Responda APENAS JSON: {\"path\":\"...\",\"content\":\"...\",\"imports\":[],\"summary\":\"...\",\"w5h2\":{\"what\":\"...\",\"why\":\"...\",\"how\":\"...\"}}. Prefira menos de 150 linhas e uma responsabilidade. Nao escreva timestamp.";
+    let user = format!(
+        "ARQUIVO: {}\nINSTRUCAO: {}\nCONTEXTO:\n{}",
+        ws.rel(&alvo),
+        instrucao,
+        contexto
+    );
+    let resposta = chamar_provider(system, &user)?;
+    let json = extrair_json_valor(&resposta)?;
+    let envelope: WriteEnvelope =
+        serde_json::from_value(json).map_err(|e| format!("contrato de criacao invalido: {e}"))?;
+    validar_novo(ws, &alvo, &envelope, instrucao)?;
+    let linhas = envelope.content.lines().count();
+    println!("\n--- preview {} ({} linhas) ---", ws.rel(&alvo), linhas);
+    for (i, linha) in envelope.content.lines().take(200).enumerate() {
+        println!("{:>4}: {linha}", i + 1);
+    }
+    if !sim && !confirmar("gravar?")? {
+        println!("cancelado");
+        return Ok(());
+    }
+    if alvo.exists() {
+        fs::remove_file(&alvo).map_err(|e| format!("remover para sobrescrever: {e}"))?;
+    }
+    escrever_atomico(&alvo, &envelope.content)?;
+    cmd_annotate(Path::new(&ws.rel(&alvo)), false)?;
+    if let Some(mut side) = ler_sidecar(Path::new(&ws.rel(&alvo))) {
+        if let Some(primeiro) = side.blocks.first_mut() {
+            primeiro.w5h2 = envelope.w5h2.clone();
+        }
+        escrever_sidecar(Path::new(&ws.rel(&alvo)), &side)?;
+    }
+    log_evento(
+        "write_file",
+        serde_json::json!({"path": ws.rel(&alvo), "lines": linhas}),
+    );
+    println!("criado: {} ({} linhas)", ws.rel(&alvo), linhas);
+    Ok(())
+}
+
+fn cmd_new_component(ws: &Workspace, rest: &str) -> Result<(), String> {
+    let mut partes = rest.split_whitespace();
+    let nome = partes
+        .next()
+        .ok_or_else(|| "uso: /new component <Nome> [--html] [--css] [--js]".to_string())?;
+    let flags: Vec<&str> = partes.collect();
+    let slug = nome.to_lowercase().replace(' ', "-");
+    let dir = ws.resolver(&format!("src/components/{slug}"), false)?;
+    if dir.exists() {
+        return Err(format!("componente ja existe: {}", ws.rel(&dir)));
+    }
+    let quer_html = flags.is_empty() || flags.contains(&"--html");
+    let quer_css = flags.is_empty() || flags.contains(&"--css");
+    let quer_js = flags.contains(&"--js");
+    let mut criados = Vec::new();
+    if quer_html {
+        let link = if quer_css {
+            format!("  <link rel=\"stylesheet\" href=\"{slug}.css\">\n")
+        } else {
+            String::new()
+        };
+        let html = format!("<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>{nome}</title>\n{link}</head>\n<body>\n  <section data-c2-block=\"{slug}\">\n    <h1>{nome}</h1>\n  </section>\n</body>\n</html>\n");
+        let path = dir.join(format!("{slug}.html"));
+        escrever_atomico(&path, &html)?;
+        criados.push(path);
+    }
+    if quer_css {
+        let css = format!("/* {nome} */\n.{slug} {{\n  display: block;\n}}\n");
+        let path = dir.join(format!("{slug}.css"));
+        escrever_atomico(&path, &css)?;
+        criados.push(path);
+    }
+    if quer_js {
+        let js = format!("// {nome}\n");
+        let path = dir.join(format!("{slug}.js"));
+        escrever_atomico(&path, &js)?;
+        criados.push(path);
+    }
+    for path in &criados {
+        let rel = ws.rel(path);
+        cmd_annotate(Path::new(&rel), false)?;
+        println!("criado: {rel}");
+    }
+    log_evento(
+        "new_component",
+        serde_json::json!({"name": nome, "files": criados.len()}),
+    );
+    Ok(())
+}
+
+fn cmd_rm(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let path = ws.resolver(entrada.trim(), true)?;
+    if path.is_dir() {
+        return Err("remocao de diretorio bloqueada".to_string());
+    }
+    if !confirmar(&format!("apagar {}?", ws.rel(&path)))? {
+        println!("cancelado");
+        return Ok(());
+    }
+    let backup_path = backup(ws, &path)?;
+    fs::remove_file(&path).map_err(|e| e.to_string())?;
+    let rel = ws.rel(&path);
+    let _ = fs::remove_file(sidecar_path(Path::new(&rel)));
+    log_evento(
+        "rm_file",
+        serde_json::json!({"path": rel, "backup": backup_path.display().to_string()}),
+    );
+    println!("apagado: {rel} (backup: {})", backup_path.display());
+    Ok(())
+}
+
+fn cmd_mv(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let mut it = entrada.split_whitespace();
+    let origem = it
+        .next()
+        .ok_or_else(|| "uso: /mv <origem> <destino>".to_string())?;
+    let destino = it
+        .next()
+        .ok_or_else(|| "uso: /mv <origem> <destino>".to_string())?;
+    let origem_path = ws.resolver(origem, true)?;
+    let destino_path = ws.resolver(destino, false)?;
+    if destino_path.exists() {
+        return Err("destino ja existe".to_string());
+    }
+    if !confirmar(&format!(
+        "mover {} -> {}?",
+        ws.rel(&origem_path),
+        ws.rel(&destino_path)
+    ))? {
+        println!("cancelado");
+        return Ok(());
+    }
+    backup(ws, &origem_path)?;
+    if let Some(pai) = destino_path.parent() {
+        fs::create_dir_all(pai).map_err(|e| e.to_string())?;
+    }
+    fs::rename(&origem_path, &destino_path).map_err(|e| e.to_string())?;
+    let rel_origem = ws.rel(&origem_path);
+    let rel_destino = ws.rel(&destino_path);
+    let _ = fs::remove_file(sidecar_path(Path::new(&rel_origem)));
+    cmd_annotate(Path::new(&rel_destino), false)?;
+    log_evento(
+        "mv_file",
+        serde_json::json!({"from": rel_origem, "to": rel_destino}),
+    );
+    println!("movido: {rel_origem} -> {rel_destino}");
+    Ok(())
+}
+
+fn cmd_preview(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let path = ws.resolver(entrada.trim(), true)?;
+    if path.extension().and_then(|e| e.to_str()) != Some("html") {
+        return Err("preview suporta apenas .html".to_string());
+    }
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path.to_string_lossy()])
+            .spawn()
+            .map_err(|e| format!("abrir navegador: {e}"))?;
+    }
+    #[cfg(not(windows))]
+    {
+        println!("file://{}", path.display());
+    }
+    println!("preview: {}", ws.rel(&path));
+    Ok(())
+}
+
+fn cmd_edit(ws: &Workspace, entrada: &str) -> Result<(), String> {
+    let (file, instrucao) = entrada
+        .split_once(char::is_whitespace)
+        .or_else(|| entrada.split_once('"'))
+        .ok_or_else(|| "uso: /edit <arquivo> \"instrucao\"".to_string())?;
+    let path = ws.resolver(file.trim(), true)?;
+    let rel = path.strip_prefix(&ws.root).unwrap_or(&path).to_path_buf();
+    println!("editando {} ...", rel.display());
+    cmd_ask_contract(instrucao.trim_matches('"'), Path::new(&rel), 3)
+}
+
 fn cmd_chat() -> Result<(), String> {
     use std::io::BufRead;
-    if !std::io::stdin().is_terminal() {
+    if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
         return Err("modo interativo exige um terminal; use um subcomando".to_string());
     }
-    let raiz = env::current_dir()
-        .map(|p| p.display().to_string())
-        .unwrap_or_default();
+    let mut ws = Workspace::novo()?;
     println!("Bom dia! Sou o c2h, seu harness de contexto por blocos.");
-    println!("projeto: {raiz}");
-    println!("modelo: {} · provider: {}", model(), base_url());
+    println!("projeto: {}", ws.root.display());
+    println!("modelo: {} - provider: {}", model(), base_url());
     if api_key().is_none() {
         println!("aviso: api_key ausente; configure config.json antes de conversar.");
     }
@@ -512,7 +1178,7 @@ fn cmd_chat() -> Result<(), String> {
 
     let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Quando receber contexto de arquivo, use-o antes de sugerir mudancas. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
-    let mut arquivo: Option<PathBuf> = None;
+    let mut arquivo: Option<String> = None;
     let stdin = std::io::stdin();
     loop {
         print!("c2h> ");
@@ -530,52 +1196,139 @@ fn cmd_chat() -> Result<(), String> {
         if entrada.is_empty() {
             continue;
         }
-        match entrada {
-            "/sair" | "/exit" | "/quit" => break,
-            "/help" | "/ajuda" => {
-                println!(
-                    "\nComandos:\n  /file <arquivo>  anexa contexto de um arquivo\n  /drop            remove o arquivo ativo\n  /clear           limpa o historico\n  /status          mostra projeto/modelo\n  /help            esta ajuda\n  /sair            encerra\n"
-                );
-                continue;
+        if entrada == "/sair" || entrada == "/exit" || entrada == "/quit" {
+            break;
+        }
+        if entrada == "/help" || entrada == "/ajuda" {
+            println!(
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
+            );
+            continue;
+        }
+        if entrada == "/clear" {
+            historico.clear();
+            println!("historico limpo");
+            continue;
+        }
+        if entrada == "/drop" {
+            arquivo = None;
+            println!("arquivo ativo removido");
+            continue;
+        }
+        if entrada == "/pwd" {
+            let cwd = if ws.cwd.as_os_str().is_empty() {
+                "/".to_string()
+            } else {
+                format!("/{}", ws.cwd.to_string_lossy().replace('\\', "/"))
+            };
+            println!("{cwd}");
+            continue;
+        }
+        if entrada == "/status" {
+            println!("projeto: {}", ws.root.display());
+            println!("cwd: {}", ws.cwd.display());
+            println!("modelo: {} - provider: {}", model(), base_url());
+            println!("arquivo ativo: {}", arquivo.as_deref().unwrap_or("nenhum"));
+            println!("mensagens: {}", historico.len());
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/ls ") {
+            if let Err(erro) = listar_dir(&ws, Some(resto.trim())) {
+                println!("erro: {erro}");
             }
-            "/clear" => {
-                historico.clear();
-                println!("historico limpo");
-                continue;
+            continue;
+        }
+        if entrada == "/ls" {
+            if let Err(erro) = listar_dir(&ws, None) {
+                println!("erro: {erro}");
             }
-            "/status" => {
-                println!("projeto: {raiz}");
-                println!("modelo: {} · provider: {}", model(), base_url());
-                println!(
-                    "arquivo ativo: {}",
-                    arquivo
-                        .as_ref()
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|| "nenhum".to_string())
-                );
-                println!("mensagens: {}", historico.len());
-                continue;
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/cd ") {
+            match ws.entrar(resto.trim()) {
+                Ok(()) => println!("cwd: /{}", ws.cwd.to_string_lossy().replace('\\', "/")),
+                Err(erro) => println!("erro: {erro}"),
             }
-            "/drop" => {
-                arquivo = None;
-                println!("arquivo ativo removido");
-                continue;
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/tree") {
+            let depth = resto.trim().parse::<usize>().unwrap_or(3);
+            if let Err(erro) = arvore(&ws, depth) {
+                println!("erro: {erro}");
             }
-            _ if entrada.starts_with("/file ") => {
-                let path = PathBuf::from(entrada.trim_start_matches("/file ").trim());
-                match montar_contexto(&path) {
-                    Ok(_) => {
-                        arquivo = Some(path.clone());
-                        println!("contexto anexado: {}", path.display());
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/read ") {
+            if let Err(erro) = ler_arquivo_chat(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/find ") {
+            if let Err(erro) = buscar_texto(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/imports ") {
+            if let Err(erro) = cmd_imports(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/write ") {
+            if let Err(erro) = cmd_write(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/new component ") {
+            if let Err(erro) = cmd_new_component(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/edit ") {
+            if let Err(erro) = cmd_edit(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/rm ") {
+            if let Err(erro) = cmd_rm(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/mv ") {
+            if let Err(erro) = cmd_mv(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/preview ") {
+            if let Err(erro) = cmd_preview(&ws, resto.trim()) {
+                println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/file ") {
+            match ws.resolver(resto.trim(), true) {
+                Ok(path) => {
+                    let rel = ws.rel(&path);
+                    if let Err(erro) = montar_contexto(Path::new(&rel)) {
+                        println!("erro: {erro}");
+                    } else {
+                        arquivo = Some(rel.clone());
+                        println!("contexto anexado: {rel}");
                     }
-                    Err(erro) => println!("erro: {erro}"),
                 }
-                continue;
+                Err(erro) => println!("erro: {erro}"),
             }
-            _ => {}
+            continue;
         }
         let contexto = match &arquivo {
-            Some(path) => match montar_contexto(path) {
+            Some(rel) => match montar_contexto(Path::new(rel)) {
                 Ok(texto) => format!("\n\nCONTEXTO ATIVO:\n{texto}"),
                 Err(erro) => format!("\n\n[contexto indisponivel: {erro}]"),
             },
@@ -1826,6 +2579,55 @@ mod tests {
             "def a():\n    return 1\n\ndef b():\n    pass\n",
         );
         assert_eq!(blocos.len(), 2);
+    }
+
+    #[test]
+    fn workspace_bloqueia_parent_dir() {
+        let root = std::env::temp_dir().join(format!("c2h-jail-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let canon = std::fs::canonicalize(&root).unwrap();
+        let ws = Workspace {
+            root: root.clone(),
+            root_canon: canon,
+            cwd: PathBuf::new(),
+        };
+        assert!(ws.resolver("../fora.rs", false).is_err());
+        assert!(ws.resolver("sub/../../fora.rs", false).is_err());
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn extrai_imports_html_css() {
+        let html = "<link href=\"a.css\" rel=\"stylesheet\">\n<script src=\"a.js\"></script>";
+        let imports = importacoes(html, "html");
+        assert!(imports.contains(&"a.css".to_string()));
+        assert!(imports.contains(&"a.js".to_string()));
+        let css = "@import \"base.css\";\nbody { background: url(\"fundo.png\"); }";
+        let imports = importacoes(css, "css");
+        assert!(imports.contains(&"base.css".to_string()));
+        assert!(imports.contains(&"fundo.png".to_string()));
+    }
+
+    #[test]
+    fn validar_novo_rejeita_script_quando_pedido_sem_js() {
+        let root = std::env::temp_dir().join(format!("c2h-new-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let canon = std::fs::canonicalize(&root).unwrap();
+        let ws = Workspace {
+            root: root.clone(),
+            root_canon: canon,
+            cwd: PathBuf::new(),
+        };
+        let alvo = root.join("a.html");
+        let env = WriteEnvelope {
+            path: "a.html".to_string(),
+            content: "<html><script>alert(1)</script></html>".to_string(),
+            imports: vec![],
+            summary: "x".to_string(),
+            w5h2: W5h2::default(),
+        };
+        assert!(validar_novo(&ws, &alvo, &env, "layout sem JS").is_err());
+        std::fs::remove_dir_all(root).ok();
     }
 
     #[test]
