@@ -4202,7 +4202,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
         file: rel_file(file),
         status: if !path_anotavel(&rel_file(file)) {
             "disposable"
-        } else if novos.is_empty() {
+        } else if novos.is_empty() || novos.iter().any(|b| !why_tecnico(&b.w5h2.why)) {
             "unannotated"
         } else {
             "annotated"

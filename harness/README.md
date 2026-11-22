@@ -198,10 +198,16 @@ Gatilhos do annotation pass:
 
 ```text
 blocks vazio
+qualquer bloco sem why tecnico
 arquivo > 120 linhas com 1 bloco
 arquivo > 150 linhas com menos de 2 blocos
 bloco cobrindo > 150 linhas
+bloco high-risk sem why
 ```
+
+Structural annotate com bloco sem why fica `status: unannotated`; o annotation
+pass e disparado no write/replace/annotate. Arquivo pequeno com 2 blocos tambem
+passa a ser anotado.
 
 Qualidade estrutural (diagnóstico, sem bloquear):
 
