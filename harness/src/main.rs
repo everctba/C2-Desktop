@@ -605,7 +605,7 @@ fn chamar_api(
 fn ferramentas() -> serde_json::Value {
     let mut tools = serde_json::json!([
         {"type":"function","function":{"name":"list_dir","description":"Lista arquivos e diretorios do projeto.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"diretorio relativo; vazio para o atual"}}}}},
-        {"type":"function","function":{"name":"read_file","description":"Le um arquivo de texto, com faixa de linhas opcional.","parameters":{"type":"object","properties":{"path":{"type":"string"},"start":{"type":"integer"},"end":{"type":"integer"}},"required":["path"]}}},
+        {"type":"function","function":{"name":"read_file","description":"Le um arquivo de texto. Maximo 120 linhas por chamada; use full=true para arquivo inteiro.","parameters":{"type":"object","properties":{"path":{"type":"string"},"start":{"type":"integer"},"end":{"type":"integer"},"full":{"type":"boolean"}},"required":["path"]}}},
         {"type":"function","function":{"name":"find_text","description":"Busca texto nos arquivos do projeto.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
         {"type":"function","function":{"name":"write_file","description":"Cria SOMENTE arquivo novo. Se existir, use replace_file. O harness valida, mostra preview e pede confirmacao.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
         {"type":"function","function":{"name":"replace_file","description":"Substitui arquivo existente com backup, tmp, validacao e rename atomico. Nao use remove_file para editar.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
@@ -1367,12 +1367,19 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
         .and_then(|v| v.as_u64())
         .unwrap_or(1)
         .max(1) as usize;
-    let fim = args
-        .get("end")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(120)
-        .min(linhas.len() as u64) as usize;
+    let full = args.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
+    let fim_pedido = args.get("end").and_then(|v| v.as_u64()).unwrap_or(if full {
+        linhas.len() as u64
+    } else {
+        120
+    });
     let ini = ini.min(linhas.len().max(1));
+    let fim = if full {
+        fim_pedido.min(linhas.len() as u64) as usize
+    } else {
+        let teto = ini.saturating_add(119);
+        (fim_pedido as usize).min(linhas.len()).min(teto)
+    };
     let fim = fim.max(ini).min(linhas.len());
     let total = linhas.len();
     let mut saida = String::new();
@@ -2080,6 +2087,11 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
             }
         }
         if total > 0 {
+            side.status = if side.blocks.iter().all(|b| why_tecnico(&b.w5h2.why)) {
+                "annotated".to_string()
+            } else {
+                "unannotated".to_string()
+            };
             escrever_sidecar(Path::new(&side.file), side)?;
         }
     }
@@ -2535,8 +2547,13 @@ fn executar_agente(
     let max_passos = env::var("C2H_MAX_STEPS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(16)
+        .unwrap_or(24)
         .clamp(2, 64);
+    let reserva = env::var("C2H_RESERVE_STEPS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(2)
+        .min(max_passos.saturating_sub(1));
     let mut cache_leituras: BTreeMap<String, String> = BTreeMap::new();
     let mut leituras_por_arquivo: BTreeMap<String, usize> = BTreeMap::new();
     let tarefa = historico
@@ -2549,6 +2566,12 @@ fn executar_agente(
     for passo in 0..max_passos {
         let mut mensagens = vec![serde_json::json!({"role":"system","content":system})];
         mensagens.extend(historico.clone());
+        if passo + 1 == max_passos.saturating_sub(reserva) {
+            mensagens.push(serde_json::json!({
+                "role": "user",
+                "content": format!("ORCAMENTO: restam {reserva} passos. Pare de explorar/anotar e priorize write_file/replace_file/edit_file + run_test.")
+            }));
+        }
         if passo + 1 == max_passos {
             mensagens.push(serde_json::json!({
                 "role": "user",

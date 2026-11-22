@@ -359,7 +359,9 @@ BLOCOS SEM WHY (use annotate_blocks com este block_id):
 - a.rs::fn::a [fn] linhas 1-3
 ```
 
-`annotate_blocks` aceita `block_id`, `path`+`start_line` ou `path:linha`:
+`annotate_blocks` aceita `block_id`, `path`+`start_line` ou `path:linha`.
+Depois de atualizar, o sidecar vira `status: annotated` quando todos os blocos
+tem why tecnico.
 
 ```json
 {"blocks":[{"path":"a.rs","start_line":1,"what":"...","why":"..."}]}
@@ -542,10 +544,10 @@ $env:C2H_MAX_STEPS="24"
 c2h
 ```
 
-Padrao: 16. Se o limite chegar ao fim, o harness faz uma ultima chamada **sem
-tools** pedindo ao modelo que responda com o que ja coletou. O evento
-`agent_forced_final` registra isso. Para repos grandes, 24-32 pode ser melhor,
-mas aumenta custo/latencia.
+Padrao: 24. `C2H_RESERVE_STEPS` (padrao 2) injeta um aviso antes do limite:
+pare de explorar/anotar e priorize editar/testar. No fim, o harness faz uma
+ultima chamada **sem tools** pedindo ao modelo que responda com o que ja coletou.
+O evento `agent_forced_final` registra isso.
 
 ## YOLO
 
