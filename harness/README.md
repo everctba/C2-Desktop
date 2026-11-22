@@ -231,6 +231,23 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## YOLO
+
+```powershell
+c2h --yolo
+# ou
+$env:C2H_YOLO="1"
+```
+
+Tambem dentro do chat:
+
+```text
+/yolo
+```
+
+Nesse modo, `write_file`, `edit_file`, `/rm` e `/mv` nao pedem confirmacao.
+Use com cuidado.
+
 `c2h chat` abre o mesmo modo explicitamente. O histórico da conversa fica em
 memória; nada é gravado em disco além dos logs de debug.
 
