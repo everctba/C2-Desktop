@@ -125,9 +125,27 @@ Comandos:
 /file <arquivo> /drop /clear /status /help /sair
 ```
 
-`/write` usa a IA com um contrato de arquivo novo, mostra preview, pede
-confirmacao e grava atomicamente. `/new component` cria um scaffold HTML/CSS/JS.
-`/edit` reutiliza o contrato de blocos e o test gate.
+## Agent loop com ferramentas
+
+No chat, o `c2h` agora envia ferramentas ao modelo e executa `tool_calls`:
+
+```text
+list_dir, read_file, find_text, write_file, edit_file,
+new_component, move_file, remove_file, run_test
+```
+
+O usuario pode pedir em linguagem natural:
+
+```text
+c2h> crie player.html com layout de player mp3, sem JS
+```
+
+O modelo escolhe `list_dir`, `write_file` etc. O harness valida, mostra preview,
+pede confirmacao e grava. `/tools` lista as ferramentas; `/auto` desliga a
+confirmacao de escrita (use com cuidado).
+
+`/write` continua disponivel como atalho explicito. `/new component` cria um
+scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 
 `c2h chat` abre o mesmo modo explicitamente. O histórico da conversa fica em
 memória; nada é gravado em disco além dos logs de debug.

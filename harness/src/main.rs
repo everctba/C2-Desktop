@@ -445,6 +445,8 @@ impl Drop for Spinner {
     }
 }
 
+static MOCK_TOOL_USED: AtomicBool = AtomicBool::new(false);
+
 fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
     let mensagens = vec![
         serde_json::json!({"role": "system", "content": system}),
@@ -454,28 +456,70 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
 }
 
 fn chamar_provider_mensagens(
-    system: &str,
+    _system: &str,
     mensagens: &[serde_json::Value],
 ) -> Result<String, String> {
+    let msg = chamar_api(mensagens, None)?;
+    msg.get("content")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "resposta sem content".to_string())
+}
+
+fn chamar_api(
+    mensagens: &[serde_json::Value],
+    tools: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    if tools.is_some() {
+        if let Ok(mock) = env::var("C2H_MOCK_TOOL_CALL") {
+            if !MOCK_TOOL_USED.swap(true, Ordering::Relaxed) {
+                let value: serde_json::Value =
+                    serde_json::from_str(&mock).map_err(|e| format!("mock tool invalido: {e}"))?;
+                let nome = value
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("list_dir");
+                let args = value
+                    .get("arguments")
+                    .and_then(|v| v.as_str())
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "{}".to_string());
+                log_evento("provider_mock_tool", serde_json::json!({"name": nome}));
+                return Ok(serde_json::json!({
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "mock-call-1",
+                        "type": "function",
+                        "function": {"name": nome, "arguments": args}
+                    }]
+                }));
+            }
+        }
+    }
     log_evento(
         "provider_request",
-        serde_json::json!({"model": model(), "system_chars": system.len(), "messages": mensagens.len()}),
+        serde_json::json!({"model": model(), "messages": mensagens.len(), "tools": tools.is_some()}),
     );
     if let Ok(mock) = env::var("C2H_MOCK_RESPONSE") {
         log_evento(
             "provider_mock",
             serde_json::json!({"response_chars": mock.len()}),
         );
-        return Ok(mock);
+        return Ok(serde_json::json!({"role":"assistant","content": mock}));
     }
     let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
     let _spinner = Spinner::novo("IA pensando");
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "model": model(),
         "messages": mensagens,
         "temperature": 0.2,
         "stream": false
     });
+    if let Some(tools) = tools {
+        body["tools"] = tools.clone();
+        body["tool_choice"] = serde_json::json!("auto");
+    }
     let url = format!("{}/chat/completions", base_url().trim_end_matches('/'));
     let resposta = ureq::post(&url)
         .set("Authorization", &format!("Bearer {key}"))
@@ -494,16 +538,34 @@ fn chamar_provider_mensagens(
             outro => format!("provider: {outro}"),
         })?;
     let json: serde_json::Value = resposta.into_json().map_err(|e| format!("json: {e}"))?;
-    let content = json
-        .pointer("/choices/0/message/content")
+    let msg = json
+        .pointer("/choices/0/message")
+        .cloned()
+        .ok_or_else(|| "resposta sem choices[0].message".to_string())?;
+    let tamanho = msg
+        .get("content")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| "resposta sem choices[0].message.content".to_string())?;
+        .map(|s| s.len())
+        .unwrap_or(0);
     log_evento(
         "provider_response",
-        serde_json::json!({"chars": content.len()}),
+        serde_json::json!({"chars": tamanho, "tool_calls": msg.get("tool_calls").is_some()}),
     );
-    Ok(content)
+    Ok(msg)
+}
+
+fn ferramentas() -> serde_json::Value {
+    serde_json::json!([
+        {"type":"function","function":{"name":"list_dir","description":"Lista arquivos e diretorios do projeto.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"diretorio relativo; vazio para o atual"}}}}},
+        {"type":"function","function":{"name":"read_file","description":"Le um arquivo de texto, com faixa de linhas opcional.","parameters":{"type":"object","properties":{"path":{"type":"string"},"start":{"type":"integer"},"end":{"type":"integer"}},"required":["path"]}}},
+        {"type":"function","function":{"name":"find_text","description":"Busca texto nos arquivos do projeto.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
+        {"type":"function","function":{"name":"write_file","description":"Cria um arquivo novo pequeno. O harness valida, mostra preview e pede confirmacao.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
+        {"type":"function","function":{"name":"edit_file","description":"Edita um bloco de um arquivo existente via block_id, com patch validado e test gate.","parameters":{"type":"object","properties":{"path":{"type":"string"},"block_id":{"type":"string"},"new_code":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"}},"required":["path","block_id","new_code"]}}},
+        {"type":"function","function":{"name":"new_component","description":"Cria scaffold HTML/CSS/JS de um componente.","parameters":{"type":"object","properties":{"name":{"type":"string"},"html":{"type":"boolean"},"css":{"type":"boolean"},"js":{"type":"boolean"}},"required":["name"]}}},
+        {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
+        {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
+        {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}}
+    ])
 }
 
 #[derive(Clone)]
@@ -1162,6 +1224,327 @@ fn cmd_edit(ws: &Workspace, entrada: &str) -> Result<(), String> {
     cmd_ask_contract(instrucao.trim_matches('"'), Path::new(&rel), 3)
 }
 
+fn texto_listar(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let entrada = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let dir = if entrada.trim().is_empty() {
+        ws.cwd_abs()
+    } else {
+        ws.resolver(entrada, true)?
+    };
+    let mut saida = String::new();
+    let mut itens: Vec<_> = fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok())
+        .collect();
+    itens.sort_by_key(|e| e.file_name());
+    for item in itens {
+        let nome = item.file_name().to_string_lossy().to_string();
+        let is_dir = item.metadata().map(|m| m.is_dir()).unwrap_or(false);
+        saida.push_str(&format!("{nome}{}\n", if is_dir { "/" } else { "" }));
+    }
+    Ok(saida)
+}
+
+fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let path = ws.resolver(
+        args.get("path").and_then(|v| v.as_str()).unwrap_or(""),
+        true,
+    )?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    if bytes.iter().take(2048).any(|b| *b == 0) {
+        return Err("arquivo binario".to_string());
+    }
+    let texto = String::from_utf8_lossy(&bytes);
+    let linhas: Vec<&str> = texto.lines().collect();
+    let ini = args
+        .get("start")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1)
+        .max(1) as usize;
+    let fim = args
+        .get("end")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(linhas.len() as u64)
+        .min(linhas.len() as u64) as usize;
+    let mut saida = String::new();
+    for (i, linha) in linhas
+        .iter()
+        .enumerate()
+        .skip(ini - 1)
+        .take(fim.saturating_sub(ini) + 1)
+    {
+        saida.push_str(&format!("{:>5}: {linha}\n", i + 1));
+    }
+    Ok(saida)
+}
+
+fn texto_buscar(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let termo = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if termo.is_empty() {
+        return Err("query vazia".to_string());
+    }
+    let mut saida = String::new();
+    let mut achados = 0usize;
+    fn andar(ws: &Workspace, dir: &Path, termo: &str, saida: &mut String, achados: &mut usize) {
+        let Ok(entradas) = fs::read_dir(dir) else {
+            return;
+        };
+        for item in entradas.filter_map(|e| e.ok()) {
+            if *achados >= 80 {
+                return;
+            }
+            let nome = item.file_name().to_string_lossy().to_string();
+            if matches!(nome.as_str(), "target" | ".git" | "node_modules" | ".c2h") {
+                continue;
+            }
+            let path = item.path();
+            if path.is_dir() {
+                andar(ws, &path, termo, saida, achados);
+                continue;
+            }
+            let Ok(meta) = item.metadata() else {
+                continue;
+            };
+            if meta.len() > 1_500_000 {
+                continue;
+            }
+            let Ok(texto) = fs::read_to_string(&path) else {
+                continue;
+            };
+            for (i, linha) in texto.lines().enumerate() {
+                if linha.to_lowercase().contains(termo) {
+                    saida.push_str(&format!("{}:{}: {}\n", ws.rel(&path), i + 1, linha.trim()));
+                    *achados += 1;
+                    if *achados >= 80 {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    andar(ws, &ws.cwd_abs(), &termo, &mut saida, &mut achados);
+    Ok(format!("{achados} resultado(s)\n{saida}"))
+}
+
+fn ferramenta_write(
+    ws: &Workspace,
+    args: &serde_json::Value,
+    auto: bool,
+) -> Result<String, String> {
+    let rel = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+    let summary = args.get("summary").and_then(|v| v.as_str()).unwrap_or("");
+    let alvo = ws.resolver(rel, false)?;
+    if alvo.exists() {
+        return Err(format!("arquivo ja existe: {rel}; use edit_file"));
+    }
+    let envelope = WriteEnvelope {
+        path: rel.to_string(),
+        content: content.to_string(),
+        imports: vec![],
+        summary: summary.to_string(),
+        w5h2: W5h2 {
+            what: summary.to_string(),
+            why: "solicitado pelo agente".to_string(),
+            ..W5h2::default()
+        },
+    };
+    validar_novo(ws, &alvo, &envelope, "")?;
+    println!(
+        "\n--- arquivo proposto: {rel} ({} linhas) ---",
+        content.lines().count()
+    );
+    for (i, linha) in content.lines().take(120).enumerate() {
+        println!("{:>4}: {linha}", i + 1);
+    }
+    if !auto && !confirmar("criar arquivo?")? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    escrever_atomico(&alvo, content)?;
+    cmd_annotate(Path::new(rel), false)?;
+    if let Some(mut side) = ler_sidecar(Path::new(rel)) {
+        if let Some(primeiro) = side.blocks.first_mut() {
+            primeiro.w5h2 = envelope.w5h2.clone();
+        }
+        escrever_sidecar(Path::new(rel), &side)?;
+    }
+    log_evento(
+        "tool_write",
+        serde_json::json!({"path": rel, "lines": content.lines().count()}),
+    );
+    Ok(format!(
+        "arquivo criado: {rel} ({} linhas)",
+        content.lines().count()
+    ))
+}
+
+fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
+    let rel = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let block_id = args.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
+    let new_code = args.get("new_code").and_then(|v| v.as_str()).unwrap_or("");
+    let path = ws.resolver(rel, true)?;
+    let rel = path
+        .strip_prefix(&ws.root)
+        .unwrap_or(&path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let envelope = ResponseEnvelope {
+        contract_version: 1,
+        changes: vec![Change {
+            file: rel.clone(),
+            block_id: block_id.to_string(),
+            action: "update".to_string(),
+            new_code: new_code.to_string(),
+            w5h2: W5h2 {
+                what: args
+                    .get("what")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                why: args
+                    .get("why")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                ..W5h2::default()
+            },
+            evidence: vec![format!("{rel}:1")],
+        }],
+    };
+    let violacoes = validar_resposta(Path::new("."), &envelope);
+    if !violacoes.is_empty() {
+        return Err(serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?);
+    }
+    if !auto && !confirmar(&format!("editar {rel}?"))? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    aplicar_envelope(Path::new("."), &envelope, false)?;
+    Ok(format!("editado: {rel}"))
+}
+
+fn ferramenta_test() -> Result<String, String> {
+    let Ok(comando) = env::var("C2H_TEST_CMD") else {
+        return Ok("C2H_TEST_CMD nao configurado".to_string());
+    };
+    #[cfg(windows)]
+    let saida = std::process::Command::new("cmd")
+        .args(["/C", &comando])
+        .output();
+    #[cfg(not(windows))]
+    let saida = std::process::Command::new("sh")
+        .args(["-c", &comando])
+        .output();
+    match saida {
+        Ok(out) => {
+            let texto = format!(
+                "exit={}\nstdout:\n{}\nstderr:\n{}",
+                out.status.code().unwrap_or(-1),
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            Ok(texto.chars().take(8000).collect())
+        }
+        Err(e) => Err(format!("teste: {e}")),
+    }
+}
+
+fn executar_ferramenta(
+    ws: &Workspace,
+    auto: bool,
+    nome: &str,
+    argumentos: &str,
+) -> Result<String, String> {
+    let args: serde_json::Value =
+        serde_json::from_str(argumentos).unwrap_or_else(|_| serde_json::json!({}));
+    log_evento("tool_call", serde_json::json!({"name": nome, "args": args}));
+    let resultado = match nome {
+        "list_dir" => texto_listar(ws, &args),
+        "read_file" => texto_ler(ws, &args),
+        "find_text" => texto_buscar(ws, &args),
+        "write_file" => ferramenta_write(ws, &args, auto),
+        "edit_file" => ferramenta_edit(ws, &args, auto),
+        "new_component" => {
+            let nome = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            cmd_new_component(ws, nome).map(|_| format!("componente criado: {nome}"))
+        }
+        "move_file" => {
+            let from = args.get("from").and_then(|v| v.as_str()).unwrap_or("");
+            let to = args.get("to").and_then(|v| v.as_str()).unwrap_or("");
+            cmd_mv(ws, &format!("{from} {to}")).map(|_| format!("movido: {from} -> {to}"))
+        }
+        "remove_file" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            cmd_rm(ws, path).map(|_| format!("removido: {path}"))
+        }
+        "run_test" => ferramenta_test(),
+        outro => Err(format!("ferramenta desconhecida: {outro}")),
+    };
+    log_evento(
+        "tool_result",
+        serde_json::json!({"name": nome, "ok": resultado.is_ok()}),
+    );
+    resultado
+}
+
+fn executar_agente(
+    system: &str,
+    historico: &mut Vec<serde_json::Value>,
+    ws: &Workspace,
+    auto: bool,
+) -> Result<(), String> {
+    let tools = ferramentas();
+    for passo in 0..8 {
+        let mut mensagens = vec![serde_json::json!({"role":"system","content":system})];
+        mensagens.extend(historico.clone());
+        let msg = chamar_api(&mensagens, Some(&tools))?;
+        let tool_calls = msg
+            .get("tool_calls")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        if tool_calls.is_empty() {
+            let content = msg
+                .get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            println!("\n{content}\n");
+            historico.push(msg);
+            return Ok(());
+        }
+        println!(
+            "agente: {} ferramenta(s) no passo {}",
+            tool_calls.len(),
+            passo + 1
+        );
+        historico.push(msg);
+        for call in tool_calls {
+            let id = call.get("id").and_then(|v| v.as_str()).unwrap_or("call");
+            let nome = call
+                .pointer("/function/name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let argumentos = call
+                .pointer("/function/arguments")
+                .and_then(|v| v.as_str())
+                .unwrap_or("{}");
+            println!("  -> {nome}");
+            let resultado = executar_ferramenta(ws, auto, nome, argumentos)?;
+            let truncado: String = resultado.chars().take(1200).collect();
+            historico.push(serde_json::json!({
+                "role": "tool",
+                "tool_call_id": id,
+                "content": truncado
+            }));
+        }
+    }
+    Err("agente excedeu 8 passos".to_string())
+}
+
 fn cmd_chat() -> Result<(), String> {
     use std::io::BufRead;
     if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
@@ -1176,9 +1559,10 @@ fn cmd_chat() -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Quando receber contexto de arquivo, use-o antes de sugerir mudancas. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
+    let mut auto = false;
     let stdin = std::io::stdin();
     loop {
         print!("c2h> ");
@@ -1201,7 +1585,7 @@ fn cmd_chat() -> Result<(), String> {
         }
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
-                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
             );
             continue;
         }
@@ -1312,6 +1696,21 @@ fn cmd_chat() -> Result<(), String> {
             }
             continue;
         }
+        if entrada == "/auto" {
+            auto = !auto;
+            println!("auto={auto} (escrita sem confirmacao)");
+            continue;
+        }
+        if entrada == "/tools" {
+            if let Some(lista) = ferramentas().as_array() {
+                for tool in lista {
+                    if let Some(nome) = tool.pointer("/function/name").and_then(|v| v.as_str()) {
+                        println!("- {nome}");
+                    }
+                }
+            }
+            continue;
+        }
         if let Some(resto) = entrada.strip_prefix("/file ") {
             match ws.resolver(resto.trim(), true) {
                 Ok(path) => {
@@ -1336,15 +1735,11 @@ fn cmd_chat() -> Result<(), String> {
         };
         let system = format!("{system_base}{contexto}");
         historico.push(serde_json::json!({"role":"user","content":entrada}));
-        match chamar_provider_mensagens(&system, &historico) {
-            Ok(resposta) => {
-                println!("\n{resposta}\n");
-                historico.push(serde_json::json!({"role":"assistant","content":resposta}));
-                while historico.len() > 24 {
-                    historico.remove(0);
-                }
-            }
-            Err(erro) => println!("\nerro: {erro}\n"),
+        if let Err(erro) = executar_agente(&system, &mut historico, &ws, auto) {
+            println!("\nerro: {erro}\n");
+        }
+        while historico.len() > 40 {
+            historico.remove(0);
         }
     }
     println!("ate mais.");
