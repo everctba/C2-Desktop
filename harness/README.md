@@ -231,6 +231,21 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## Tool `git`
+
+O binario git instalado pode ser chamado sem shell:
+
+```json
+{"name":"git","args":{"args":["status"]}}
+{"name":"git","args":{"args":["clone","--depth","1","https://github.com/...","destino"]}}
+```
+
+- leitura automatica: status/diff/log/show/branch/rev-parse/remote/tag/ls-files;
+- escrita com confirmacao: clone/pull/fetch/add/commit/checkout/restore/switch/merge/rebase/reset/clean/push/init/mv/rm/stash;
+- YOLO pula confirmacao;
+- cwd no root do c2h;
+- sem shell.
+
 ## Tool `shell` (livre)
 
 O agente pode executar comando de shell livre:

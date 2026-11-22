@@ -589,7 +589,8 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
         {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}}
+        {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
+        {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}}
     ])
 }
 
@@ -1600,6 +1601,81 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Object(resumo)
 }
 
+fn executar_git(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
+    let lista: Vec<String> = args
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if lista.is_empty() {
+        return Err("uso: git({args:[\"status\"]})".to_string());
+    }
+    let sub = lista[0].trim_start_matches('-').to_lowercase();
+    let leitura = [
+        "status",
+        "diff",
+        "log",
+        "show",
+        "branch",
+        "rev-parse",
+        "remote",
+        "tag",
+        "ls-files",
+        "version",
+        "help",
+        "blame",
+        "describe",
+    ];
+    let escrita = [
+        "clone",
+        "pull",
+        "fetch",
+        "add",
+        "commit",
+        "checkout",
+        "restore",
+        "switch",
+        "merge",
+        "rebase",
+        "reset",
+        "clean",
+        "push",
+        "init",
+        "mv",
+        "rm",
+        "stash",
+        "submodule",
+        "worktree",
+    ];
+    if !leitura.contains(&sub.as_str()) && !escrita.contains(&sub.as_str()) {
+        return Err(format!("subcomando git nao permitido: {}", lista[0]));
+    }
+    let eh_escrita = escrita.contains(&sub.as_str()) && !leitura.contains(&sub.as_str());
+    if eh_escrita && !auto && !confirmar(&format!("git {} ?", lista.join(" ")))? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    let saida = std::process::Command::new("git")
+        .args(&lista)
+        .current_dir(&ws.root)
+        .output()
+        .map_err(|e| format!("executar git: {e}. git esta no PATH?"))?;
+    log_evento(
+        "git_call",
+        serde_json::json!({"sub": sub, "args": lista.len(), "exit": saida.status.code()}),
+    );
+    let texto = format!(
+        "exit={}\nstdout:\n{}\nstderr:\n{}",
+        saida.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&saida.stdout),
+        String::from_utf8_lossy(&saida.stderr)
+    );
+    Ok(texto.chars().take(10000).collect())
+}
+
 fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
     use std::io::Read;
     use std::sync::mpsc;
@@ -1766,6 +1842,7 @@ fn executar_ferramenta(
         "run_test" => ferramenta_test(),
         "bd" => executar_bd(ws, &args, auto),
         "shell" => executar_shell(ws, &args, auto),
+        "git" => executar_git(ws, &args, auto),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(
