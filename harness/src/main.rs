@@ -587,7 +587,8 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"new_component","description":"Cria scaffold HTML/CSS/JS de um componente.","parameters":{"type":"object","properties":{"name":{"type":"string"},"html":{"type":"boolean"},"css":{"type":"boolean"},"js":{"type":"boolean"}},"required":["name"]}}},
         {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
-        {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}}
+        {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}}
     ])
 }
 
@@ -1583,6 +1584,12 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
             resumo.insert(chave.to_string(), valor.clone());
         }
     }
+    if let Some(lista) = args.get("args").and_then(|v| v.as_array()) {
+        resumo.insert("args_count".to_string(), serde_json::json!(lista.len()));
+        if let Some(primeiro) = lista.first().and_then(|v| v.as_str()) {
+            resumo.insert("subcommand".to_string(), serde_json::json!(primeiro));
+        }
+    }
     for chave in ["content", "new_code"] {
         if let Some(texto) = args.get(chave).and_then(|v| v.as_str()) {
             resumo.insert(format!("{chave}_chars"), serde_json::json!(texto.len()));
@@ -1590,6 +1597,52 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
         }
     }
     serde_json::Value::Object(resumo)
+}
+
+fn executar_bd(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
+    let lista: Vec<String> = args
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if lista.is_empty() {
+        return Err("uso: bd({args:[\"ready\"]})".to_string());
+    }
+    let sub = lista[0].trim_start_matches('-').to_lowercase();
+    let leitura = [
+        "ready", "list", "show", "status", "prime", "export", "help", "version",
+    ];
+    let escrita = [
+        "init", "create", "update", "close", "delete", "remember", "dep", "sync", "import",
+        "export",
+    ];
+    if !leitura.contains(&sub.as_str()) && !escrita.contains(&sub.as_str()) {
+        return Err(format!("subcomando bd nao permitido: {}", lista[0]));
+    }
+    let eh_escrita = escrita.contains(&sub.as_str()) && !leitura.contains(&sub.as_str());
+    if eh_escrita && !auto && !confirmar(&format!("bd {} ?", lista.join(" ")))? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    let saida = std::process::Command::new("bd")
+        .args(&lista)
+        .current_dir(&ws.root)
+        .output()
+        .map_err(|e| format!("executar bd: {e}. bd esta no PATH?"))?;
+    log_evento(
+        "bd_call",
+        serde_json::json!({"sub": sub, "args": lista.len(), "exit": saida.status.code()}),
+    );
+    let texto = format!(
+        "exit={}\nstdout:\n{}\nstderr:\n{}",
+        saida.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&saida.stdout),
+        String::from_utf8_lossy(&saida.stderr)
+    );
+    Ok(texto.chars().take(8000).collect())
 }
 
 fn executar_ferramenta(
@@ -1625,6 +1678,7 @@ fn executar_ferramenta(
             cmd_rm(ws, path).map(|_| format!("removido: {path}"))
         }
         "run_test" => ferramenta_test(),
+        "bd" => executar_bd(ws, &args, auto),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(

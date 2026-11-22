@@ -231,6 +231,21 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## Tool `bd`
+
+O agente pode executar somente o binario `bd`, sem shell:
+
+```json
+{"name":"bd","args":{"args":["ready"]}}
+```
+
+- `ready/list/show/status/prime/help/version` sao leitura;
+- `init/create/update/close/delete/remember/dep/sync/import/export` pedem confirmacao;
+- `cwd` e o root do c2h; o `bd` resolve o `.beads` no repo;
+- sem pipes, sem redirect, sem shell;
+- saida limitada a 8000 chars;
+- em YOLO, escrita roda sem confirmacao.
+
 ## YOLO
 
 ```powershell
