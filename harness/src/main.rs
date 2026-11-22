@@ -33,6 +33,9 @@ struct Cli {
     /// Timeline de debug em .c2h/logs
     #[arg(long, global = true)]
     debug: bool,
+    /// YOLO: nao pede confirmacao para escrita/rm/mv
+    #[arg(long, global = true)]
+    yolo: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -907,6 +910,10 @@ fn cmd_imports(ws: &Workspace, entrada: &str) -> Result<(), String> {
 
 fn confirmar(pergunta: &str) -> Result<bool, String> {
     use std::io::BufRead;
+    if AUTO_CONFIRM.load(Ordering::Relaxed) {
+        println!("[yolo] {pergunta} -> sim");
+        return Ok(true);
+    }
     print!("{pergunta} [s/N] ");
     let _ = std::io::stdout().flush();
     let mut linha = String::new();
@@ -1894,7 +1901,7 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     truncado
 }
 
-fn cmd_chat() -> Result<(), String> {
+fn cmd_chat(yolo: bool) -> Result<(), String> {
     use std::io::BufRead;
     if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
         return Err("modo interativo exige um terminal; use um subcomando".to_string());
@@ -1911,7 +1918,14 @@ fn cmd_chat() -> Result<(), String> {
     let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
-    let mut auto = false;
+    let mut auto = yolo
+        || env::var("C2H_YOLO")
+            .map(|v| v == "1" || v == "true")
+            .unwrap_or(false);
+    AUTO_CONFIRM.store(auto, Ordering::Relaxed);
+    if auto {
+        println!("YOLO ATIVO: escrita/rm/mv sem confirmacao.");
+    }
     let stdin = std::io::stdin();
     loop {
         print!("c2h> ");
@@ -1934,7 +1948,7 @@ fn cmd_chat() -> Result<(), String> {
         }
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
-                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
             );
             continue;
         }
@@ -2098,8 +2112,9 @@ fn cmd_chat() -> Result<(), String> {
             }
             continue;
         }
-        if entrada == "/auto" {
+        if entrada == "/auto" || entrada == "/yolo" {
             auto = !auto;
+            AUTO_CONFIRM.store(auto, Ordering::Relaxed);
             println!("auto={auto} (escrita sem confirmacao)");
             continue;
         }
@@ -2765,6 +2780,7 @@ fn carregar_arquivo(file: &Path) -> Result<(String, Vec<Block>), String> {
 }
 
 static DEBUG_ATIVO: AtomicBool = AtomicBool::new(false);
+static AUTO_CONFIRM: AtomicBool = AtomicBool::new(false);
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn iniciar_debug(flag: bool) {
@@ -3943,7 +3959,7 @@ fn main() {
         serde_json::json!({"command": nome_comando(cli.command.as_ref())}),
     );
     let resultado = match &cli.command {
-        None | Some(Command::Chat) => cmd_chat(),
+        None | Some(Command::Chat) => cmd_chat(cli.yolo),
         Some(Command::Doctor) => cmd_doctor(),
         Some(Command::Blocks { file }) => cmd_blocks(file, cli.json),
         Some(Command::Annotate { file, dry_run, ai }) => {
