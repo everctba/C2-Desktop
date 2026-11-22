@@ -1646,6 +1646,18 @@ fn executar_agente(
             tool_calls.len(),
             passo + 1
         );
+        let mut msg = msg;
+        if let Some(content) = msg.get("content").and_then(|v| v.as_str()) {
+            if !content.trim().is_empty() {
+                log_evento(
+                    "assistant_preamble_ignored",
+                    serde_json::json!({"chars": content.len()}),
+                );
+            }
+        }
+        if let Some(obj) = msg.as_object_mut() {
+            obj.insert("content".to_string(), serde_json::Value::Null);
+        }
         historico.push(msg);
         for call in tool_calls {
             let id = call.get("id").and_then(|v| v.as_str()).unwrap_or("call");
@@ -1875,7 +1887,7 @@ fn cmd_chat() -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = false;
