@@ -251,6 +251,21 @@ $env:C2H_SIGN="0"
 O sidecar tambem registra `generated_by` (`c2h`, `c2h-ai`, etc.) e
 `origin` por bloco.
 
+## Risco e revisao do why no edit
+
+Blocos de I/O, formato, parsing, persistencia e validacao recebem
+`risk: high` (heuristica + IA). Se um bloco high-risk estiver sem why tecnico,
+o sidecar fica `weak` e o annotation pass e disparado.
+
+`edit_file` agora exige `why_review`:
+
+```json
+{"path":"doc.js","block_id":"doc.js::fn::formatOf","new_code":"...","why_review":"o why atual diz que formatOf deve retornar null para extensao desconhecida; a edicao preserva isso"}
+```
+
+O harness compara o review com o why atual. Sem confronto, retorna
+`E-WHY-REVIEW` e mostra o why atual.
+
 ## Substituicao atomica
 
 Para arquivo existente, use `replace_file`:

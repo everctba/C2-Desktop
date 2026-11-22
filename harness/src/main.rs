@@ -140,6 +140,8 @@ struct SidecarBlock {
     #[serde(default)]
     origin: String,
     #[serde(default)]
+    risk: String,
+    #[serde(default)]
     start_line: usize,
     #[serde(default)]
     end_line: usize,
@@ -586,7 +588,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"find_text","description":"Busca texto nos arquivos do projeto.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
         {"type":"function","function":{"name":"write_file","description":"Cria SOMENTE arquivo novo. Se existir, use replace_file. O harness valida, mostra preview e pede confirmacao.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
         {"type":"function","function":{"name":"replace_file","description":"Substitui arquivo existente com backup, tmp, validacao e rename atomico. Nao use remove_file para editar.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
-        {"type":"function","function":{"name":"edit_file","description":"Edita um bloco de um arquivo existente via block_id, com patch validado e test gate.","parameters":{"type":"object","properties":{"path":{"type":"string"},"block_id":{"type":"string"},"new_code":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"}},"required":["path","block_id","new_code"]}}},
+        {"type":"function","function":{"name":"edit_file","description":"Edita um bloco existente. Exige why_review confrontando o why atual do sidecar; patch validado e test gate.","parameters":{"type":"object","properties":{"path":{"type":"string"},"block_id":{"type":"string"},"new_code":{"type":"string"},"why_review":{"type":"string","description":"como a edicao preserva/atualiza o why atual do bloco"},"what":{"type":"string"},"why":{"type":"string"}},"required":["path","block_id","new_code","why_review"]}}},
         {"type":"function","function":{"name":"new_component","description":"Cria scaffold HTML/CSS/JS de um componente.","parameters":{"type":"object","properties":{"name":{"type":"string"},"html":{"type":"boolean"},"css":{"type":"boolean"},"js":{"type":"boolean"}},"required":["name"]}}},
         {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup. NAO use para substituir conteudo; use replace_file.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
@@ -594,7 +596,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
 }
 
@@ -1598,6 +1600,15 @@ fn ferramenta_write(
     Ok(resultado)
 }
 
+fn palavras_relevantes(texto: &str) -> std::collections::BTreeSet<String> {
+    texto
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|p| p.len() >= 4)
+        .map(|p| p.to_string())
+        .collect()
+}
+
 fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
     let rel = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
     let block_id = args.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
@@ -1632,6 +1643,30 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
         .unwrap_or(true);
     if vazio {
         anotar_blocos_ia(Path::new(&rel))?;
+    }
+    let why_atual = ler_sidecar(Path::new(&rel))
+        .and_then(|s| s.blocks.into_iter().find(|b| b.id == block_id))
+        .map(|b| b.w5h2.why)
+        .unwrap_or_default();
+    let why_review = args
+        .get("why_review")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if why_review.len() < 15 {
+        return Err(format!(
+            "E-WHY-REVIEW: antes de editar, confronte o why atual.\nBLOCO: {block_id}\nWHY ATUAL: {why_atual}\nEnvie why_review explicando por que a edicao preserva ou muda esse why."
+        ));
+    }
+    if why_tecnico(&why_atual) {
+        let atual = palavras_relevantes(&why_atual);
+        let review = palavras_relevantes(why_review);
+        let comuns = atual.intersection(&review).count();
+        if comuns < 2 && comuns * 2 < atual.len() {
+            return Err(format!(
+                "E-WHY-REVIEW: o why_review nao confronta o why atual.\nWHY ATUAL: {why_atual}\nReescreva citando a consequencia/problema que o bloco protege."
+            ));
+        }
     }
     let violacoes = validar_resposta(Path::new("."), &envelope);
     if !violacoes.is_empty() {
@@ -1706,7 +1741,7 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
         return Err("blocks vazio".to_string());
     }
     let mut sidecars = sidecars_do_projeto();
-    let mut updates: Vec<(String, W5h2, Vec<String>)> = Vec::new();
+    let mut updates: Vec<(String, W5h2, Vec<String>, String)> = Vec::new();
     let mut erros = Vec::new();
     for item in lista {
         let id = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
@@ -1759,20 +1794,26 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
                     .collect()
             })
             .unwrap_or_default();
-        updates.push((id.to_string(), w5h2, ev));
+        let risk = item
+            .get("risk")
+            .and_then(|v| v.as_str())
+            .unwrap_or("medium")
+            .to_string();
+        updates.push((id.to_string(), w5h2, ev, risk));
     }
     if !erros.is_empty() {
         return Err(format!("annotate_blocks rejeitado:\n{}", erros.join("\n")));
     }
     let mut total = 0usize;
     for side in &mut sidecars {
-        for (id, w5h2, ev) in &updates {
+        for (id, w5h2, ev, risk) in &updates {
             if let Some(bloco) = side.blocks.iter_mut().find(|b| &b.id == id) {
                 bloco.w5h2 = w5h2.clone();
                 if !ev.is_empty() {
                     bloco.evidence = ev.clone();
                 }
                 bloco.origin = "agent_annotation".to_string();
+                bloco.risk = risk.clone();
                 total += 1;
             }
         }
@@ -2196,6 +2237,42 @@ fn sidecars_do_projeto() -> Vec<Sidecar> {
         .filter_map(|t| serde_json::from_str::<Sidecar>(&t).ok())
         .filter(|s| Path::new(&s.file).is_file())
         .collect()
+}
+
+fn risco_heuristico(nome: &str, kind: &str) -> String {
+    let n = nome.to_lowercase();
+    let critico = [
+        "format",
+        "load",
+        "loaddoc",
+        "save",
+        "savedoc",
+        "parse",
+        "encode",
+        "decode",
+        "write",
+        "read",
+        "validate",
+        "header",
+        "meta",
+        "trim",
+        "serialize",
+        "deserialize",
+        "import",
+        "export",
+        "sync",
+        "persist",
+    ];
+    if kind == "section" || kind == "block" {
+        return "medium".to_string();
+    }
+    if critico.iter().any(|c| n.contains(c)) {
+        "high".to_string()
+    } else if n.contains("render") || n.contains("draw") || n.contains("ui") {
+        "medium".to_string()
+    } else {
+        "low".to_string()
+    }
 }
 
 fn why_tecnico(texto: &str) -> bool {
@@ -3616,7 +3693,7 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
             }
         }
     }
-    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. O what e a responsabilidade; o why e teleologico: por que o bloco existe, que problema evita e que objetivo garante. O how e o mecanismo. Nunca use \"solicitado pelo agente\". Nao escreva timestamp.";
+    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. Priorize blocos centrais de I/O, formato, parsing, persistencia, encode/decode e validacao; marque risk high neles. O what e a responsabilidade; o why e teleologico: por que o bloco existe, que problema evita e que objetivo garante. O how e o mecanismo. Nunca use \"solicitado pelo agente\". Nao escreva timestamp.";
     let comentarios = extrair_comentarios(&conteudo, 60);
     let mut user = format!(
         "ARQUIVO: {}\nTotal de linhas: {}\nCOMENTARIOS/DOCSTRINGS:\n{}\nConteudo:\n{}",
@@ -3680,6 +3757,11 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                         kind,
                         name: id.split("::").last().unwrap_or(&id).to_string(),
                         origin: "annotation".to_string(),
+                        risk: item
+                            .get("risk")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("medium")
+                            .to_string(),
                         start_line: start,
                         end_line: end,
                         created_at: agora_iso(),
@@ -3771,6 +3853,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
                 origin: "structural".to_string(),
+                risk: risco_heuristico(&bloco.name, &bloco.kind),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: old.created_at.clone(),
@@ -3789,6 +3872,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
                 origin: "structural".to_string(),
+                risk: risco_heuristico(&bloco.name, &bloco.kind),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: agora.clone(),
