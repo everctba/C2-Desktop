@@ -265,6 +265,21 @@ $env:C2H_SIGN="0"
 O sidecar tambem registra `generated_by` (`c2h`, `c2h-ai`, etc.) e
 `origin` por bloco.
 
+## Goal e business_logic opcionais
+
+O W5H2 aceita dois campos opcionais:
+
+```json
+{
+  "goal": "resultado observavel, ex: doc_load(package.json) retorna null",
+  "business_logic": "ordem/invariante/excecao, ex: listen antes de upgrade"
+}
+```
+
+Nao sao obrigatorios e so entram no contexto/read_file quando preenchidos.
+`goal` deve ser mensuravel; `business_logic` deve ser regra, ordem ou excecao,
+nao descricao generica.
+
 ## Risco e revisao do why no edit
 
 Blocos de I/O, formato, parsing, persistencia e validacao recebem

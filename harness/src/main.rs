@@ -111,6 +111,10 @@ struct W5h2 {
     #[serde(default)]
     why: String,
     #[serde(default)]
+    goal: String,
+    #[serde(default)]
+    business_logic: String,
+    #[serde(default)]
     when: String,
     #[serde(default, rename = "where")]
     where_: String,
@@ -607,7 +611,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
 }
 
@@ -1394,6 +1398,12 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
                     bloco.w5h2.what,
                     bloco.w5h2.why
                 );
+                if !bloco.w5h2.goal.trim().is_empty() {
+                    linha.push_str(&format!(" — goal: {}", bloco.w5h2.goal));
+                }
+                if !bloco.w5h2.business_logic.trim().is_empty() {
+                    linha.push_str(&format!(" — business_logic: {}", bloco.w5h2.business_logic));
+                }
                 if !bloco.w5h2.how.trim().is_empty() {
                     linha.push_str(&format!(" — how: {}", bloco.w5h2.how));
                 }
@@ -1777,6 +1787,16 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
         let w5h2 = W5h2 {
             what: what.to_string(),
             why: why.to_string(),
+            goal: item
+                .get("goal")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            business_logic: item
+                .get("business_logic")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             when: item
                 .get("when")
                 .and_then(|v| v.as_str())
@@ -4036,6 +4056,16 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string(),
+                            goal: item
+                                .get("goal")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            business_logic: item
+                                .get("business_logic")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
                             when: item
                                 .get("when")
                                 .and_then(|v| v.as_str())
@@ -4285,6 +4315,8 @@ fn cmd_annotate_ai(file: &Path, dry_run: bool) -> Result<(), String> {
         bloco.w5h2 = W5h2 {
             what: texto("what"),
             why: texto("why"),
+            goal: texto("goal"),
+            business_logic: texto("business_logic"),
             when: texto("when"),
             where_: texto("where"),
             who: texto("who"),
