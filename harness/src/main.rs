@@ -1742,6 +1742,13 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
             resumo.insert(chave.to_string(), valor.clone());
         }
     }
+    if let Some(cmd) = args.get("command").and_then(|v| v.as_str()) {
+        resumo.insert("command_chars".to_string(), serde_json::json!(cmd.len()));
+        resumo.insert(
+            "command_head".to_string(),
+            serde_json::json!(cmd.chars().take(120).collect::<String>()),
+        );
+    }
     if let Some(lista) = args.get("blocks").and_then(|v| v.as_array()) {
         resumo.insert("blocks_count".to_string(), serde_json::json!(lista.len()));
     }
@@ -2128,6 +2135,65 @@ fn executar_ferramenta(
     resultado
 }
 
+fn descrever_tool(nome: &str, argumentos: &str) -> String {
+    let Ok(args) = serde_json::from_str::<serde_json::Value>(argumentos) else {
+        return nome.to_string();
+    };
+    match nome {
+        "shell" => {
+            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+            let cmd = cmd.replace('\n', " ").chars().take(180).collect::<String>();
+            format!("shell: {cmd}")
+        }
+        "read_file" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
+            let start = args.get("start").and_then(|v| v.as_u64());
+            let end = args.get("end").and_then(|v| v.as_u64());
+            match (start, end) {
+                (Some(a), Some(b)) => format!("read_file: {path} ({a}-{b})"),
+                (Some(a), None) => format!("read_file: {path} ({a}-)"),
+                _ => format!("read_file: {path}"),
+            }
+        }
+        "write_file" | "replace_file" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("{nome}: {path}")
+        }
+        "edit_file" => {
+            let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("?");
+            let block = args.get("block_id").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("edit_file: {path} :: {block}")
+        }
+        "bd" | "git" => {
+            let lista = args
+                .get("args")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str())
+                        .take(5)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+                .unwrap_or_default();
+            format!("{nome}: {lista}")
+        }
+        "annotate_blocks" => {
+            let n = args
+                .get("blocks")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            format!("annotate_blocks: {n} blocos")
+        }
+        "find_text" => {
+            let q = args.get("query").and_then(|v| v.as_str()).unwrap_or("?");
+            format!("find_text: {q}")
+        }
+        _ => nome.to_string(),
+    }
+}
+
 fn executar_agente(
     system: &str,
     historico: &mut Vec<serde_json::Value>,
@@ -2212,7 +2278,7 @@ fn executar_agente(
                 .pointer("/function/arguments")
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
-            println!("  -> {nome}");
+            println!("  -> {}", descrever_tool(nome, argumentos));
             if nome == "read_file" {
                 let chave = format!("read_file|{argumentos}");
                 if cache_leituras.contains_key(&chave) {

@@ -386,6 +386,22 @@ O binario git instalado pode ser chamado sem shell:
 - cwd no root do c2h;
 - sem shell.
 
+## Visualizacao das tools
+
+O chat mostra o alvo da tool:
+
+```text
+-> shell: git --version
+-> read_file: player-test.html (1-120)
+-> replace_file: src/index.js
+-> edit_file: src/store.rs :: src/store.rs::fn::add
+-> bd: ready
+-> annotate_blocks: 20 blocos
+```
+
+O log `tool_call` guarda `command_head`/`command_chars` para shell e os
+metadados redigidos, sem o conteudo completo.
+
 ## Tool `shell` (livre)
 
 O agente pode executar comando de shell livre:
