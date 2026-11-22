@@ -146,8 +146,11 @@ vez de abortar.
 
 Ferramentas `read_file`/`list_dir` tambem devolvem anotacoes/status do sidecar:
 
-- `read_file`: codigo + W5H2 completo (what/why/when/where/who/how/how_much);
-- `list_dir`: nome + `[sidecar status=... blocks=...]`.
+- `read_file`: cabecalho com `TOTAL`/`MOSTRANDO`, pagina padrao de 120 linhas,
+  `start`/`end`, codigo + W5H2 completo;
+- `list_dir`: nome + `[sidecar status=... blocks=...]`;
+- no maximo 2 leituras por arquivo por turno; leitura identica e cacheada;
+- resultado de tool acima de 12000 chars e truncado com aviso.
 
 Toda mudanca no contrato exige `evidence` com `arquivo:linha`; sem isso o
 validator retorna `E-EVID-00`.

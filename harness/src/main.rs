@@ -1329,9 +1329,22 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
     let fim = args
         .get("end")
         .and_then(|v| v.as_u64())
-        .unwrap_or(linhas.len() as u64)
+        .unwrap_or(120)
         .min(linhas.len() as u64) as usize;
+    let ini = ini.min(linhas.len().max(1));
+    let fim = fim.max(ini).min(linhas.len());
+    let total = linhas.len();
     let mut saida = String::new();
+    saida.push_str(&format!(
+        "ARQUIVO: {}\nTOTAL: {} linhas\nMOSTRANDO: {}-{}\n",
+        ws.rel(&path),
+        total,
+        ini,
+        fim
+    ));
+    if fim < total {
+        saida.push_str("TRUNCADO: use start/end para continuar.\n");
+    }
     for (i, linha) in linhas
         .iter()
         .enumerate()
@@ -1600,6 +1613,8 @@ fn executar_agente(
     auto: bool,
 ) -> Result<(), String> {
     let tools = ferramentas();
+    let mut cache_leituras: BTreeMap<String, String> = BTreeMap::new();
+    let mut leituras_por_arquivo: BTreeMap<String, usize> = BTreeMap::new();
     let tarefa = historico
         .iter()
         .rev()
@@ -1643,11 +1658,54 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
             println!("  -> {nome}");
+            if nome == "read_file" {
+                let chave = format!("read_file|{argumentos}");
+                if cache_leituras.contains_key(&chave) {
+                    let aviso = "LEITURA REPETIDA: este arquivo/faixa ja foi lido neste turno. Use o resultado anterior ou o contexto do harness.".to_string();
+                    log_evento(
+                        "tool_repeat",
+                        serde_json::json!({"name": nome, "reason": "same_args"}),
+                    );
+                    historico
+                        .push(serde_json::json!({"role":"tool","tool_call_id":id,"content":aviso}));
+                    continue;
+                }
+                let path_lido = serde_json::from_str::<serde_json::Value>(argumentos)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("path")
+                            .and_then(|p| p.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .unwrap_or_default();
+                let contador = leituras_por_arquivo.entry(path_lido.clone()).or_insert(0);
+                if *contador >= 2 {
+                    let aviso = format!("LIMITE: no maximo 2 leituras por arquivo neste turno ({path_lido}). Use o contexto ja enviado ou peca uma faixa especifica em outro turno.");
+                    log_evento(
+                        "tool_repeat",
+                        serde_json::json!({"name": nome, "reason": "limit", "file": path_lido}),
+                    );
+                    historico
+                        .push(serde_json::json!({"role":"tool","tool_call_id":id,"content":aviso}));
+                    continue;
+                }
+                *contador += 1;
+            }
             let resultado = match executar_ferramenta(ws, auto, &tarefa, nome, argumentos) {
                 Ok(texto) => texto,
                 Err(erro) => format!("ERRO DA FERRAMENTA: {erro}"),
             };
-            let truncado: String = resultado.chars().take(1600).collect();
+            if nome == "read_file" {
+                cache_leituras.insert(format!("read_file|{argumentos}"), resultado.clone());
+            }
+            let truncado: String = if resultado.chars().count() > 12000 {
+                format!(
+                    "{}\n[TRUNCADO PELO HARNESS; use argumentos mais especificos]",
+                    resultado.chars().take(12000).collect::<String>()
+                )
+            } else {
+                resultado
+            };
             log_evento(
                 "tool_result_preview",
                 serde_json::json!({"name": nome, "preview": truncado.chars().take(500).collect::<String>()}),
@@ -1817,7 +1875,7 @@ fn cmd_chat() -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = false;
