@@ -618,7 +618,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa comando de shell no root. Use apenas para testes/build/git; NAO leia codigo com type/cat/findstr/grep nem redirecione > para codigo. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"path":{"type":"string"},"start_line":{"type":"integer"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["what","why"]}}},"required":["blocks"]}}}
     ]);
     if !SHELL_ENABLED.load(Ordering::Relaxed) {
         if let Some(lista) = tools.as_array_mut() {
@@ -1396,32 +1396,52 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
     }
     if let Some(side) = ler_sidecar(Path::new(&ws.rel(&path))) {
         if !side.blocks.is_empty() {
-            saida.push_str("\nANOTACOES RELEVANTES (why tecnico):\n");
-            for bloco in side
+            let fortes: Vec<_> = side
                 .blocks
                 .iter()
                 .filter(|b| why_tecnico(&b.w5h2.why))
                 .take(20)
-            {
-                let mut linha = format!(
-                    "- {}:{} [{}] {} — {}",
-                    ws.rel(&path),
-                    bloco.start_line,
-                    bloco.kind,
-                    bloco.w5h2.what,
-                    bloco.w5h2.why
-                );
-                if !bloco.w5h2.goal.trim().is_empty() {
-                    linha.push_str(&format!(" — goal: {}", bloco.w5h2.goal));
+                .collect();
+            if !fortes.is_empty() {
+                saida.push_str("\nANOTACOES RELEVANTES (why tecnico):\n");
+                for bloco in fortes {
+                    let mut linha = format!(
+                        "- {} [{}] linhas {}-{} — {} — {}",
+                        bloco.id,
+                        bloco.kind,
+                        bloco.start_line,
+                        bloco.end_line,
+                        bloco.w5h2.what,
+                        bloco.w5h2.why
+                    );
+                    if !bloco.w5h2.goal.trim().is_empty() {
+                        linha.push_str(&format!(" — goal: {}", bloco.w5h2.goal));
+                    }
+                    if !bloco.w5h2.business_logic.trim().is_empty() {
+                        linha
+                            .push_str(&format!(" — business_logic: {}", bloco.w5h2.business_logic));
+                    }
+                    if !bloco.w5h2.how.trim().is_empty() {
+                        linha.push_str(&format!(" — how: {}", bloco.w5h2.how));
+                    }
+                    saida.push_str(&linha);
+                    saida.push('\n');
                 }
-                if !bloco.w5h2.business_logic.trim().is_empty() {
-                    linha.push_str(&format!(" — business_logic: {}", bloco.w5h2.business_logic));
+            }
+            let sem_why: Vec<_> = side
+                .blocks
+                .iter()
+                .filter(|b| !why_tecnico(&b.w5h2.why))
+                .take(30)
+                .collect();
+            if !sem_why.is_empty() {
+                saida.push_str("\nBLOCOS SEM WHY (use annotate_blocks com este block_id):\n");
+                for bloco in sem_why {
+                    saida.push_str(&format!(
+                        "- {} [{}] linhas {}-{}\n",
+                        bloco.id, bloco.kind, bloco.start_line, bloco.end_line
+                    ));
                 }
-                if !bloco.w5h2.how.trim().is_empty() {
-                    linha.push_str(&format!(" — how: {}", bloco.w5h2.how));
-                }
-                saida.push_str(&linha);
-                saida.push('\n');
             }
             log_evento(
                 "tool_read_annotations",
@@ -1873,6 +1893,78 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Object(resumo)
 }
 
+fn normalizar_path(p: &str) -> String {
+    p.replace('\\', "/").trim_start_matches("./").to_string()
+}
+
+fn resolver_block_id(
+    block_id: &str,
+    path: &str,
+    start_line: Option<usize>,
+    sidecars: &[Sidecar],
+) -> Result<String, String> {
+    let existe = |id: &str| sidecars.iter().any(|s| s.blocks.iter().any(|b| b.id == id));
+    if !block_id.is_empty() && existe(block_id) {
+        return Ok(block_id.to_string());
+    }
+    let mut alvo_path = path.to_string();
+    let mut alvo_linha = start_line;
+    if alvo_path.is_empty() {
+        if let Some((pre, suf)) = block_id.rsplit_once(':') {
+            if let Ok(n) = suf.parse::<usize>() {
+                alvo_path = pre.to_string();
+                alvo_linha = Some(n);
+            }
+        }
+    }
+    if !alvo_path.is_empty() {
+        let alvo = normalizar_path(&alvo_path);
+        for side in sidecars {
+            let file = normalizar_path(&side.file);
+            if file == alvo
+                || file.ends_with(&format!("/{alvo}"))
+                || alvo.ends_with(&format!("/{file}"))
+            {
+                if let Some(linha) = alvo_linha {
+                    if let Some(b) = side.blocks.iter().find(|b| b.start_line == linha) {
+                        return Ok(b.id.clone());
+                    }
+                }
+            }
+        }
+    }
+    let mut validos = Vec::new();
+    for side in sidecars {
+        let file = normalizar_path(&side.file);
+        let mesmo = alvo_path.is_empty()
+            || file == normalizar_path(&alvo_path)
+            || file.ends_with(&format!("/{}", normalizar_path(&alvo_path)));
+        if mesmo {
+            for b in side.blocks.iter().take(20) {
+                validos.push(b.id.clone());
+            }
+        }
+        if validos.len() >= 20 {
+            break;
+        }
+    }
+    if validos.is_empty() {
+        for side in sidecars {
+            for b in side.blocks.iter().take(5) {
+                validos.push(b.id.clone());
+            }
+        }
+    }
+    Err(format!(
+        "block_id desconhecido: {block_id}\nIDs validos:\n- {}",
+        validos
+            .into_iter()
+            .take(20)
+            .collect::<Vec<_>>()
+            .join("\n- ")
+    ))
+}
+
 fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> {
     let lista = args
         .get("blocks")
@@ -1885,18 +1977,25 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
     let mut updates: Vec<(String, W5h2, Vec<String>, String, String, String)> = Vec::new();
     let mut erros = Vec::new();
     for item in lista {
-        let id = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
+        let id_bruto = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
+        let path_arg = item.get("path").and_then(|v| v.as_str()).unwrap_or("");
+        let start_arg = item
+            .get("start_line")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as usize);
         let what = item.get("what").and_then(|v| v.as_str()).unwrap_or("");
         let why = item.get("why").and_then(|v| v.as_str()).unwrap_or("");
-        if id.is_empty() || what.trim().is_empty() || !why_tem_consequencia(why) {
-            erros.push(format!("bloco invalido/why fraco: {id}"));
+        if what.trim().is_empty() || !why_tem_consequencia(why) {
+            erros.push(format!("bloco invalido/why fraco: {id_bruto}"));
             continue;
         }
-        let existe = sidecars.iter().any(|s| s.blocks.iter().any(|b| b.id == id));
-        if !existe {
-            erros.push(format!("block_id desconhecido: {id}"));
-            continue;
-        }
+        let id = match resolver_block_id(id_bruto, path_arg, start_arg, &sidecars) {
+            Ok(id) => id,
+            Err(e) => {
+                erros.push(e);
+                continue;
+            }
+        };
         let w5h2 = W5h2 {
             what: what.to_string(),
             why: why.to_string(),

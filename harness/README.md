@@ -352,9 +352,22 @@ problema evitado, consequencia. `why_tem_consequencia` exige marcadores como
 (`chama`, `registra`, `inicializa`) e rejeitado no `annotate_blocks`/`edit_file`.
 O contexto ainda inclui why tecnico sem consequencia, mas ranqueia pior.
 
-Blocos com `why` vazio nao entram no contexto nem no `read_file`. O `edit_file`
-bloqueia com `E-WHY-REVIEW` se o bloco ainda nao tem why tecnico; use
-`annotate_blocks` primeiro.
+Blocos com `why` vazio nao entram no contexto, mas o `read_file` mostra os IDs:
+
+```text
+BLOCOS SEM WHY (use annotate_blocks com este block_id):
+- a.rs::fn::a [fn] linhas 1-3
+```
+
+`annotate_blocks` aceita `block_id`, `path`+`start_line` ou `path:linha`:
+
+```json
+{"blocks":[{"path":"a.rs","start_line":1,"what":"...","why":"..."}]}
+{"blocks":[{"block_id":"a.rs:1","what":"...","why":"..."}]}
+```
+
+Se o ID nao existir, o erro lista IDs validos. O `edit_file` bloqueia com
+`E-WHY-REVIEW` se o bloco ainda nao tem why tecnico; use `annotate_blocks` primeiro.
 
 O agente pode atualizar anotacoes sem tocar no codigo:
 
