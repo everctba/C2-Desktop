@@ -1952,7 +1952,12 @@ fn cmd_chat() -> Result<(), String> {
         }
         if entrada == "/status" {
             println!("projeto: {}", ws.root.display());
-            println!("cwd: {}", ws.cwd.display());
+            let cwd_exibicao = if ws.cwd.as_os_str().is_empty() {
+                "/".to_string()
+            } else {
+                format!("/{}", ws.cwd.to_string_lossy().replace('\\', "/"))
+            };
+            println!("cwd: {cwd_exibicao}");
             println!("modelo: {} - provider: {}", model(), base_url());
             println!("arquivo ativo: {}", arquivo.as_deref().unwrap_or("nenhum"));
             println!("mensagens: {}", historico.len());
