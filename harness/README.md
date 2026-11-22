@@ -291,6 +291,38 @@ Para arquivo existente, use `replace_file`:
 Fluxo: valida path, backup, tmp, rename atomico, sidecar e gates.
 `write_file` e somente para arquivo novo; nunca use `remove_file` para editar.
 
+## Politica de escopo e cobertura
+
+Por padrao o annotation pass ignora:
+
+```text
+tmp/ target/ dist/ node_modules/ vendor/ generated/ .git/ .c2h/
+probe-* fix-*
+```
+
+O contexto mostra:
+
+```text
+ARQUIVOS CRITICOS SEM ANOTACAO:
+- app/server.js
+- src/live/client.js
+```
+
+E o ranking considera:
+
+```text
+arquivo ativo
+git diff
+imports do ativo
+cwd
+risk high/medium
+match da tarefa
+densidade do why
+```
+
+Blocos `confidence=low` nao entram. Cada bloco carrega
+`confidence` e `verified_by`.
+
 ## Qualidade do W5H2
 
 O `why` precisa ser tecnico e teleologico: proposito, problema evitado,

@@ -132,6 +132,13 @@ struct Block {
     semantic_hash: String,
 }
 
+fn confidence_default() -> String {
+    "medium".to_string()
+}
+fn verified_default() -> String {
+    "none".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SidecarBlock {
     id: String,
@@ -141,6 +148,10 @@ struct SidecarBlock {
     origin: String,
     #[serde(default)]
     risk: String,
+    #[serde(default = "confidence_default")]
+    confidence: String,
+    #[serde(default = "verified_default")]
+    verified_by: String,
     #[serde(default)]
     start_line: usize,
     #[serde(default)]
@@ -596,7 +607,7 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
 }
 
@@ -1748,7 +1759,7 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
         return Err("blocks vazio".to_string());
     }
     let mut sidecars = sidecars_do_projeto();
-    let mut updates: Vec<(String, W5h2, Vec<String>, String)> = Vec::new();
+    let mut updates: Vec<(String, W5h2, Vec<String>, String, String, String)> = Vec::new();
     let mut erros = Vec::new();
     for item in lista {
         let id = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
@@ -1806,14 +1817,24 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
             .and_then(|v| v.as_str())
             .unwrap_or("medium")
             .to_string();
-        updates.push((id.to_string(), w5h2, ev, risk));
+        let confidence = item
+            .get("confidence")
+            .and_then(|v| v.as_str())
+            .unwrap_or("medium")
+            .to_string();
+        let verified = item
+            .get("verified_by")
+            .and_then(|v| v.as_str())
+            .unwrap_or("none")
+            .to_string();
+        updates.push((id.to_string(), w5h2, ev, risk, confidence, verified));
     }
     if !erros.is_empty() {
         return Err(format!("annotate_blocks rejeitado:\n{}", erros.join("\n")));
     }
     let mut total = 0usize;
     for side in &mut sidecars {
-        for (id, w5h2, ev, risk) in &updates {
+        for (id, w5h2, ev, risk, confidence, verified) in &updates {
             if let Some(bloco) = side.blocks.iter_mut().find(|b| &b.id == id) {
                 bloco.w5h2 = w5h2.clone();
                 if !ev.is_empty() {
@@ -1821,6 +1842,8 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
                 }
                 bloco.origin = "agent_annotation".to_string();
                 bloco.risk = risk.clone();
+                bloco.confidence = confidence.clone();
+                bloco.verified_by = verified.clone();
                 total += 1;
             }
         }
@@ -2301,7 +2324,104 @@ fn why_tecnico(texto: &str) -> bool {
     if genericos.iter().any(|g| t == *g || t.starts_with(g)) {
         return false;
     }
-    true
+    let mecanico = [
+        "chama ",
+        "registra ",
+        "inicializa ",
+        "retorna ",
+        "usa ",
+        "faz ",
+    ];
+    if mecanico.iter().any(|p| t.starts_with(p)) {
+        return false;
+    }
+    let consequencia = [
+        "porque", "pois", "sem isso", "sem ", "evita", "impede", "garante", "corrompe", "perde",
+        "quebra", "falha", "erro", "senão", "senao", "para que", "a fim de",
+    ];
+    consequencia.iter().any(|p| t.contains(p))
+}
+
+fn path_anotavel(path: &str) -> bool {
+    let p = path.replace('\\', "/").to_lowercase();
+    let proibidos = [
+        "tmp/",
+        "/tmp/",
+        "target/",
+        "dist/",
+        "node_modules/",
+        "vendor/",
+        "generated/",
+        ".git/",
+        ".c2h/",
+    ];
+    if proibidos.iter().any(|x| p.contains(x)) {
+        return false;
+    }
+    let nome = p.rsplit('/').next().unwrap_or(&p);
+    !(nome.starts_with("probe-") || nome.starts_with("fix-") || nome.ends_with(".min.js"))
+}
+
+fn arquivo_codigo(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()).unwrap_or(""),
+        "rs" | "py" | "js" | "jsx" | "ts" | "tsx" | "html" | "htm" | "css" | "md"
+    )
+}
+
+fn coletar_codigo(dir: &Path, nivel: usize, out: &mut Vec<String>) {
+    if nivel > 3 || out.len() >= 300 {
+        return;
+    }
+    let Ok(entradas) = fs::read_dir(dir) else {
+        return;
+    };
+    for item in entradas.filter_map(|e| e.ok()) {
+        let path = item.path();
+        let rel = path.to_string_lossy().replace('\\', "/");
+        if path.is_dir() {
+            if !path_anotavel(&format!("{rel}/")) {
+                continue;
+            }
+            coletar_codigo(&path, nivel + 1, out);
+        } else if arquivo_codigo(&path) && path_anotavel(&rel) {
+            out.push(rel);
+        }
+        if out.len() >= 300 {
+            return;
+        }
+    }
+}
+
+fn arquivos_criticos_sem_anotacao(ws: &Workspace, ativo: Option<&str>) -> Vec<String> {
+    let mut candidatos = std::collections::BTreeSet::new();
+    if let Some(a) = ativo {
+        candidatos.insert(a.to_string());
+    }
+    if let Ok(saida) = std::process::Command::new("git")
+        .args(["diff", "--name-only"])
+        .output()
+    {
+        for linha in String::from_utf8_lossy(&saida.stdout).lines() {
+            if arquivo_codigo(Path::new(linha.trim())) {
+                candidatos.insert(linha.trim().to_string());
+            }
+        }
+    }
+    let mut locais = Vec::new();
+    coletar_codigo(&ws.cwd_abs(), 0, &mut locais);
+    for l in locais {
+        candidatos.insert(l);
+    }
+    candidatos
+        .into_iter()
+        .filter(|rel| {
+            let side = ler_sidecar(Path::new(rel));
+            side.map(|s| !s.blocks.iter().any(|b| why_tecnico(&b.w5h2.why)))
+                .unwrap_or(true)
+        })
+        .take(8)
+        .collect()
 }
 
 fn extrair_comentarios(conteudo: &str, max_linhas: usize) -> String {
@@ -2373,6 +2493,31 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
         .collect();
     let cwd_rel = ws.cwd.to_string_lossy().replace('\\', "/");
     let sidecars = sidecars_do_projeto();
+    let changed: std::collections::BTreeSet<String> = std::process::Command::new("git")
+        .args(["diff", "--name-only"])
+        .output()
+        .ok()
+        .map(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .map(|l| l.trim().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    let imports_ativo: std::collections::BTreeSet<String> = ativo
+        .and_then(|a| fs::read_to_string(a).ok())
+        .map(|texto| {
+            importacoes(
+                &texto,
+                Path::new(ativo.unwrap())
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or(""),
+            )
+            .into_iter()
+            .collect()
+        })
+        .unwrap_or_default();
     let mut candidatos: Vec<(usize, String, String, String)> = Vec::new();
     let mut stale = 0usize;
     let mut sem_why = 0usize;
@@ -2393,6 +2538,10 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                 sem_why += 1;
                 continue;
             }
+            if bloco.confidence == "low" {
+                stale += 1;
+                continue;
+            }
             let corpo = normalizar_conteudo(&linhas[bloco.start_line - 1..bloco.end_line]);
             if hash(&corpo) != bloco.semantic_hash {
                 stale += 1;
@@ -2403,6 +2552,15 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                 score += 1000;
             }
             if !cwd_rel.is_empty() && side.file.starts_with(&cwd_rel) {
+                score += 100;
+            }
+            if changed.contains(&side.file) {
+                score += 200;
+            }
+            if imports_ativo
+                .iter()
+                .any(|imp| imp.contains(&side.file) || side.file.ends_with(imp))
+            {
                 score += 100;
             }
             if bloco.risk == "high" {
@@ -2421,6 +2579,10 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                 bloco.w5h2.what.chars().take(160).collect::<String>(),
                 bloco.w5h2.why.chars().take(260).collect::<String>()
             );
+            linha.push_str(&format!(
+                " [conf:{} verified:{}]",
+                bloco.confidence, bloco.verified_by
+            ));
             if !bloco.w5h2.how.trim().is_empty() {
                 linha.push_str(&format!(
                     " — how: {}",
@@ -2460,6 +2622,14 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
                     out.push_str(&format!("- {imp}\n"));
                 }
             }
+        }
+    }
+
+    let criticos = arquivos_criticos_sem_anotacao(ws, ativo);
+    if !criticos.is_empty() {
+        out.push_str("\nARQUIVOS CRITICOS SEM ANOTACAO:\n");
+        for c in &criticos {
+            out.push_str(&format!("- {c}\n"));
         }
     }
 
@@ -2514,6 +2684,7 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
             "blocks": blocos,
             "stale_skipped": stale,
             "empty_why_skipped": sem_why,
+            "critical_unannotated": criticos.len(),
             "active": ativo
         }),
     );
@@ -3625,6 +3796,9 @@ fn revisar_requisitos(conteudo: &str, instrucao: &str) -> Result<(), String> {
 }
 
 fn precisa_anotacao(file: &Path) -> bool {
+    if !path_anotavel(&rel_file(file)) {
+        return false;
+    }
     let linhas = fs::read_to_string(file)
         .map(|t| t.lines().count())
         .unwrap_or(0);
@@ -3723,6 +3897,17 @@ fn caminho_cache_anotacao(conteudo: &str) -> PathBuf {
 }
 
 fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
+    if !path_anotavel(&rel_file(file)) {
+        log_evento(
+            "annotation_skipped_scope",
+            serde_json::json!({"file": rel_file(file)}),
+        );
+        println!(
+            "annotation pass ignorado pela politica de escopo: {}",
+            rel_file(file)
+        );
+        return Ok(false);
+    }
     let conteudo = fs::read_to_string(file).map_err(|e| e.to_string())?;
     let linhas: Vec<&str> = conteudo.lines().collect();
     let cache_path = caminho_cache_anotacao(&conteudo);
@@ -3748,7 +3933,7 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
             }
         }
     }
-    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. Priorize blocos centrais de I/O, formato, parsing, persistencia, encode/decode e validacao; marque risk high neles. O what e a responsabilidade; o why e teleologico: por que o bloco existe, que problema evita e que objetivo garante. O how e o mecanismo. Nunca use \"solicitado pelo agente\". Nao escreva timestamp.";
+    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"risk\":\"high|medium|low\",\"confidence\":\"high|medium|low\",\"verified_by\":\"none|code|test|human\"}]}. Use 1 a 12 blocos, sem sobreposicao. Priorize blocos centrais de I/O, formato, parsing, persistencia, encode/decode e validacao; marque risk high neles. O what e a responsabilidade; o why e teleologico: por que o bloco existe, que problema evita e que objetivo garante. O how e o mecanismo. Nunca use \"solicitado pelo agente\". Nao escreva timestamp.";
     let comentarios = extrair_comentarios(&conteudo, 60);
     let mut user = format!(
         "ARQUIVO: {}\nTotal de linhas: {}\nCOMENTARIOS/DOCSTRINGS:\n{}\nConteudo:\n{}",
@@ -3817,6 +4002,16 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                             .and_then(|v| v.as_str())
                             .unwrap_or("medium")
                             .to_string(),
+                        confidence: item
+                            .get("confidence")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("medium")
+                            .to_string(),
+                        verified_by: item
+                            .get("verified_by")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("none")
+                            .to_string(),
                         start_line: start,
                         end_line: end,
                         created_at: agora_iso(),
@@ -3833,8 +4028,28 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string(),
+                            when: item
+                                .get("when")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            where_: item
+                                .get("where")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            who: item
+                                .get("who")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
                             how: item
                                 .get("how")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            how_much: item
+                                .get("how_much")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string(),
@@ -3909,6 +4124,8 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 name: bloco.name.clone(),
                 origin: "structural".to_string(),
                 risk: risco_heuristico(&bloco.name, &bloco.kind),
+                confidence: "medium".to_string(),
+                verified_by: "none".to_string(),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: old.created_at.clone(),
@@ -3928,6 +4145,8 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 name: bloco.name.clone(),
                 origin: "structural".to_string(),
                 risk: risco_heuristico(&bloco.name, &bloco.kind),
+                confidence: "medium".to_string(),
+                verified_by: "none".to_string(),
                 start_line: bloco.start_line,
                 end_line: bloco.end_line,
                 created_at: agora.clone(),
@@ -3944,7 +4163,9 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
         schema_version: SCHEMA_VERSION,
         contract_version: CONTRACT_VERSION,
         file: rel_file(file),
-        status: if novos.is_empty() {
+        status: if !path_anotavel(&rel_file(file)) {
+            "disposable"
+        } else if novos.is_empty() {
             "unannotated"
         } else {
             "annotated"
