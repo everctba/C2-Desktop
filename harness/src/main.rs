@@ -1090,7 +1090,7 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
     validar_novo(ws, &alvo, &envelope, instrucao)?;
     revisar_requisitos(&envelope.content, instrucao)?;
     let linhas = envelope.content.lines().count();
-    if linhas > 150 {
+    if linhas > 150 && env::var("C2H_SUGGEST_SPLIT").is_ok() {
         if let Err(erro) = sugerir_divisao(&envelope.content, instrucao) {
             println!("aviso: sugestao de divisao falhou: {erro}");
         }

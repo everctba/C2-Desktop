@@ -175,11 +175,12 @@ arquivo > 150 linhas com menos de 2 blocos
 bloco cobrindo > 150 linhas
 ```
 
-Qualidade estrutural:
+Qualidade estrutural (diagnóstico, sem bloquear):
 
 - arquivo > 150 linhas gera warning;
-- `/write` sugere divisão em componentes quando passa de 150 linhas;
-- blocos grandes demais marcam o sidecar como `status: weak`.
+- blocos grandes demais marcam o sidecar como `status: weak`;
+- a sugestão de split é opt-in: `C2H_SUGGEST_SPLIT=1`;
+- não existe `--max-lines` bloqueante por enquanto.
 
 Comandos:
 
