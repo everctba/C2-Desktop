@@ -2014,6 +2014,23 @@ fn nomes_do_cwd(ws: &Workspace) -> Vec<String> {
     nomes
 }
 
+fn shell_info() -> (&'static str, &'static str) {
+    #[cfg(windows)]
+    {
+        (
+            "Windows",
+            "cmd /C (use where, dir, type, echo; NAO use which, command -v, for ...; do ...; done, printf)",
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        (
+            std::env::consts::OS,
+            "sh -c (use which, command -v, for, printf, etc.)",
+        )
+    }
+}
+
 fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> String {
     let tokens: Vec<String> = tarefa
         .to_lowercase()
@@ -2045,6 +2062,9 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     out.push_str("<contexto_do_harness>\n");
     out.push_str(&format!("PROJETO: {}\n", ws.root.display()));
     out.push_str(&format!("CWD: /{cwd_rel}\n"));
+    let (sistema, shell) = shell_info();
+    out.push_str(&format!("SISTEMA OPERACIONAL: {sistema}\n"));
+    out.push_str(&format!("SHELL DA TOOL: {shell}\n"));
     let nomes = nomes_do_cwd(ws);
     if !nomes.is_empty() {
         out.push_str("ARQUIVOS NO CWD:\n");
