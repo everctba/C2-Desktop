@@ -222,6 +222,7 @@ Responda APENAS JSON valido, sem markdown, no formato:
 Regras:
 - block_id deve existir no sidecar para update/delete;
 - new_code obrigatorio para create/update;
+- evidence e OBRIGATORIA em toda mudanca, no formato arquivo:linha real;
 - w5h2 deve ser curto e baseado em evidencia;
 - nao escreva created_at/updated_at/timestamp;
 - nao invente arquivo, block_id ou evidencia;
@@ -307,6 +308,14 @@ fn validar_resposta(raiz: &Path, resposta: &ResponseEnvelope) -> Vec<Violation> 
                 Some(&change.block_id),
                 "new_code vazio",
                 "retorne o codigo do bloco",
+            );
+        }
+        if change.evidence.is_empty() {
+            erro(
+                "E-EVID-00",
+                Some(&change.block_id),
+                "evidencia obrigatoria",
+                "cite arquivo:linha de onde veio a decisao",
             );
         }
         if change.action != "create" {
@@ -1280,7 +1289,15 @@ fn texto_listar(ws: &Workspace, args: &serde_json::Value) -> Result<String, Stri
     for item in itens {
         let nome = item.file_name().to_string_lossy().to_string();
         let is_dir = item.metadata().map(|m| m.is_dir()).unwrap_or(false);
-        saida.push_str(&format!("{nome}{}\n", if is_dir { "/" } else { "" }));
+        if is_dir {
+            saida.push_str(&format!("{nome}/\n"));
+        } else {
+            let rel = ws.rel(&item.path());
+            let status = ler_sidecar(Path::new(&rel))
+                .map(|s| format!(" [sidecar:{} {} blocos]", s.status, s.blocks.len()))
+                .unwrap_or_default();
+            saida.push_str(&format!("{nome}{status}\n"));
+        }
     }
     Ok(saida)
 }
@@ -1314,6 +1331,21 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
         .take(fim.saturating_sub(ini) + 1)
     {
         saida.push_str(&format!("{:>5}: {linha}\n", i + 1));
+    }
+    if let Some(side) = ler_sidecar(Path::new(&ws.rel(&path))) {
+        if !side.blocks.is_empty() {
+            saida.push_str("\nANOTACOES DOS BLOCOS:\n");
+            for bloco in side.blocks.iter().take(20) {
+                saida.push_str(&format!(
+                    "- {} [{}] what: {} | why: {} | how: {}\n",
+                    bloco.id, bloco.kind, bloco.w5h2.what, bloco.w5h2.why, bloco.w5h2.how
+                ));
+            }
+            log_evento(
+                "tool_read_annotations",
+                serde_json::json!({"file": ws.rel(&path), "blocks": side.blocks.len()}),
+            );
+        }
     }
     Ok(saida)
 }
@@ -1605,6 +1637,117 @@ fn executar_agente(
     Err("agente excedeu 8 passos".to_string())
 }
 
+fn sidecars_do_projeto() -> Vec<Sidecar> {
+    let dir = Path::new(".c2h/blocks");
+    let Ok(entradas) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entradas
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json"))
+        .filter_map(|p| fs::read_to_string(p).ok())
+        .filter_map(|t| serde_json::from_str::<Sidecar>(&t).ok())
+        .collect()
+}
+
+fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> String {
+    let tokens: Vec<String> = tarefa
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|t| t.len() >= 3)
+        .map(|t| t.to_string())
+        .collect();
+    let cwd_rel = ws.cwd.to_string_lossy().replace('\\', "/");
+    let mut sidecars = sidecars_do_projeto();
+    sidecars.sort_by_key(|s| {
+        std::cmp::Reverse({
+            let mut score = 0usize;
+            if ativo == Some(s.file.as_str()) {
+                score += 1000;
+            }
+            if !cwd_rel.is_empty() && s.file.starts_with(&cwd_rel) {
+                score += 100;
+            }
+            for bloco in &s.blocks {
+                let texto =
+                    format!("{} {} {}", bloco.id, bloco.w5h2.what, bloco.w5h2.why).to_lowercase();
+                score += tokens.iter().filter(|t| texto.contains(t.as_str())).count() * 20;
+            }
+            score
+        })
+    });
+
+    let mut out = String::new();
+    out.push_str("<contexto_do_harness>\n");
+    out.push_str(&format!("PROJETO: {}\n", ws.root.display()));
+    out.push_str(&format!("CWD: /{cwd_rel}\n"));
+    if let Some(ativo) = ativo {
+        out.push_str(&format!("ARQUIVO ATIVO: {ativo}\n"));
+    }
+
+    let mut blocos_total = 0usize;
+    let mut arquivos = 0usize;
+    for side in sidecars.iter().take(5) {
+        if side.blocks.is_empty() {
+            continue;
+        }
+        arquivos += 1;
+        out.push_str(&format!(
+            "\nARQUIVO: {} (status: {})\n",
+            side.file, side.status
+        ));
+        for bloco in side.blocks.iter().take(12) {
+            blocos_total += 1;
+            out.push_str(&format!(
+                "- [{}] {} linhas {}-{} | what: {} | why: {} | how: {}\n",
+                bloco.kind,
+                bloco.id,
+                bloco.start_line,
+                bloco.end_line,
+                bloco.w5h2.what,
+                bloco.w5h2.why,
+                bloco.w5h2.how
+            ));
+        }
+    }
+
+    if let Some(ativo) = ativo {
+        if let Ok(texto) = fs::read_to_string(ativo) {
+            let ext = Path::new(ativo)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            let imports = importacoes(&texto, ext);
+            if !imports.is_empty() {
+                out.push_str("\nIMPORTS DO ARQUIVO ATIVO:\n");
+                for imp in imports.iter().take(20) {
+                    out.push_str(&format!("- {imp}\n"));
+                }
+            }
+        }
+    }
+
+    if let Ok(saida) = std::process::Command::new("git")
+        .args(["diff", "--stat"])
+        .output()
+    {
+        if saida.status.success() {
+            let diff = String::from_utf8_lossy(&saida.stdout);
+            if !diff.trim().is_empty() {
+                out.push_str("\nDIFF ATUAL:\n");
+                out.push_str(&diff.chars().take(2000).collect::<String>());
+            }
+        }
+    }
+    out.push_str("</contexto_do_harness>");
+    let truncado: String = out.chars().take(10000).collect();
+    log_evento(
+        "context_compiled",
+        serde_json::json!({"chars": truncado.len(), "files": arquivos, "blocks": blocos_total, "active": ativo}),
+    );
+    truncado
+}
+
 fn cmd_chat() -> Result<(), String> {
     use std::io::BufRead;
     if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
@@ -1808,14 +1951,8 @@ fn cmd_chat() -> Result<(), String> {
             }
             continue;
         }
-        let contexto = match &arquivo {
-            Some(rel) => match montar_contexto(Path::new(rel)) {
-                Ok(texto) => format!("\n\nCONTEXTO ATIVO:\n{texto}"),
-                Err(erro) => format!("\n\n[contexto indisponivel: {erro}]"),
-            },
-            None => String::new(),
-        };
-        let system = format!("{system_base}{contexto}");
+        let contexto = compilar_contexto(&ws, entrada, arquivo.as_deref());
+        let system = format!("{system_base}\n\n{contexto}");
         historico.push(serde_json::json!({"role":"user","content":entrada}));
         if let Err(erro) = executar_agente(&system, &mut historico, &ws, auto) {
             println!("\nerro: {erro}\n");

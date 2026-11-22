@@ -125,6 +125,23 @@ Comandos:
 /file <arquivo> /drop /clear /status /help /sair
 ```
 
+## Context compiler automatico
+
+Antes de cada mensagem no chat, o harness monta contexto com:
+
+```text
+projeto, cwd, arquivo ativo
+blocos/W5H2 relevantes (ate 5 arquivos)
+imports do arquivo ativo
+git diff --stat
+```
+
+O contexto entra no system message; nao depende mais de `/file`. O log registra
+`context_compiled` com arquivos, blocos e caracteres.
+
+Ferramentas `read_file`/`list_dir` tambem devolvem anotacoes/status do sidecar.
+Toda mudanca no contrato exige `evidence` com `arquivo:linha`.
+
 ## Annotation pass e sidecar
 
 Depois de criar um arquivo, o sidecar nasce com:
