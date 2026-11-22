@@ -588,7 +588,8 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
         {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
         {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
-        {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}}
+        {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
+        {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}}
     ])
 }
 
@@ -1599,6 +1600,91 @@ fn resumir_args_tool(args: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Object(resumo)
 }
 
+fn executar_shell(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
+    use std::io::Read;
+    use std::sync::mpsc;
+    use std::time::Duration;
+    let comando = args
+        .get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if comando.trim().is_empty() {
+        return Err("uso: shell({command: \"git status\"})".to_string());
+    }
+    let timeout = args
+        .get("timeout_seconds")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(60)
+        .clamp(1, 600);
+    if !auto && !confirmar(&format!("executar shell: {comando} ?"))? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", &comando]);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", &comando]);
+        c
+    };
+    let mut filho = cmd
+        .current_dir(&ws.root)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("spawn shell: {e}"))?;
+    let mut stdout = filho.stdout.take();
+    let mut stderr = filho.stderr.take();
+    let (tx_out, rx_out) = mpsc::channel();
+    let (tx_err, rx_err) = mpsc::channel();
+    if let Some(mut s) = stdout.take() {
+        std::thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = s.read_to_string(&mut buf);
+            let _ = tx_out.send(buf);
+        });
+    }
+    if let Some(mut s) = stderr.take() {
+        std::thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = s.read_to_string(&mut buf);
+            let _ = tx_err.send(buf);
+        });
+    }
+    let inicio = std::time::Instant::now();
+    let codigo = loop {
+        if let Ok(Some(s)) = filho.try_wait() {
+            break s.code().unwrap_or(-1);
+        }
+        if inicio.elapsed() > Duration::from_secs(timeout) {
+            let _ = filho.kill();
+            break filho.wait().ok().and_then(|s| s.code()).unwrap_or(-1);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let out = rx_out
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap_or_default();
+    let err = rx_err
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap_or_default();
+    let texto = format!(
+        "exit={codigo}\nstdout:\n{}\nstderr:\n{}",
+        out.chars().take(6000).collect::<String>(),
+        err.chars().take(6000).collect::<String>()
+    );
+    log_evento(
+        "shell_call",
+        serde_json::json!({"command_chars": comando.len(), "head": comando.chars().take(80).collect::<String>(), "exit": codigo, "timeout": inicio.elapsed().as_secs() >= timeout}),
+    );
+    Ok(texto)
+}
+
 fn executar_bd(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<String, String> {
     let lista: Vec<String> = args
         .get("args")
@@ -1679,6 +1765,7 @@ fn executar_ferramenta(
         }
         "run_test" => ferramenta_test(),
         "bd" => executar_bd(ws, &args, auto),
+        "shell" => executar_shell(ws, &args, auto),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(

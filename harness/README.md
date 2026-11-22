@@ -231,6 +231,21 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## Tool `shell` (livre)
+
+O agente pode executar comando de shell livre:
+
+```json
+{"name":"shell","args":{"command":"git --version","timeout_seconds":60}}
+```
+
+- roda via `cmd /C` (Windows) ou `sh -c`;
+- cwd no root do c2h;
+- captura stdout/stderr/exit;
+- timeout 1..600s;
+- pede confirmacao, exceto em YOLO;
+- **executa com as permissoes do seu usuario**: nao ha sandbox/ACL.
+
 ## Tool `bd`
 
 O agente pode executar somente o binario `bd`, sem shell:
