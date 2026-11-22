@@ -378,9 +378,19 @@ fn chamar_provider(system: &str, user: &str) -> Result<String, String> {
     let resposta = ureq::post(&url)
         .set("Authorization", &format!("Bearer {key}"))
         .set("Content-Type", "application/json")
+        .set("x-opencode-session", &session_id())
         .timeout(std::time::Duration::from_secs(120))
         .send_json(body)
-        .map_err(|e| format!("provider: {e}"))?;
+        .map_err(|e| match e {
+            ureq::Error::Status(codigo, resposta) => {
+                let corpo = resposta.into_string().unwrap_or_default();
+                format!(
+                    "provider status {codigo}: {}",
+                    corpo.chars().take(800).collect::<String>()
+                )
+            }
+            outro => format!("provider: {outro}"),
+        })?;
     let json: serde_json::Value = resposta.into_json().map_err(|e| format!("json: {e}"))?;
     let content = json
         .pointer("/choices/0/message/content")
@@ -1372,6 +1382,22 @@ fn base_url() -> String {
         .ok()
         .or_else(|| config_str("base_url"))
         .unwrap_or_else(|| "https://api.deepseek.com/v1".to_string())
+}
+
+fn session_id() -> String {
+    env::var("C2H_SESSION")
+        .ok()
+        .or_else(|| config_str("session"))
+        .unwrap_or_else(|| {
+            format!(
+                "c2h-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            )
+        })
 }
 
 fn model() -> String {
