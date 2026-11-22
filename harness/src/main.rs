@@ -1088,10 +1088,7 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
     }
     escrever_atomico(&alvo, &envelope.content)?;
     cmd_annotate(Path::new(&ws.rel(&alvo)), false)?;
-    let vazio = ler_sidecar(Path::new(&ws.rel(&alvo)))
-        .map(|s| s.blocks.is_empty())
-        .unwrap_or(true);
-    if vazio {
+    if precisa_anotacao(Path::new(&ws.rel(&alvo))) {
         if let Err(erro) = anotar_blocos_ia(Path::new(&ws.rel(&alvo))) {
             println!("aviso: annotation pass falhou: {erro}");
         }
@@ -1245,14 +1242,14 @@ fn cmd_edit(ws: &Workspace, entrada: &str) -> Result<(), String> {
         .or_else(|| entrada.split_once('"'))
         .ok_or_else(|| "uso: /edit <arquivo> \"instrucao\"".to_string())?;
     let path = ws.resolver(file.trim(), true)?;
-    let rel = path.strip_prefix(&ws.root).unwrap_or(&path).to_path_buf();
+    let rel = ws.rel(&path);
     let vazio = ler_sidecar(Path::new(&rel))
         .map(|s| s.blocks.is_empty())
         .unwrap_or(true);
     if vazio {
         anotar_blocos_ia(Path::new(&rel))?;
     }
-    println!("editando {} ...", rel.display());
+    println!("editando {} ...", rel);
     cmd_ask_contract(instrucao.trim_matches('"'), Path::new(&rel), 3)
 }
 
@@ -1400,10 +1397,7 @@ fn ferramenta_write(
     }
     escrever_atomico(&alvo, content)?;
     cmd_annotate(Path::new(rel), false)?;
-    let vazio = ler_sidecar(Path::new(rel))
-        .map(|s| s.blocks.is_empty())
-        .unwrap_or(true);
-    if vazio {
+    if precisa_anotacao(Path::new(rel)) {
         if let Err(erro) = anotar_blocos_ia(Path::new(&ws.rel(&alvo))) {
             println!("aviso: annotation pass falhou: {erro}");
         }
@@ -1429,11 +1423,7 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
     let block_id = args.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
     let new_code = args.get("new_code").and_then(|v| v.as_str()).unwrap_or("");
     let path = ws.resolver(rel, true)?;
-    let rel = path
-        .strip_prefix(&ws.root)
-        .unwrap_or(&path)
-        .to_string_lossy()
-        .replace('\\', "/");
+    let rel = ws.rel(&path);
     let envelope = ResponseEnvelope {
         contract_version: 1,
         changes: vec![Change {
@@ -1718,10 +1708,7 @@ fn cmd_chat() -> Result<(), String> {
                         println!("erro: {erro}");
                         continue;
                     }
-                    let vazio = ler_sidecar(Path::new(&rel))
-                        .map(|s| s.blocks.is_empty())
-                        .unwrap_or(true);
-                    if vazio {
+                    if precisa_anotacao(Path::new(&rel)) {
                         match anotar_blocos_ia(Path::new(&rel)) {
                             Ok(true) => {}
                             Ok(false) => println!("annotation pass nao encontrou blocos"),
@@ -2671,6 +2658,23 @@ fn revisar_requisitos(conteudo: &str, instrucao: &str) -> Result<(), String> {
         return Err(format!("revisor: {violacoes}"));
     }
     Ok(())
+}
+
+fn precisa_anotacao(file: &Path) -> bool {
+    let linhas = fs::read_to_string(file)
+        .map(|t| t.lines().count())
+        .unwrap_or(0);
+    let lado = ler_sidecar(file);
+    let blocos = lado.map(|s| s.blocks).unwrap_or_default();
+    if blocos.is_empty() {
+        return true;
+    }
+    if linhas > 150 && blocos.len() < 2 {
+        return true;
+    }
+    blocos
+        .iter()
+        .any(|b| b.end_line.saturating_sub(b.start_line) > 150)
 }
 
 fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {

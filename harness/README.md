@@ -133,7 +133,8 @@ Depois de criar um arquivo, o sidecar nasce com:
 {"status":"unannotated","blocks":[],"source_hash":"sha256:..."}
 ```
 
-Se `blocks` estiver vazio, o harness roda um **annotation pass**:
+Se `blocks` estiver vazio **ou** o arquivo tiver mais de 150 linhas com menos
+de 2 blocos, o harness roda um **annotation pass**:
 
 ```text
 arquivo -> IA descobre blocos -> validator -> sidecar annotated
