@@ -8,6 +8,7 @@
 /target/
 /harness/target/
 /harness/no_path/*.exe
+/harness/no_path/config.json
 /harness/.c2h/
 /harness/lab/target/
 /harness/lab/.taskline.json

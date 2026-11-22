@@ -38,6 +38,25 @@ Ainda pendente:
 
 ## Provider
 
+O `c2h` carrega automaticamente `config.json` na pasta do executavel:
+
+```json
+{
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "api_key": "",
+  "contract_version": 1
+}
+```
+
+Edite:
+
+```text
+harness/no_path/config.json
+```
+
+Variaveis de ambiente tem prioridade:
+
 ```powershell
 $env:C2H_BASE_URL="https://api.deepseek.com/v1"
 $env:C2H_MODEL="deepseek-chat"
@@ -50,7 +69,10 @@ Aceita também:
 ```text
 DEEPSEEK_API_KEY
 OPENCODEGO_API_KEY
+C2H_CONFIG=<caminho de outro config.json>
 ```
+
+`c2h config` mostra os valores efetivos e o caminho do config, sem a chave.
 
 Nada é escrito no código pelo `ask`; ele apenas imprime a resposta.
 

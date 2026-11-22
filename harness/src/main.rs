@@ -1322,20 +1322,63 @@ fn cmd_context(file: &Path, max_chars: usize) -> Result<(), String> {
     Ok(())
 }
 
+fn config_path() -> Option<PathBuf> {
+    if let Ok(path) = env::var("C2H_CONFIG") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(pai) = exe.parent() {
+            let path = pai.join("config.json");
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+    let local = PathBuf::from("config.json");
+    if local.is_file() {
+        return Some(local);
+    }
+    None
+}
+
+fn config_json() -> Option<serde_json::Value> {
+    let path = config_path()?;
+    let texto = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&texto).ok()
+}
+
+fn config_str(chave: &str) -> Option<String> {
+    config_json()?
+        .get(chave)
+        .and_then(|v| v.as_str())
+        .map(|v| v.to_string())
+        .filter(|v| !v.trim().is_empty())
+}
+
 fn api_key() -> Option<String> {
     env::var("C2H_API_KEY")
         .ok()
         .or_else(|| env::var("DEEPSEEK_API_KEY").ok())
         .or_else(|| env::var("OPENCODEGO_API_KEY").ok())
+        .or_else(|| config_str("api_key"))
         .filter(|v| !v.trim().is_empty())
 }
 
 fn base_url() -> String {
-    env::var("C2H_BASE_URL").unwrap_or_else(|_| "https://api.deepseek.com/v1".to_string())
+    env::var("C2H_BASE_URL")
+        .ok()
+        .or_else(|| config_str("base_url"))
+        .unwrap_or_else(|| "https://api.deepseek.com/v1".to_string())
 }
 
 fn model() -> String {
-    env::var("C2H_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string())
+    env::var("C2H_MODEL")
+        .ok()
+        .or_else(|| config_str("model"))
+        .unwrap_or_else(|| "deepseek-chat".to_string())
 }
 
 fn cmd_ask(
@@ -1450,6 +1493,12 @@ fn cmd_config() {
         }
     );
     println!("contract_version={CONTRACT_VERSION}");
+    println!(
+        "config_file={}",
+        config_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "nao encontrado".to_string())
+    );
 }
 
 #[cfg(test)]
