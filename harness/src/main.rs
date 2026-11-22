@@ -134,6 +134,10 @@ struct SidecarBlock {
     id: String,
     kind: String,
     name: String,
+    #[serde(default)]
+    start_line: usize,
+    #[serde(default)]
+    end_line: usize,
     created_at: String,
     updated_at: String,
     semantic_hash: String,
@@ -148,6 +152,13 @@ struct Sidecar {
     schema_version: u32,
     contract_version: u32,
     file: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    source_hash: String,
+    #[serde(default)]
+    generated_by: String,
+    #[serde(default)]
     blocks: Vec<SidecarBlock>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -985,6 +996,12 @@ fn validar_novo(
     {
         return Err("o pedido era sem JavaScript".to_string());
     }
+    if let Some(erro) = violacoes_politica(&envelope.content, instrucao)
+        .into_iter()
+        .next()
+    {
+        return Err(erro);
+    }
     for imp in &envelope.imports {
         if imp.starts_with("http") {
             return Err(format!("import externo nao permitido: {imp}"));
@@ -1056,6 +1073,7 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
     let envelope: WriteEnvelope =
         serde_json::from_value(json).map_err(|e| format!("contrato de criacao invalido: {e}"))?;
     validar_novo(ws, &alvo, &envelope, instrucao)?;
+    revisar_requisitos(&envelope.content, instrucao)?;
     let linhas = envelope.content.lines().count();
     println!("\n--- preview {} ({} linhas) ---", ws.rel(&alvo), linhas);
     for (i, linha) in envelope.content.lines().take(200).enumerate() {
@@ -1070,6 +1088,14 @@ fn cmd_write(ws: &Workspace, rest: &str) -> Result<(), String> {
     }
     escrever_atomico(&alvo, &envelope.content)?;
     cmd_annotate(Path::new(&ws.rel(&alvo)), false)?;
+    let vazio = ler_sidecar(Path::new(&ws.rel(&alvo)))
+        .map(|s| s.blocks.is_empty())
+        .unwrap_or(true);
+    if vazio {
+        if let Err(erro) = anotar_blocos_ia(Path::new(&ws.rel(&alvo))) {
+            println!("aviso: annotation pass falhou: {erro}");
+        }
+    }
     if let Some(mut side) = ler_sidecar(Path::new(&ws.rel(&alvo))) {
         if let Some(primeiro) = side.blocks.first_mut() {
             primeiro.w5h2 = envelope.w5h2.clone();
@@ -1220,6 +1246,12 @@ fn cmd_edit(ws: &Workspace, entrada: &str) -> Result<(), String> {
         .ok_or_else(|| "uso: /edit <arquivo> \"instrucao\"".to_string())?;
     let path = ws.resolver(file.trim(), true)?;
     let rel = path.strip_prefix(&ws.root).unwrap_or(&path).to_path_buf();
+    let vazio = ler_sidecar(Path::new(&rel))
+        .map(|s| s.blocks.is_empty())
+        .unwrap_or(true);
+    if vazio {
+        anotar_blocos_ia(Path::new(&rel))?;
+    }
     println!("editando {} ...", rel.display());
     cmd_ask_contract(instrucao.trim_matches('"'), Path::new(&rel), 3)
 }
@@ -1334,6 +1366,7 @@ fn ferramenta_write(
     ws: &Workspace,
     args: &serde_json::Value,
     auto: bool,
+    tarefa: &str,
 ) -> Result<String, String> {
     let rel = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
     let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
@@ -1353,7 +1386,8 @@ fn ferramenta_write(
             ..W5h2::default()
         },
     };
-    validar_novo(ws, &alvo, &envelope, "")?;
+    validar_novo(ws, &alvo, &envelope, tarefa)?;
+    revisar_requisitos(&envelope.content, tarefa)?;
     println!(
         "\n--- arquivo proposto: {rel} ({} linhas) ---",
         content.lines().count()
@@ -1366,6 +1400,14 @@ fn ferramenta_write(
     }
     escrever_atomico(&alvo, content)?;
     cmd_annotate(Path::new(rel), false)?;
+    let vazio = ler_sidecar(Path::new(rel))
+        .map(|s| s.blocks.is_empty())
+        .unwrap_or(true);
+    if vazio {
+        if let Err(erro) = anotar_blocos_ia(Path::new(&ws.rel(&alvo))) {
+            println!("aviso: annotation pass falhou: {erro}");
+        }
+    }
     if let Some(mut side) = ler_sidecar(Path::new(rel)) {
         if let Some(primeiro) = side.blocks.first_mut() {
             primeiro.w5h2 = envelope.w5h2.clone();
@@ -1415,6 +1457,12 @@ fn ferramenta_edit(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Resu
             evidence: vec![format!("{rel}:1")],
         }],
     };
+    let vazio = ler_sidecar(Path::new(&rel))
+        .map(|s| s.blocks.is_empty())
+        .unwrap_or(true);
+    if vazio {
+        anotar_blocos_ia(Path::new(&rel))?;
+    }
     let violacoes = validar_resposta(Path::new("."), &envelope);
     if !violacoes.is_empty() {
         return Err(serde_json::to_string_pretty(&violacoes).map_err(|e| e.to_string())?);
@@ -1455,6 +1503,7 @@ fn ferramenta_test() -> Result<String, String> {
 fn executar_ferramenta(
     ws: &Workspace,
     auto: bool,
+    tarefa: &str,
     nome: &str,
     argumentos: &str,
 ) -> Result<String, String> {
@@ -1465,7 +1514,7 @@ fn executar_ferramenta(
         "list_dir" => texto_listar(ws, &args),
         "read_file" => texto_ler(ws, &args),
         "find_text" => texto_buscar(ws, &args),
-        "write_file" => ferramenta_write(ws, &args, auto),
+        "write_file" => ferramenta_write(ws, &args, auto, tarefa),
         "edit_file" => ferramenta_edit(ws, &args, auto),
         "new_component" => {
             let nome = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -1497,6 +1546,13 @@ fn executar_agente(
     auto: bool,
 ) -> Result<(), String> {
     let tools = ferramentas();
+    let tarefa = historico
+        .iter()
+        .rev()
+        .find(|m| m.get("role").and_then(|v| v.as_str()) == Some("user"))
+        .and_then(|m| m.get("content").and_then(|v| v.as_str()))
+        .unwrap_or("")
+        .to_string();
     for passo in 0..8 {
         let mut mensagens = vec![serde_json::json!({"role":"system","content":system})];
         mensagens.extend(historico.clone());
@@ -1533,7 +1589,7 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
             println!("  -> {nome}");
-            let resultado = executar_ferramenta(ws, auto, nome, argumentos)?;
+            let resultado = executar_ferramenta(ws, auto, &tarefa, nome, argumentos)?;
             let truncado: String = resultado.chars().take(1200).collect();
             historico.push(serde_json::json!({
                 "role": "tool",
@@ -1585,7 +1641,7 @@ fn cmd_chat() -> Result<(), String> {
         }
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
-                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
+                "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto               ativa/desativa confirmacao de escrita\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /sair              encerra\n"
             );
             continue;
         }
@@ -1651,6 +1707,30 @@ fn cmd_chat() -> Result<(), String> {
         if let Some(resto) = entrada.strip_prefix("/find ") {
             if let Err(erro) = buscar_texto(&ws, resto.trim()) {
                 println!("erro: {erro}");
+            }
+            continue;
+        }
+        if let Some(resto) = entrada.strip_prefix("/annotate ") {
+            match ws.resolver(resto.trim(), true) {
+                Ok(path) => {
+                    let rel = ws.rel(&path);
+                    if let Err(erro) = cmd_annotate(Path::new(&rel), false) {
+                        println!("erro: {erro}");
+                        continue;
+                    }
+                    let vazio = ler_sidecar(Path::new(&rel))
+                        .map(|s| s.blocks.is_empty())
+                        .unwrap_or(true);
+                    if vazio {
+                        match anotar_blocos_ia(Path::new(&rel)) {
+                            Ok(true) => {}
+                            Ok(false) => println!("annotation pass nao encontrou blocos"),
+                            Err(erro) => println!("annotation pass falhou: {erro}"),
+                        }
+                    }
+                    println!("anotado: {rel}");
+                }
+                Err(erro) => println!("erro: {erro}"),
             }
             continue;
         }
@@ -1768,8 +1848,16 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
         let mut ordenadas: Vec<_> = changes
             .iter()
             .filter_map(|c| {
-                let b = blocos.iter().find(|b| b.id == c.block_id)?;
-                Some((b.start_line, b.end_line, *c))
+                if let Some(b) = blocos.iter().find(|b| b.id == c.block_id) {
+                    return Some((b.start_line, b.end_line, *c));
+                }
+                let side = ler_sidecar(Path::new(arquivo));
+                side.and_then(|s| {
+                    s.blocks
+                        .iter()
+                        .find(|b| b.id == c.block_id && b.start_line > 0)
+                        .map(|b| (b.start_line, b.end_line, *c))
+                })
             })
             .collect();
         ordenadas.sort_by_key(|(inicio, _, _)| std::cmp::Reverse(*inicio));
@@ -1829,7 +1917,22 @@ fn aplicar_envelope(raiz: &Path, envelope: &ResponseEnvelope, dry_run: bool) -> 
             serde_json::json!({"files": por_arquivo.len()}),
         );
         for (arquivo, changes) in &por_arquivo {
+            let anterior = ler_sidecar(Path::new(arquivo));
             cmd_annotate(Path::new(arquivo), false)?;
+            let atual = ler_sidecar(Path::new(arquivo));
+            let zerou = atual.as_ref().map(|s| s.blocks.is_empty()).unwrap_or(true);
+            let tinha_blocos = anterior
+                .as_ref()
+                .map(|s| !s.blocks.is_empty())
+                .unwrap_or(false);
+            if zerou && tinha_blocos && anotar_blocos_ia(Path::new(arquivo)).is_err() {
+                if let Some(mut antigo) = anterior {
+                    antigo.status = "stale".to_string();
+                    antigo.source_hash = hash(&fs::read_to_string(arquivo).unwrap_or_default());
+                    escrever_sidecar(Path::new(arquivo), &antigo)?;
+                    log_evento("sidecar_stale", serde_json::json!({"file": arquivo}));
+                }
+            }
             atualizar_anotacoes(Path::new(arquivo), changes)?;
         }
         for (_, backup) in &backups {
@@ -2502,6 +2605,204 @@ fn cmd_blocks(file: &Path, json: bool) -> Result<(), String> {
     Ok(())
 }
 
+fn violacoes_politica(conteudo: &str, instrucao: &str) -> Vec<String> {
+    let mut erros = Vec::new();
+    let baixo_instr = instrucao.to_lowercase();
+    let baixo = conteudo.to_lowercase();
+    let sem_js = baixo_instr.contains("sem javascript")
+        || baixo_instr.contains("sem js")
+        || baixo_instr.contains("apenas html e css")
+        || baixo_instr.contains("so html e css")
+        || baixo_instr.contains("só html e css");
+    if sem_js {
+        if baixo.contains("<script") {
+            erros.push("conteudo tem <script> apesar do pedido sem JavaScript".to_string());
+        }
+        if baixo.contains("javascript:") {
+            erros.push("conteudo tem javascript: apesar do pedido sem JavaScript".to_string());
+        }
+        for evento in [
+            "onload=",
+            "onclick=",
+            "onchange=",
+            "onsubmit=",
+            "oninput=",
+            "addEventListener",
+        ] {
+            if baixo.contains(evento) {
+                erros.push(format!(
+                    "conteudo tem {evento} apesar do pedido sem JavaScript"
+                ));
+            }
+        }
+    }
+    erros
+}
+
+fn revisar_requisitos(conteudo: &str, instrucao: &str) -> Result<(), String> {
+    if instrucao.trim().is_empty()
+        || env::var("C2H_SKIP_REVIEW").is_ok()
+        || env::var("C2H_MOCK_RESPONSE").is_ok()
+    {
+        return Ok(());
+    }
+    let system = "Voce e um revisor rigoroso. Compare o conteudo com o pedido do usuario. Responda APENAS JSON: {\"compliant\":true|false,\"violations\":[\"...\"],\"fix\":\"...\"}. Nao invente problemas; verifique especialmente pedidos como 'sem JavaScript'.";
+    let user = format!(
+        "PEDIDO:\n{instrucao}\n\nCONTEUDO:\n{}",
+        conteudo.chars().take(12000).collect::<String>()
+    );
+    let resposta = chamar_provider(system, &user)?;
+    let json = extrair_json_valor(&resposta)?;
+    let compliant = json
+        .get("compliant")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    if !compliant {
+        let violacoes = json
+            .get("violations")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            })
+            .unwrap_or_else(|| "conteudo nao atende ao pedido".to_string());
+        return Err(format!("revisor: {violacoes}"));
+    }
+    Ok(())
+}
+
+fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
+    let conteudo = fs::read_to_string(file).map_err(|e| e.to_string())?;
+    let linhas: Vec<&str> = conteudo.lines().collect();
+    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"...\",\"how\":\"...\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. Nao escreva timestamp.";
+    let mut user = format!(
+        "ARQUIVO: {}\nTotal de linhas: {}\nConteudo:\n{}",
+        rel_file(file),
+        linhas.len(),
+        conteudo.chars().take(16000).collect::<String>()
+    );
+    let mut ultimo_erro = String::new();
+    for tentativa in 0..3 {
+        let resposta = chamar_provider(system, &user)?;
+        match extrair_json_valor(&resposta) {
+            Ok(json) => {
+                let Some(lista) = json.get("blocks").and_then(|v| v.as_array()) else {
+                    ultimo_erro = "resposta sem blocks[]".to_string();
+                    user = format!(
+                        "Resposta anterior invalida: {ultimo_erro}. Devolva blocks[].\n{user}"
+                    );
+                    continue;
+                };
+                if lista.is_empty() {
+                    ultimo_erro = "blocks[] vazio".to_string();
+                    user = format!("Resposta anterior invalida: {ultimo_erro}. Identifique pelo menos um bloco.\n{user}");
+                    continue;
+                }
+                let mut blocos = Vec::new();
+                let mut ids = std::collections::BTreeSet::new();
+                let mut intervalos: Vec<(usize, usize)> = Vec::new();
+                let mut erro = None;
+                for item in lista.iter().take(12) {
+                    let id = item
+                        .get("block_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let kind = item
+                        .get("kind")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("block")
+                        .to_string();
+                    let start =
+                        item.get("start_line").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                    let end = item.get("end_line").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                    if id.is_empty()
+                        || !ids.insert(id.clone())
+                        || start == 0
+                        || end < start
+                        || end > linhas.len()
+                    {
+                        erro = Some(format!("bloco invalido: {id} {start}-{end}"));
+                        break;
+                    }
+                    if intervalos.iter().any(|(a, b)| start <= *b && end >= *a) {
+                        erro = Some(format!("blocos sobrepostos em {id}"));
+                        break;
+                    }
+                    intervalos.push((start, end));
+                    let corpo = normalizar_conteudo(&linhas[start - 1..end]);
+                    blocos.push(SidecarBlock {
+                        id: id.clone(),
+                        kind,
+                        name: id.split("::").last().unwrap_or(&id).to_string(),
+                        start_line: start,
+                        end_line: end,
+                        created_at: agora_iso(),
+                        updated_at: agora_iso(),
+                        semantic_hash: hash(&corpo),
+                        w5h2: W5h2 {
+                            what: item
+                                .get("what")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            why: item
+                                .get("why")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            how: item
+                                .get("how")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            ..W5h2::default()
+                        },
+                        evidence: vec![format!("{}:{}", rel_file(file), start)],
+                    });
+                }
+                if let Some(erro_msg) = erro {
+                    ultimo_erro = erro_msg.clone();
+                    if tentativa < 2 {
+                        user = format!("Resposta anterior rejeitada: {erro_msg}. Corrija os blocos e devolva o JSON completo.\n{user}");
+                    }
+                    continue;
+                }
+                let sidecar = Sidecar {
+                    schema_version: SCHEMA_VERSION,
+                    contract_version: CONTRACT_VERSION,
+                    file: rel_file(file),
+                    status: "annotated".to_string(),
+                    source_hash: hash(&conteudo),
+                    generated_by: "c2h-ai".to_string(),
+                    blocks: blocos,
+                };
+                escrever_sidecar(file, &sidecar)?;
+                log_evento(
+                    "annotate_blocks_ai",
+                    serde_json::json!({"file": rel_file(file), "blocks": sidecar.blocks.len()}),
+                );
+                println!(
+                    "annotation pass: {} blocos descobertos",
+                    sidecar.blocks.len()
+                );
+                return Ok(true);
+            }
+            Err(erro) => {
+                ultimo_erro = erro.clone();
+                if tentativa < 2 {
+                    user = format!(
+                        "Erro de formato: {erro}. Devolva APENAS JSON com blocks[].\n{user}"
+                    );
+                }
+            }
+        }
+    }
+    Err(format!("annotation pass nao convergiu: {ultimo_erro}"))
+}
+
 fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
     let (_, blocos) = carregar_arquivo(file)?;
     let anterior = ler_sidecar(file);
@@ -2520,6 +2821,8 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 id: bloco.id.clone(),
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
+                start_line: bloco.start_line,
+                end_line: bloco.end_line,
                 created_at: old.created_at.clone(),
                 updated_at: if changed {
                     agora.clone()
@@ -2535,6 +2838,8 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 id: bloco.id.clone(),
                 kind: bloco.kind.clone(),
                 name: bloco.name.clone(),
+                start_line: bloco.start_line,
+                end_line: bloco.end_line,
                 created_at: agora.clone(),
                 updated_at: agora.clone(),
                 semantic_hash: bloco.semantic_hash.clone(),
@@ -2544,10 +2849,19 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
         };
         novos.push(side);
     }
+    let source_hash = hash(&fs::read_to_string(file).unwrap_or_default());
     let sidecar = Sidecar {
         schema_version: SCHEMA_VERSION,
         contract_version: CONTRACT_VERSION,
         file: rel_file(file),
+        status: if novos.is_empty() {
+            "unannotated"
+        } else {
+            "annotated"
+        }
+        .to_string(),
+        source_hash,
+        generated_by: "c2h".to_string(),
         blocks: novos,
     };
     if dry_run {
@@ -2974,6 +3288,15 @@ mod tests {
             "def a():\n    return 1\n\ndef b():\n    pass\n",
         );
         assert_eq!(blocos.len(), 2);
+    }
+
+    #[test]
+    #[test]
+    fn politica_bloqueia_script_quando_sem_js() {
+        let erros = violacoes_politica("<html><script>alert(1)</script></html>", "sem JavaScript");
+        assert!(!erros.is_empty());
+        let erros = violacoes_politica("<html><style>body{}</style></html>", "sem JavaScript");
+        assert!(erros.is_empty());
     }
 
     #[test]

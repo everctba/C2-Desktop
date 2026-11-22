@@ -125,6 +125,34 @@ Comandos:
 /file <arquivo> /drop /clear /status /help /sair
 ```
 
+## Annotation pass e sidecar
+
+Depois de criar um arquivo, o sidecar nasce com:
+
+```json
+{"status":"unannotated","blocks":[],"source_hash":"sha256:..."}
+```
+
+Se `blocks` estiver vazio, o harness roda um **annotation pass**:
+
+```text
+arquivo -> IA descobre blocos -> validator -> sidecar annotated
+```
+
+Cada bloco guarda `start_line`/`end_line`, hash, W5H2 e timestamps. O `/edit`
+funciona com esses blocos e, se o sidecar estiver vazio, dispara a descoberta
+antes.
+
+Comandos:
+
+```text
+/annotate <arquivo>   descobre blocos com IA
+```
+
+Politicas genericas (sem JavaScript, tamanho, imports) e um critico de
+requisitos sao aplicados antes de gravar. O annotation pass nao inventa
+timestamps: o harness carimba.
+
 ## Agent loop com ferramentas
 
 No chat, o `c2h` agora envia ferramentas ao modelo e executa `tool_calls`:
