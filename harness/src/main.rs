@@ -48,6 +48,9 @@ enum Command {
         /// Grava sem alterar (dry-run)
         #[arg(long)]
         dry_run: bool,
+        /// Usa a IA para preencher o W5H2 dos blocos
+        #[arg(long)]
+        ai: bool,
     },
     /// Valida sidecar contra o codigo atual
     Validate { file: Option<PathBuf> },
@@ -1251,6 +1254,89 @@ fn cmd_status() -> Result<(), String> {
     Ok(())
 }
 
+fn extrair_json_valor(texto: &str) -> Result<serde_json::Value, String> {
+    let limpo = texto
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
+    let inicio = limpo
+        .find('{')
+        .ok_or_else(|| "resposta sem JSON".to_string())?;
+    let fim = limpo
+        .rfind('}')
+        .ok_or_else(|| "JSON incompleto".to_string())?;
+    serde_json::from_str(&limpo[inicio..=fim]).map_err(|e| format!("JSON invalido: {e}"))
+}
+
+fn cmd_annotate_ai(file: &Path, dry_run: bool) -> Result<(), String> {
+    let (conteudo, blocos) = carregar_arquivo(file)?;
+    let linhas: Vec<&str> = conteudo.lines().collect();
+    let mut pedido = String::from("Preencha W5H2 dos blocos abaixo. Responda APENAS JSON:\n{\"blocks\":[{\"block_id\":\"...\",\"what\":\"...\",\"why\":\"...\",\"when\":\"...\",\"where\":\"...\",\"who\":\"...\",\"how\":\"...\",\"how_much\":\"...\"}]}\nUse \"unknown\" quando nao souber e nao escreva timestamp.\n\n");
+    for bloco in &blocos {
+        let inicio = bloco.start_line.saturating_sub(1).min(linhas.len());
+        let fim = bloco.end_line.min(linhas.len());
+        pedido.push_str(&format!(
+            "\nBLOCO: {}\n```\n{}\n```\n",
+            bloco.id,
+            linhas[inicio..fim].join("\n")
+        ));
+    }
+    let resposta = chamar_provider(
+        "Voce preenche anotacoes 5W2H de blocos de codigo. Nao invente; use unknown. Responda somente JSON.",
+        &pedido,
+    )?;
+    let json = extrair_json_valor(&resposta)?;
+    let lista = json
+        .get("blocks")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "resposta sem blocks[]".to_string())?;
+    let Some(mut sidecar) = ler_sidecar(file) else {
+        return Err("sidecar ausente; rode c2h annotate primeiro".to_string());
+    };
+    let mut atualizados = 0usize;
+    for item in lista {
+        let Some(id) = item.get("block_id").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(bloco) = sidecar.blocks.iter_mut().find(|b| b.id == id) else {
+            continue;
+        };
+        let texto = |chave: &str| {
+            item.get(chave)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+        bloco.w5h2 = W5h2 {
+            what: texto("what"),
+            why: texto("why"),
+            when: texto("when"),
+            where_: texto("where"),
+            who: texto("who"),
+            how: texto("how"),
+            how_much: texto("how_much"),
+        };
+        atualizados += 1;
+    }
+    if dry_run {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&sidecar).map_err(|e| e.to_string())?
+        );
+    } else {
+        escrever_sidecar(file, &sidecar)?;
+        log_evento(
+            "annotate_ai",
+            serde_json::json!({"file": rel_file(file), "blocks": atualizados}),
+        );
+        println!("sidecar: {}", sidecar_path(file).display());
+        println!("blocos atualizados: {atualizados}");
+    }
+    Ok(())
+}
+
 fn cmd_validate(file: Option<&Path>) -> Result<(), String> {
     let arquivos: Vec<PathBuf> = match file {
         Some(path) => vec![path.to_path_buf()],
@@ -1630,7 +1716,13 @@ fn main() {
     let resultado = match &cli.command {
         Command::Doctor => cmd_doctor(),
         Command::Blocks { file } => cmd_blocks(file, cli.json),
-        Command::Annotate { file, dry_run } => cmd_annotate(file, *dry_run),
+        Command::Annotate { file, dry_run, ai } => {
+            if *ai {
+                cmd_annotate_ai(file, *dry_run)
+            } else {
+                cmd_annotate(file, *dry_run)
+            }
+        }
         Command::Validate { file } => cmd_validate(file.as_deref()),
         Command::Status => cmd_status(),
         Command::Context { file, max_chars } => cmd_context(file, *max_chars),
