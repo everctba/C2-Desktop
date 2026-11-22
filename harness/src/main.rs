@@ -584,16 +584,17 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"list_dir","description":"Lista arquivos e diretorios do projeto.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"diretorio relativo; vazio para o atual"}}}}},
         {"type":"function","function":{"name":"read_file","description":"Le um arquivo de texto, com faixa de linhas opcional.","parameters":{"type":"object","properties":{"path":{"type":"string"},"start":{"type":"integer"},"end":{"type":"integer"}},"required":["path"]}}},
         {"type":"function","function":{"name":"find_text","description":"Busca texto nos arquivos do projeto.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},
-        {"type":"function","function":{"name":"write_file","description":"Cria um arquivo novo pequeno. O harness valida, mostra preview e pede confirmacao.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
+        {"type":"function","function":{"name":"write_file","description":"Cria SOMENTE arquivo novo. Se existir, use replace_file. O harness valida, mostra preview e pede confirmacao.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
+        {"type":"function","function":{"name":"replace_file","description":"Substitui arquivo existente com backup, tmp, validacao e rename atomico. Nao use remove_file para editar.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"}},"required":["path","content"]}}},
         {"type":"function","function":{"name":"edit_file","description":"Edita um bloco de um arquivo existente via block_id, com patch validado e test gate.","parameters":{"type":"object","properties":{"path":{"type":"string"},"block_id":{"type":"string"},"new_code":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"}},"required":["path","block_id","new_code"]}}},
         {"type":"function","function":{"name":"new_component","description":"Cria scaffold HTML/CSS/JS de um componente.","parameters":{"type":"object","properties":{"name":{"type":"string"},"html":{"type":"boolean"},"css":{"type":"boolean"},"js":{"type":"boolean"}},"required":["name"]}}},
         {"type":"function","function":{"name":"move_file","description":"Move um arquivo com backup.","parameters":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"}},"required":["from","to"]}}},
-        {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
+        {"type":"function","function":{"name":"remove_file","description":"Remove um arquivo com backup. NAO use para substituir conteudo; use replace_file.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}},
         {"type":"function","function":{"name":"run_test","description":"Roda o comando de teste configurado (C2H_TEST_CMD).","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa um comando de shell livre no root do projeto. Pode rodar git, powershell, cmd, python, node, rm etc. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why tecnico causa->efeito.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"what":{"type":"string"},"why":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["block_id","what","why"]}}},"required":["blocks"]}}}
     ])
 }
 
@@ -1441,6 +1442,64 @@ fn texto_buscar(ws: &Workspace, args: &serde_json::Value) -> Result<String, Stri
     Ok(format!("{achados} resultado(s)\n{saida}"))
 }
 
+fn ferramenta_replace_file(
+    ws: &Workspace,
+    args: &serde_json::Value,
+    auto: bool,
+    tarefa: &str,
+) -> Result<String, String> {
+    let rel = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+    let summary = args.get("summary").and_then(|v| v.as_str()).unwrap_or("");
+    let alvo = ws.resolver(rel, true)?;
+    if !alvo.is_file() {
+        return Err(format!("arquivo nao existe para replace: {rel}"));
+    }
+    let envelope = WriteEnvelope {
+        path: rel.to_string(),
+        content: content.to_string(),
+        imports: vec![],
+        summary: summary.to_string(),
+        w5h2: W5h2 {
+            what: summary.to_string(),
+            why: "desconhecido".to_string(),
+            ..W5h2::default()
+        },
+    };
+    validar_novo(ws, &alvo, &envelope, tarefa)?;
+    revisar_requisitos(content, tarefa)?;
+    println!(
+        "\n--- replace proposto: {rel} ({} linhas) ---",
+        content.lines().count()
+    );
+    for (i, linha) in content.lines().take(120).enumerate() {
+        println!("{:>4}: {linha}", i + 1);
+    }
+    if !auto && !confirmar(&format!("substituir {rel}?"))? {
+        return Ok("cancelado pelo usuario".to_string());
+    }
+    let antigo_sidecar = ler_sidecar(Path::new(rel));
+    let backup_path = backup(ws, &alvo)?;
+    escrever_atomico(&alvo, content)?;
+    cmd_annotate(Path::new(rel), false)?;
+    if precisa_anotacao(Path::new(rel)) && anotar_blocos_ia(Path::new(rel)).is_err() {
+        if let Some(mut old) = antigo_sidecar {
+            old.status = "stale".to_string();
+            old.source_hash = hash(content);
+            escrever_sidecar(Path::new(rel), &old)?;
+        }
+    }
+    marcar_qualidade(Path::new(rel));
+    log_evento(
+        "replace_file",
+        serde_json::json!({"path": rel, "lines": content.lines().count(), "backup": backup_path.display().to_string()}),
+    );
+    Ok(format!(
+        "substituido: {rel} ({} linhas)",
+        content.lines().count()
+    ))
+}
+
 fn ferramenta_write(
     ws: &Workspace,
     args: &serde_json::Value,
@@ -1908,6 +1967,7 @@ fn executar_ferramenta(
         "read_file" => texto_ler(ws, &args),
         "find_text" => texto_buscar(ws, &args),
         "write_file" => ferramenta_write(ws, &args, auto, tarefa),
+        "replace_file" => ferramenta_replace_file(ws, &args, auto, tarefa),
         "edit_file" => ferramenta_edit(ws, &args, auto),
         "new_component" => {
             let nome = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -2301,7 +2361,7 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar ou editar algo, chame write_file/new_component/edit_file em vez de apenas mostrar codigo. Nao invente arquivos ou APIs.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao invente arquivos ou APIs.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = yolo
@@ -3515,7 +3575,7 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
             }
         }
     }
-    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. O why deve explicar a causa tecnica, nunca \"solicitado pelo agente\". Nao escreva timestamp.";
+    let system = "Voce identifica blocos de responsabilidade em um arquivo. Responda APENAS JSON: {\"blocks\":[{\"block_id\":\"id-unico\",\"kind\":\"section|function|class|block\",\"start_line\":1,\"end_line\":10,\"what\":\"...\",\"why\":\"causa->efeito tecnico\",\"when\":\"quando e alcancado\",\"where\":\"contexto\",\"who\":\"quem usa\",\"how\":\"como funciona\",\"how_much\":\"limites/custo\",\"confidence\":\"high|medium|low\"}]}. Use 1 a 12 blocos, sem sobreposicao. O what e a responsabilidade; o why e teleologico: por que o bloco existe, que problema evita e que objetivo garante. O how e o mecanismo. Nunca use \"solicitado pelo agente\". Nao escreva timestamp.";
     let comentarios = extrair_comentarios(&conteudo, 60);
     let mut user = format!(
         "ARQUIVO: {}\nTotal de linhas: {}\nCOMENTARIOS/DOCSTRINGS:\n{}\nConteudo:\n{}",

@@ -231,10 +231,22 @@ scaffold HTML/CSS/JS. `/edit` reutiliza o contrato de blocos e o test gate.
 `/doctor` mostra config/diagnostico e `/logs [n]` mostra os ultimos eventos da
 timeline sem sair do chat.
 
+## Substituicao atomica
+
+Para arquivo existente, use `replace_file`:
+
+```json
+{"name":"replace_file","args":{"path":"src/index.js","content":"...","summary":"..."}}
+```
+
+Fluxo: valida path, backup, tmp, rename atomico, sidecar e gates.
+`write_file` e somente para arquivo novo; nunca use `remove_file` para editar.
+
 ## Qualidade do W5H2
 
-O `why` precisa ser tecnico (causa->efeito). Valores como
-`solicitado pelo agente`, `necessario`, `desconhecido` sao rejeitados.
+O `why` precisa ser tecnico e teleologico: proposito, problema evitado,
+consequencia. Nao e descricao mecanica. Valores como `solicitado pelo agente`,
+`necessario`, `desconhecido` sao rejeitados.
 
 O agente pode atualizar anotacoes sem tocar no codigo:
 
