@@ -620,7 +620,12 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa comando de shell no root. Use apenas para testes/build/git; NAO leia codigo com type/cat/findstr/grep nem redirecione > para codigo. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"path":{"type":"string"},"start_line":{"type":"integer"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["what","why"]}}},"required":["blocks"]}}}
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"path":{"type":"string"},"start_line":{"type":"integer"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["what","why"]}}},"required":["blocks"]}}},
+        {"type":"function","function":{"name":"goal_status","description":"Mostra o goal ativo: objetivo, epic, status, tarefa atual, iteracoes e falhas.","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"goal_tasks","description":"Lista tarefas do goal/epic com status e readiness.","parameters":{"type":"object","properties":{"status":{"type":"string","enum":["open","closed","all"],"description":"open (padrao), closed ou all"},"ready":{"type":"boolean","description":"somente prontas"}}}}},
+        {"type":"function","function":{"name":"goal_next","description":"Mostra a proxima tarefa pronta do goal.","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"goal_context","description":"Contexto do goal ativo e da tarefa atual, com eventos recentes.","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"goal_events","description":"Eventos recentes do goal ativo.","parameters":{"type":"object","properties":{"limit":{"type":"integer","description":"padrao 10, max 100"}}}}}
     ]);
     if !SHELL_ENABLED.load(Ordering::Relaxed) {
         if let Some(lista) = tools.as_array_mut() {
@@ -2471,6 +2476,11 @@ fn executar_ferramenta(
         "shell" => executar_shell(ws, &args, auto),
         "git" => executar_git(ws, &args, auto),
         "annotate_blocks" => executar_annotate_blocks(&args),
+        "goal_status" => ferramenta_goal_status(ws),
+        "goal_tasks" => ferramenta_goal_tasks(ws, &args),
+        "goal_next" => ferramenta_goal_next(ws),
+        "goal_context" => ferramenta_goal_context(ws),
+        "goal_events" => ferramenta_goal_events(ws, &args),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(
@@ -3080,6 +3090,34 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
         }
     }
 
+    if BD_DISPONIVEL.load(Ordering::Relaxed) && GOAL_RUNNER_ENABLED.load(Ordering::Relaxed) {
+        if let Some(goal) = goal_ativo(ws) {
+            if let Ok(tarefas) = goal_tarefas_bd(ws, &goal.epic) {
+                let ready = goal_ready_ids(ws, &goal.epic);
+                let atual = goal_tarefa_atual(ws, &goal, &tarefas, &ready);
+                let restantes = tarefas
+                    .iter()
+                    .filter(|t| t.get("status").and_then(|v| v.as_str()) != Some("closed"))
+                    .count();
+                out.push_str("\nGOAL ATIVO:\n");
+                out.push_str(&format!(
+                    "- id: {}\n- objetivo: {}\n- epic: {}\n- status: {}\n",
+                    goal.id, goal.objective, goal.epic, goal.status
+                ));
+                if let Some(t) = atual {
+                    out.push_str(&format!(
+                        "- tarefa atual: {} — {}\n",
+                        t.get("id").and_then(|v| v.as_str()).unwrap_or("?"),
+                        t.get("title").and_then(|v| v.as_str()).unwrap_or("")
+                    ));
+                } else {
+                    out.push_str("- tarefa atual: nenhuma\n");
+                }
+                out.push_str(&format!("- tarefas restantes: {restantes}\n"));
+            }
+        }
+    }
+
     let criticos = arquivos_criticos_sem_anotacao(ws, ativo);
     if !criticos.is_empty() {
         out.push_str("\nARQUIVOS CRITICOS SEM ANOTACAO:\n");
@@ -3600,6 +3638,246 @@ fn cmd_goal_status(ws: &Workspace) {
         }
         None => println!("nenhum goal em .c2h/goals"),
     }
+}
+
+fn goals_lidos(ws: &Workspace) -> Vec<Goal> {
+    let Ok(entradas) = fs::read_dir(goal_dir(ws)) else {
+        return Vec::new();
+    };
+    let mut arquivos: Vec<_> = entradas.filter_map(|e| e.ok()).collect();
+    arquivos.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+    arquivos
+        .into_iter()
+        .rev()
+        .filter_map(|e| fs::read_to_string(e.path()).ok())
+        .filter_map(|raw| serde_json::from_str::<Goal>(raw.trim_start_matches('\u{feff}')).ok())
+        .collect()
+}
+
+fn goal_ativo(ws: &Workspace) -> Option<Goal> {
+    let mut goals = goals_lidos(ws);
+    goals.sort_by_key(|g| g.updated_at.clone());
+    if let Some(g) = goals.iter().rev().find(|g| g.status != "done") {
+        return Some(g.clone());
+    }
+    goals.pop()
+}
+
+fn goal_tarefas_bd(ws: &Workspace, epic: &str) -> Result<Vec<serde_json::Value>, String> {
+    let lista = bd_json(
+        ws,
+        &[
+            "list".to_string(),
+            "--parent".to_string(),
+            epic.to_string(),
+            "--status".to_string(),
+            "open,in_progress,blocked,deferred,closed".to_string(),
+            "--json".to_string(),
+        ],
+    )?;
+    Ok(lista.as_array().cloned().unwrap_or_default())
+}
+
+fn goal_ready_ids(ws: &Workspace, epic: &str) -> std::collections::BTreeSet<String> {
+    bd_json(
+        ws,
+        &[
+            "list".to_string(),
+            "--parent".to_string(),
+            epic.to_string(),
+            "--status".to_string(),
+            "open".to_string(),
+            "--ready".to_string(),
+            "--json".to_string(),
+        ],
+    )
+    .ok()
+    .and_then(|v| v.as_array().cloned())
+    .unwrap_or_default()
+    .iter()
+    .filter_map(|t| t.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+    .collect()
+}
+
+fn goal_tarefa_atual(
+    _ws: &Workspace,
+    goal: &Goal,
+    tarefas: &[serde_json::Value],
+    ready: &std::collections::BTreeSet<String>,
+) -> Option<serde_json::Value> {
+    if let Some(t) = tarefas
+        .iter()
+        .find(|t| t.get("status").and_then(|v| v.as_str()) == Some("in_progress"))
+    {
+        return Some(t.clone());
+    }
+    tarefas
+        .iter()
+        .find(|t| {
+            t.get("status").and_then(|v| v.as_str()) == Some("open")
+                && t.get("id")
+                    .and_then(|v| v.as_str())
+                    .map(|id| ready.contains(id))
+                    .unwrap_or(false)
+        })
+        .cloned()
+        .or_else(|| {
+            let _ = goal;
+            None
+        })
+}
+
+fn goal_eventos_lidos(ws: &Workspace, goal_id: &str, limit: usize) -> Vec<serde_json::Value> {
+    let path = goal_dir(ws).join(format!("{goal_id}.events.jsonl"));
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut eventos: Vec<_> = raw
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
+        .collect();
+    if eventos.len() > limit {
+        eventos = eventos.split_off(eventos.len() - limit);
+    }
+    eventos
+}
+
+fn goal_resumo_valor(ws: &Workspace, goal: &Goal) -> Result<serde_json::Value, String> {
+    let tarefas = goal_tarefas_bd(ws, &goal.epic)?;
+    let ready = goal_ready_ids(ws, &goal.epic);
+    let atual = goal_tarefa_atual(ws, goal, &tarefas, &ready);
+    let restantes = tarefas
+        .iter()
+        .filter(|t| t.get("status").and_then(|v| v.as_str()) != Some("closed"))
+        .count();
+    let valor = serde_json::json!({
+        "id": goal.id,
+        "objective": goal.objective,
+        "epic": goal.epic,
+        "status": goal.status,
+        "iterations": goal.iterations,
+        "max_iterations": goal.budget.max_iterations,
+        "tasks_done": goal.tasks_done,
+        "tasks_remaining": restantes,
+        "resume_count": goal.resume_count,
+        "current_task": atual.as_ref().map(|t| serde_json::json!({
+            "id": t.get("id"),
+            "title": t.get("title"),
+            "status": t.get("status"),
+            "acceptance": t.get("acceptance_criteria"),
+        })),
+        "last_error": goal.failures.last(),
+        "updated_at": goal.updated_at,
+    });
+    Ok(valor)
+}
+
+fn ferramenta_goal_status(ws: &Workspace) -> Result<String, String> {
+    let Some(goal) = goal_ativo(ws) else {
+        return Ok(serde_json::json!({"goal": null, "hint": "use /goal run <epic>"}).to_string());
+    };
+    serde_json::to_string_pretty(&goal_resumo_valor(ws, &goal)?).map_err(|e| e.to_string())
+}
+
+fn ferramenta_goal_tasks(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let Some(goal) = goal_ativo(ws) else {
+        return Ok(serde_json::json!({"goal": null, "tasks": []}).to_string());
+    };
+    let filtro = args
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("open");
+    let so_prontas = args.get("ready").and_then(|v| v.as_bool()).unwrap_or(false);
+    let tarefas = goal_tarefas_bd(ws, &goal.epic)?;
+    let ready = goal_ready_ids(ws, &goal.epic);
+    let saida: Vec<_> = tarefas
+        .into_iter()
+        .filter(|t| {
+            let status = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            match filtro {
+                "all" => true,
+                "closed" => status == "closed",
+                _ => status != "closed",
+            }
+        })
+        .filter(|t| {
+            if so_prontas {
+                t.get("id")
+                    .and_then(|v| v.as_str())
+                    .map(|id| ready.contains(id))
+                    .unwrap_or(false)
+            } else {
+                true
+            }
+        })
+        .map(|t| {
+            let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            serde_json::json!({
+                "id": id,
+                "title": t.get("title"),
+                "status": t.get("status"),
+                "priority": t.get("priority"),
+                "type": t.get("issue_type"),
+                "acceptance": t.get("acceptance_criteria"),
+                "ready": ready.contains(id),
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({"goal": goal.id, "epic": goal.epic, "tasks": saida}).to_string())
+}
+
+fn ferramenta_goal_next(ws: &Workspace) -> Result<String, String> {
+    let Some(goal) = goal_ativo(ws) else {
+        return Ok(serde_json::json!({"goal": null, "next": null}).to_string());
+    };
+    let tarefas = goal_tarefas_bd(ws, &goal.epic)?;
+    let ready = goal_ready_ids(ws, &goal.epic);
+    let proxima = tarefas.iter().find(|t| {
+        t.get("id")
+            .and_then(|v| v.as_str())
+            .map(|id| ready.contains(id))
+            .unwrap_or(false)
+            && t.get("status").and_then(|v| v.as_str()) == Some("open")
+    });
+    Ok(serde_json::json!({
+        "goal": goal.id,
+        "next": proxima.map(|t| serde_json::json!({
+            "id": t.get("id"),
+            "title": t.get("title"),
+            "acceptance": t.get("acceptance_criteria"),
+            "description": t.get("description"),
+        })),
+    })
+    .to_string())
+}
+
+fn ferramenta_goal_context(ws: &Workspace) -> Result<String, String> {
+    let Some(goal) = goal_ativo(ws) else {
+        return Ok(serde_json::json!({"goal": null, "context": null}).to_string());
+    };
+    let mut resumo = goal_resumo_valor(ws, &goal)?;
+    if let Some(obj) = resumo.as_object_mut() {
+        obj.insert(
+            "recent_events".to_string(),
+            serde_json::json!(goal_eventos_lidos(ws, &goal.id, 10)),
+        );
+    }
+    serde_json::to_string_pretty(&resumo).map_err(|e| e.to_string())
+}
+
+fn ferramenta_goal_events(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let Some(goal) = goal_ativo(ws) else {
+        return Ok(serde_json::json!({"goal": null, "events": []}).to_string());
+    };
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(10)
+        .clamp(1, 100) as usize;
+    Ok(
+        serde_json::json!({"goal": goal.id, "events": goal_eventos_lidos(ws, &goal.id, limit)})
+            .to_string(),
+    )
 }
 
 fn cmd_chat(yolo: bool) -> Result<(), String> {

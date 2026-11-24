@@ -567,6 +567,33 @@ $env:C2H_GOAL_RUNNER="0"
 O goal runner ainda e MVP futuro; a flag ja existe para o runner nao tentar
 operar sem a infra do bd.
 
+## Goal tools (read-only)
+
+A IA pode consultar o goal ativo:
+
+```json
+{"name":"goal_status","arguments":{}}
+{"name":"goal_tasks","arguments":{"status":"open","ready":true}}
+{"name":"goal_next","arguments":{}}
+{"name":"goal_context","arguments":{}}
+{"name":"goal_events","arguments":{"limit":10}}
+```
+
+`goal_status` retorna objetivo, epic, status, tarefa atual, iteracoes e falha.
+`goal_tasks` lista tarefas abertas/fechadas/prontas. `goal_next` mostra a
+proxima pronta. `goal_context` inclui eventos recentes. Nada e write.
+
+O context compiler injeta automaticamente:
+
+```text
+GOAL ATIVO:
+- id/objetivo/epic/status
+- tarefa atual
+- tarefas restantes
+```
+
+Assim, ao reabrir a IDE/sessao, a IA sabe onde estava sem ler `.c2h` na mao.
+
 ## Goal runner (MVP)
 
 O runner usa um épico do bd como lista de tarefas:
