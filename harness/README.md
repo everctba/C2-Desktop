@@ -642,7 +642,18 @@ budget de minutos (C2H_GOAL_MAX_MINUTES, padrao 15)
 sem tarefas prontas
 2 falhas na mesma tarefa
 aceite do goal falhou
+sem progresso (git status filtrado nao muda)
 bd ausente / C2H_GOAL_RUNNER=0
+```
+
+Retry: a proxima tentativa recebe a falha anterior no prompt
+(`TENTATIVA ANTERIOR FALHOU`) e instrucao para corrigir a causa.
+
+No-progress ignora `.beads/`, `.c2h/` e `tmp/`. Para permitir tarefas sem
+diff (ex: verificacao):
+
+```powershell
+$env:C2H_GOAL_REQUIRE_DIFF="0"
 ```
 
 Sem verificador explicito, a tarefa falha e nao e fechada. O modelo nao decide

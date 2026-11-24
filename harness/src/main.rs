@@ -3306,6 +3306,32 @@ fn verificar_goal_task(ws: &Workspace, acceptance: &str) -> Result<String, Strin
     Ok(provas.join(", "))
 }
 
+fn git_status_progresso(ws: &Workspace) -> Option<String> {
+    let out = std::process::Command::new("git")
+        .args(["status", "--short", "--untracked-files=all"])
+        .current_dir(&ws.root)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let texto = String::from_utf8_lossy(&out.stdout);
+    let mut linhas: Vec<&str> = texto
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            !(t.starts_with(".beads/")
+                || t.starts_with(".c2h/")
+                || t.starts_with("tmp/")
+                || t.contains(" .beads/")
+                || t.contains(" .c2h/")
+                || t.contains(" tmp/"))
+        })
+        .collect();
+    linhas.sort_unstable();
+    Some(linhas.join("\n"))
+}
+
 fn cmd_goal_run(ws: &Workspace, epic: &str, auto: bool, system_base: &str) -> Result<(), String> {
     if !GOAL_RUNNER_ENABLED.load(Ordering::Relaxed) {
         return Err(
@@ -3543,15 +3569,51 @@ fn executar_goal_loop(
             goal.status = "blocked_claim".to_string();
             break;
         }
+        let status_antes = git_status_progresso(ws);
+        let tentativa = goal
+            .failures
+            .iter()
+            .filter(|f| f.starts_with(&format!("{task_id}:")))
+            .count()
+            + 1;
+        let retry_info = goal
+            .failures
+            .iter()
+            .rev()
+            .find(|f| f.starts_with(&format!("{task_id}:")))
+            .map(|f| format!("\nTENTATIVA ANTERIOR FALHOU:\n{f}\nNao repita a mesma abordagem; corrija a causa.\n"))
+            .unwrap_or_default();
         let prompt = format!(
-            "Execute SOMENTE a tarefa abaixo. Nao pegue outras tarefas.\n\nTAREFA: {task_id}\nTITULO: {titulo}\nDESCRICAO:\n{descricao}\nACEITE:\n{aceite}\n\nAo terminar, responda com o que mudou e a evidencia. O harness vai verificar o aceite; nao declare concluido sem evidencia."
+            "Execute SOMENTE a tarefa abaixo. Nao pegue outras tarefas.\n\nTAREFA: {task_id}\nTENTATIVA: {tentativa}\nTITULO: {titulo}\nDESCRICAO:\n{descricao}\nACEITE:\n{aceite}\n{retry_info}\nAo terminar, responda com o que mudou e a evidencia. O harness vai verificar o aceite; nao declare concluido sem evidencia."
         );
         let contexto = compilar_contexto(ws, &titulo, None);
         let system = format!("{system_base}\n\n{contexto}");
         let mut hist = vec![serde_json::json!({"role":"user","content":prompt})];
         let execucao = executar_agente(&system, &mut hist, ws, auto);
         let resultado = match execucao {
-            Ok(()) => verificar_goal_task(ws, &aceite),
+            Ok(()) => {
+                let prova = verificar_goal_task(ws, &aceite);
+                if prova.is_ok()
+                    && env::var("C2H_GOAL_REQUIRE_DIFF")
+                        .map(|v| v != "0" && v != "false")
+                        .unwrap_or(true)
+                {
+                    let status_depois = git_status_progresso(ws);
+                    if let (Some(antes), Some(depois)) = (&status_antes, &status_depois) {
+                        if antes == depois {
+                            Err(format!(
+                                "sem progresso: git status nao mudou (antes/depois iguais). Use C2H_GOAL_REQUIRE_DIFF=0 para permitir."
+                            ))
+                        } else {
+                            prova
+                        }
+                    } else {
+                        prova
+                    }
+                } else {
+                    prova
+                }
+            }
             Err(e) => Err(format!("agente falhou: {e}")),
         };
         match resultado {
@@ -3578,6 +3640,13 @@ fn executar_goal_loop(
                     ],
                 );
                 goal.failures.push(format!("{task_id}: {e}"));
+                if e.contains("sem progresso") {
+                    goal_evento(
+                        ws,
+                        &goal.id,
+                        serde_json::json!({"event":"task_no_progress","task":task_id}),
+                    )?;
+                }
                 println!("  falhou: {e}");
                 goal_evento(
                     ws,
