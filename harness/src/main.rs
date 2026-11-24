@@ -3163,6 +3163,8 @@ struct Goal {
     iterations: usize,
     tasks_done: usize,
     failures: Vec<String>,
+    #[serde(default)]
+    resume_count: usize,
     started_at: String,
     updated_at: String,
 }
@@ -3202,7 +3204,7 @@ fn goal_mais_recente(ws: &Workspace) -> Option<Goal> {
         .into_iter()
         .rev()
         .filter_map(|e| fs::read_to_string(e.path()).ok())
-        .filter_map(|raw| serde_json::from_str::<Goal>(&raw).ok())
+        .filter_map(|raw| serde_json::from_str::<Goal>(raw.trim_start_matches('\u{feff}')).ok())
         .next()
 }
 
@@ -3295,29 +3297,28 @@ fn cmd_goal_run(ws: &Workspace, epic: &str, auto: bool, system_base: &str) -> Re
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
     let goal_id = format!("goal-{}", agora_iso().replace([':', '-', '.'], ""));
-    let max_iterations = env::var("C2H_GOAL_MAX_ITERATIONS")
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok())
-        .unwrap_or(5)
-        .clamp(1, 50);
-    let max_minutes = env::var("C2H_GOAL_MAX_MINUTES")
-        .ok()
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(15)
-        .clamp(1, 600);
-    let mut goal = Goal {
+    let goal = Goal {
         id: goal_id.clone(),
         objective: objective.clone(),
         epic: epic.to_string(),
         acceptance,
         status: "active".to_string(),
         budget: GoalBudget {
-            max_iterations,
-            max_minutes,
+            max_iterations: env::var("C2H_GOAL_MAX_ITERATIONS")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(5)
+                .clamp(1, 50),
+            max_minutes: env::var("C2H_GOAL_MAX_MINUTES")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(15)
+                .clamp(1, 600),
         },
         iterations: 0,
         tasks_done: 0,
         failures: Vec::new(),
+        resume_count: 0,
         started_at: agora_iso(),
         updated_at: agora_iso(),
     };
@@ -3329,7 +3330,97 @@ fn cmd_goal_run(ws: &Workspace, epic: &str, auto: bool, system_base: &str) -> Re
     )?;
     println!("goal: {} (epic {epic})", goal.id);
     println!("objetivo: {objective}");
-    println!("budget: {max_iterations} iteracoes / {max_minutes} min");
+    println!(
+        "budget: {} iteracoes / {} min",
+        goal.budget.max_iterations, goal.budget.max_minutes
+    );
+    executar_goal_loop(ws, goal, auto, system_base)
+}
+
+fn cmd_goal_resume(
+    ws: &Workspace,
+    goal_id: Option<&str>,
+    auto: bool,
+    system_base: &str,
+) -> Result<(), String> {
+    let mut goal = match goal_id {
+        Some(id) => {
+            let path = goal_dir(ws).join(format!("{id}.json"));
+            let raw = fs::read_to_string(&path).map_err(|e| format!("goal {id}: {e}"))?;
+            serde_json::from_str::<Goal>(raw.trim_start_matches('\u{feff}'))
+                .map_err(|e| format!("goal {id} invalido: {e}"))?
+        }
+        None => goal_mais_recente(ws).ok_or_else(|| "nenhum goal em .c2h/goals".to_string())?,
+    };
+    if goal.status == "done" {
+        println!("goal {} ja esta done", goal.id);
+        return Ok(());
+    }
+    goal.status = "active".to_string();
+    goal.iterations = 0;
+    goal.resume_count += 1;
+    goal.updated_at = agora_iso();
+    goal_salvar(ws, &goal)?;
+    goal_evento(
+        ws,
+        &goal.id,
+        serde_json::json!({"event":"goal_resumed","resume_count":goal.resume_count}),
+    )?;
+    let abertas = bd_json(
+        ws,
+        &[
+            "list".to_string(),
+            "--parent".to_string(),
+            goal.epic.clone(),
+            "--status".to_string(),
+            "in_progress".to_string(),
+            "--json".to_string(),
+        ],
+    )?;
+    let reabertas = abertas
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|t| t.get("id").and_then(|v| v.as_str()))
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    for id in &reabertas {
+        let _ = bd_rodar(
+            ws,
+            &[
+                "update".to_string(),
+                id.clone(),
+                "--status".to_string(),
+                "open".to_string(),
+            ],
+        );
+        goal_evento(
+            ws,
+            &goal.id,
+            serde_json::json!({"event":"task_reopened","task":id}),
+        )?;
+        println!("reaberta: {id}");
+    }
+    println!(
+        "retomando goal {} ({} tarefas reabertas, tentativa {})",
+        goal.id,
+        reabertas.len(),
+        goal.resume_count
+    );
+    executar_goal_loop(ws, goal, auto, system_base)
+}
+
+fn executar_goal_loop(
+    ws: &Workspace,
+    mut goal: Goal,
+    auto: bool,
+    system_base: &str,
+) -> Result<(), String> {
+    let epic = goal.epic.clone();
+    let max_iterations = goal.budget.max_iterations;
+    let max_minutes = goal.budget.max_minutes;
     let inicio = Instant::now();
     let mut ultima_falha: Option<String> = None;
     let mut falhas_seguidas = 0usize;
@@ -3577,6 +3668,7 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
             println!(
                 "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita
   /goal run <epic>    executa tarefas prontas do epic via bd
+  /goal resume [id]   retoma goal; reabre in_progress orfas
   /goal status        mostra o goal mais recente
   /shell [on|off]     liga/desliga shell livre (padrao off)\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
             );
@@ -3633,13 +3725,24 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
                 cmd_goal_status(&ws);
                 continue;
             }
+            if let Some(id) = resto.strip_prefix("resume") {
+                if let Err(e) = cmd_goal_resume(
+                    &ws,
+                    Some(id.trim()).filter(|s| !s.is_empty()),
+                    auto,
+                    system_base,
+                ) {
+                    println!("erro goal: {e}");
+                }
+                continue;
+            }
             if let Some(epic) = resto.strip_prefix("run ") {
                 if let Err(e) = cmd_goal_run(&ws, epic.trim(), auto, system_base) {
                     println!("erro goal: {e}");
                 }
                 continue;
             }
-            println!("uso: /goal run <epic-bd> | /goal status");
+            println!("uso: /goal run <epic-bd> | /goal resume [id] | /goal status");
             continue;
         }
         if entrada == "/status" {

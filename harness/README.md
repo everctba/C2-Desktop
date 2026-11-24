@@ -573,8 +573,13 @@ O runner usa um épico do bd como lista de tarefas:
 
 ```text
 /goal run c2-622
+/goal resume [goal-id]
 /goal status
 ```
+
+`/goal resume` carrega o goal (ou o mais recente), reabre tarefas
+`in_progress` orfas no bd, zera o orcamento da tentativa e continua o loop.
+Fechadas no bd nao sao repetidas. Evento `goal_resumed` e registrado.
 
 Fluxo por tarefa:
 
