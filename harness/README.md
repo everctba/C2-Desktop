@@ -567,6 +567,29 @@ $env:C2H_GOAL_RUNNER="0"
 O goal runner ainda e MVP futuro; a flag ja existe para o runner nao tentar
 operar sem a infra do bd.
 
+## Tools de ambiente
+
+```json
+{"name":"time_info","arguments":{}}
+{"name":"system_info","arguments":{"section":"cpu"}}
+```
+
+`time_info` retorna local, UTC, epoch, timezone, offset e weekday.
+
+`system_info` retorna (read-only):
+
+```text
+os: caption/version/build/arch
+cpu: name/cores/threads/max_mhz
+memory: total_bytes/free_bytes
+disks: mount/total_bytes/free_bytes
+gpu: name/vram_bytes/driver
+```
+
+`section` aceita `all|os|cpu|memory|disk|gpu`. No Windows usa CIM/PowerShell
+interno; nao depende do shell livre. `AdapterRAM` da GPU pode ser limitado pelo
+driver (valor aproximado).
+
 ## Goal tools (read-only)
 
 A IA pode consultar o goal ativo:

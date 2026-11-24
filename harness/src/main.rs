@@ -625,7 +625,9 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"goal_tasks","description":"Lista tarefas do goal/epic com status e readiness.","parameters":{"type":"object","properties":{"status":{"type":"string","enum":["open","closed","all"],"description":"open (padrao), closed ou all"},"ready":{"type":"boolean","description":"somente prontas"}}}}},
         {"type":"function","function":{"name":"goal_next","description":"Mostra a proxima tarefa pronta do goal.","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"goal_context","description":"Contexto do goal ativo e da tarefa atual, com eventos recentes.","parameters":{"type":"object","properties":{}}}},
-        {"type":"function","function":{"name":"goal_events","description":"Eventos recentes do goal ativo.","parameters":{"type":"object","properties":{"limit":{"type":"integer","description":"padrao 10, max 100"}}}}}
+        {"type":"function","function":{"name":"goal_events","description":"Eventos recentes do goal ativo.","parameters":{"type":"object","properties":{"limit":{"type":"integer","description":"padrao 10, max 100"}}}}},
+        {"type":"function","function":{"name":"time_info","description":"Retorna data/hora local, UTC, epoch, timezone e offset.","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"system_info","description":"Retorna SO/versao, CPU, memoria, discos e GPU/VRAM (read-only).","parameters":{"type":"object","properties":{"section":{"type":"string","enum":["all","os","cpu","memory","disk","gpu"],"description":"padrao all"}}}}}
     ]);
     if !SHELL_ENABLED.load(Ordering::Relaxed) {
         if let Some(lista) = tools.as_array_mut() {
@@ -2437,6 +2439,104 @@ fn executar_bd(ws: &Workspace, args: &serde_json::Value, auto: bool) -> Result<S
     Ok(texto.chars().take(8000).collect())
 }
 
+fn ferramenta_time_info() -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        let script = r#"$n=Get-Date; $tz=Get-TimeZone; [pscustomobject]@{ local=$n.ToString('yyyy-MM-ddTHH:mm:sszzz'); utc=$n.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); epoch=[DateTimeOffset]::Now.ToUnixTimeSeconds(); timezone=$tz.Id; offset=$tz.BaseUtcOffset.ToString('hh\:mm'); weekday=$n.DayOfWeek.ToString(); date=$n.ToString('yyyy-MM-dd'); time=$n.ToString('HH:mm:ss') } | ConvertTo-Json -Compress"#;
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .output()
+            .map_err(|e| format!("time_info: {e}"))?;
+        if !out.status.success() {
+            return Err(format!(
+                "time_info falhou: {}",
+                String::from_utf8_lossy(&out.stderr)
+                    .chars()
+                    .take(500)
+                    .collect::<String>()
+            ));
+        }
+        let raw = String::from_utf8_lossy(&out.stdout);
+        let v: serde_json::Value =
+            serde_json::from_str(raw.trim()).map_err(|e| format!("time_info json: {e}"))?;
+        serde_json::to_string_pretty(&v).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let epoch = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let local = std::process::Command::new("date")
+            .args(["+%Y-%m-%dT%H:%M:%S%z"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+        let tz = std::process::Command::new("date")
+            .arg("+%Z")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+        Ok(serde_json::json!({"local": local, "epoch": epoch, "timezone": tz}).to_string())
+    }
+}
+
+fn ferramenta_system_info(args: &serde_json::Value) -> Result<String, String> {
+    let secao = args
+        .get("section")
+        .and_then(|v| v.as_str())
+        .unwrap_or("all");
+    #[cfg(windows)]
+    {
+        let script = r#"$ErrorActionPreference='Stop'; $os=Get-CimInstance Win32_OperatingSystem; $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1; $mem=Get-CimInstance Win32_OperatingSystem; $gpu=@(Get-CimInstance Win32_VideoController | ForEach-Object { [pscustomobject]@{ name=$_.Name; vram_bytes=[int64]$_.AdapterRAM; driver=$_.DriverVersion } }); $disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { [pscustomobject]@{ mount=$_.DeviceID; total_bytes=[int64]$_.Size; free_bytes=[int64]$_.FreeSpace } }); [pscustomobject]@{ os=[pscustomobject]@{ caption=$os.Caption; version=$os.Version; build=$os.BuildNumber; arch=$os.OSArchitecture }; cpu=[pscustomobject]@{ name=$cpu.Name; cores=$cpu.NumberOfCores; threads=$cpu.NumberOfLogicalProcessors; max_mhz=$cpu.MaxClockSpeed }; memory=[pscustomobject]@{ total_bytes=([int64]$mem.TotalVisibleMemorySize * 1024); free_bytes=([int64]$mem.FreePhysicalMemory * 1024) }; disks=$disks; gpu=$gpu; hostname=$env:COMPUTERNAME } | ConvertTo-Json -Depth 6 -Compress"#;
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .output()
+            .map_err(|e| format!("system_info: {e}"))?;
+        if !out.status.success() {
+            return Err(format!(
+                "system_info falhou: {}",
+                String::from_utf8_lossy(&out.stderr)
+                    .chars()
+                    .take(800)
+                    .collect::<String>()
+            ));
+        }
+        let raw = String::from_utf8_lossy(&out.stdout);
+        let mut v: serde_json::Value =
+            serde_json::from_str(raw.trim()).map_err(|e| format!("system_info json: {e}"))?;
+        if let Some(obj) = v.as_object_mut() {
+            if secao != "all" {
+                obj.retain(|k, _| k == secao);
+            }
+        }
+        serde_json::to_string_pretty(&v).map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let uname = std::process::Command::new("uname")
+            .arg("-a")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+        let cpus = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        let mem = std::fs::read_to_string("/proc/meminfo")
+            .unwrap_or_default()
+            .lines()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let disk = std::process::Command::new("df")
+            .args(["-B1"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+            .unwrap_or_default();
+        Ok(serde_json::json!({"os": uname, "cpu_threads": cpus, "memory": mem, "disks": disk.lines().take(8).collect::<Vec<_>>()}).to_string())
+    }
+}
+
 fn executar_ferramenta(
     ws: &Workspace,
     auto: bool,
@@ -2481,6 +2581,8 @@ fn executar_ferramenta(
         "goal_next" => ferramenta_goal_next(ws),
         "goal_context" => ferramenta_goal_context(ws),
         "goal_events" => ferramenta_goal_events(ws, &args),
+        "time_info" => ferramenta_time_info(),
+        "system_info" => ferramenta_system_info(&args),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(
