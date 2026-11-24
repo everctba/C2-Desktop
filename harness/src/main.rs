@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 static SHELL_ENABLED: AtomicBool = AtomicBool::new(false);
+static BD_DISPONIVEL: AtomicBool = AtomicBool::new(false);
+static GOAL_RUNNER_ENABLED: AtomicBool = AtomicBool::new(false);
 
 const SCHEMA_VERSION: u32 = 1;
 const CONTRACT_VERSION: u32 = 1;
@@ -3156,6 +3158,23 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
     if api_key().is_none() {
         println!("aviso: api_key ausente; configure config.json antes de conversar.");
     }
+    let bd_ok = std::process::Command::new("bd")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    BD_DISPONIVEL.store(bd_ok, Ordering::Relaxed);
+    let goal_ligado = bd_ok
+        && env::var("C2H_GOAL_RUNNER")
+            .map(|v| v != "0" && v != "false")
+            .unwrap_or(true);
+    GOAL_RUNNER_ENABLED.store(goal_ligado, Ordering::Relaxed);
+    if !bd_ok {
+        println!("aviso: bd (beads) nao encontrado no PATH.");
+        println!("       goal runner/plano fica DESABILITADO; instale beads e adicione ao PATH.");
+    } else if !goal_ligado {
+        println!("aviso: goal runner desabilitado por C2H_GOAL_RUNNER=0.");
+    }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
     let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao invente arquivos ou APIs. NUNCA use shell para ler codigo (type/cat/findstr/grep/Get-Content) nem para redirecionar (>,>>) para arquivo de codigo; use read_file/find_text/write_file/replace_file/edit_file. Shell e apenas para executar comandos.";
@@ -3252,6 +3271,22 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
             println!("modelo: {} - provider: {}", model(), base_url());
             println!("arquivo ativo: {}", arquivo.as_deref().unwrap_or("nenhum"));
             println!("mensagens: {}", historico.len());
+            println!(
+                "bd: {}",
+                if BD_DISPONIVEL.load(Ordering::Relaxed) {
+                    "disponivel"
+                } else {
+                    "ausente (goal runner off)"
+                }
+            );
+            println!(
+                "goal runner: {}",
+                if GOAL_RUNNER_ENABLED.load(Ordering::Relaxed) {
+                    "on"
+                } else {
+                    "off"
+                }
+            );
             continue;
         }
         if let Some(resto) = entrada.strip_prefix("/ls ") {

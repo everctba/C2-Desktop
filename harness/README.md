@@ -535,6 +535,38 @@ O agente pode executar somente o binario `bd`, sem shell:
 - saida limitada a 8000 chars;
 - em YOLO, escrita roda sem confirmacao.
 
+## bd no PATH e goal runner
+
+Ao abrir o chat, o c2h verifica `bd` no PATH. Sem ele:
+
+```text
+aviso: bd (beads) nao encontrado no PATH.
+       goal runner/plano fica DESABILITADO; instale beads e adicione ao PATH.
+```
+
+`/status` mostra:
+
+```text
+bd: disponivel
+goal runner: on
+```
+
+ou:
+
+```text
+bd: ausente (goal runner off)
+goal runner: off
+```
+
+Para desabilitar mesmo com bd:
+
+```powershell
+$env:C2H_GOAL_RUNNER="0"
+```
+
+O goal runner ainda e MVP futuro; a flag ja existe para o runner nao tentar
+operar sem a infra do bd.
+
 ## Limite de passos
 
 O agent loop tem limite configuravel:
