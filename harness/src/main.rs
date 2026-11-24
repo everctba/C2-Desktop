@@ -3146,6 +3146,371 @@ fn compilar_contexto(ws: &Workspace, tarefa: &str, ativo: Option<&str>) -> Strin
     truncado
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GoalBudget {
+    max_iterations: usize,
+    max_minutes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Goal {
+    id: String,
+    objective: String,
+    epic: String,
+    acceptance: Vec<String>,
+    status: String,
+    budget: GoalBudget,
+    iterations: usize,
+    tasks_done: usize,
+    failures: Vec<String>,
+    started_at: String,
+    updated_at: String,
+}
+
+fn goal_dir(ws: &Workspace) -> PathBuf {
+    ws.root.join(".c2h/goals")
+}
+
+fn goal_salvar(ws: &Workspace, goal: &Goal) -> Result<(), String> {
+    let dir = goal_dir(ws);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}.json", goal.id));
+    let raw = serde_json::to_string_pretty(goal).map_err(|e| e.to_string())?;
+    escrever_atomico(&path, &raw)
+}
+
+fn goal_evento(ws: &Workspace, goal_id: &str, evento: serde_json::Value) -> Result<(), String> {
+    let dir = goal_dir(ws);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{goal_id}.events.jsonl"));
+    let mut linha = evento.to_string();
+    linha.push('\n');
+    use std::io::Write as _;
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| e.to_string())?;
+    f.write_all(linha.as_bytes()).map_err(|e| e.to_string())
+}
+
+fn goal_mais_recente(ws: &Workspace) -> Option<Goal> {
+    let dir = goal_dir(ws);
+    let mut entradas: Vec<_> = fs::read_dir(dir).ok()?.filter_map(|e| e.ok()).collect();
+    entradas.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+    entradas
+        .into_iter()
+        .rev()
+        .filter_map(|e| fs::read_to_string(e.path()).ok())
+        .filter_map(|raw| serde_json::from_str::<Goal>(&raw).ok())
+        .next()
+}
+
+fn bd_rodar(ws: &Workspace, args: &[String]) -> Result<String, String> {
+    let out = std::process::Command::new("bd")
+        .args(args)
+        .current_dir(&ws.root)
+        .output()
+        .map_err(|e| format!("executar bd: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "bd {:?} falhou: {}",
+            args,
+            String::from_utf8_lossy(&out.stderr)
+                .chars()
+                .take(800)
+                .collect::<String>()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+}
+
+fn bd_json(ws: &Workspace, args: &[String]) -> Result<serde_json::Value, String> {
+    let raw = bd_rodar(ws, args)?;
+    serde_json::from_str(&raw).map_err(|e| format!("bd json invalido: {e}"))
+}
+
+fn verificar_goal_task(ws: &Workspace, acceptance: &str) -> Result<String, String> {
+    let mut checks = 0usize;
+    let mut provas = Vec::new();
+    for linha in acceptance.lines() {
+        let l = linha.trim();
+        if let Some(nome) = l
+            .strip_prefix("test:")
+            .or_else(|| l.strip_prefix("run_test:"))
+        {
+            checks += 1;
+            let nome = nome.trim();
+            let saida = rodar_comando_configurado(ws, nome, "goal_verify")?;
+            if !saida.contains("exit=0") {
+                return Err(format!("verificacao test:{nome} falhou\n{saida}"));
+            }
+            provas.push(format!("test:{nome}=ok"));
+        } else if let Some(path) = l.strip_prefix("file:") {
+            checks += 1;
+            let alvo = ws.resolver(path.trim(), true)?;
+            if !alvo.exists() {
+                return Err(format!(
+                    "verificacao file:{} falhou: arquivo ausente",
+                    path.trim()
+                ));
+            }
+            provas.push(format!("file:{}=ok", path.trim()));
+        }
+    }
+    if checks == 0 {
+        return Err(
+            "sem verificador explicito (use test:<nome> ou file:<path> no aceite)".to_string(),
+        );
+    }
+    Ok(provas.join(", "))
+}
+
+fn cmd_goal_run(ws: &Workspace, epic: &str, auto: bool, system_base: &str) -> Result<(), String> {
+    if !GOAL_RUNNER_ENABLED.load(Ordering::Relaxed) {
+        return Err(
+            "goal runner desabilitado: bd ausente no PATH ou C2H_GOAL_RUNNER=0".to_string(),
+        );
+    }
+    let epic_json = bd_json(
+        ws,
+        &["show".to_string(), epic.to_string(), "--json".to_string()],
+    )?;
+    let issue = epic_json
+        .as_array()
+        .and_then(|a| a.first())
+        .or_else(|| epic_json.as_object().map(|_| &epic_json))
+        .ok_or_else(|| format!("epic nao encontrado: {epic}"))?;
+    let objective = issue
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or(epic)
+        .to_string();
+    let acceptance = issue
+        .get("acceptance_criteria")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>();
+    let goal_id = format!("goal-{}", agora_iso().replace([':', '-', '.'], ""));
+    let max_iterations = env::var("C2H_GOAL_MAX_ITERATIONS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(5)
+        .clamp(1, 50);
+    let max_minutes = env::var("C2H_GOAL_MAX_MINUTES")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(15)
+        .clamp(1, 600);
+    let mut goal = Goal {
+        id: goal_id.clone(),
+        objective: objective.clone(),
+        epic: epic.to_string(),
+        acceptance,
+        status: "active".to_string(),
+        budget: GoalBudget {
+            max_iterations,
+            max_minutes,
+        },
+        iterations: 0,
+        tasks_done: 0,
+        failures: Vec::new(),
+        started_at: agora_iso(),
+        updated_at: agora_iso(),
+    };
+    goal_salvar(ws, &goal)?;
+    goal_evento(
+        ws,
+        &goal.id,
+        serde_json::json!({"event":"goal_started","epic":epic,"objective":objective}),
+    )?;
+    println!("goal: {} (epic {epic})", goal.id);
+    println!("objetivo: {objective}");
+    println!("budget: {max_iterations} iteracoes / {max_minutes} min");
+    let inicio = Instant::now();
+    let mut ultima_falha: Option<String> = None;
+    let mut falhas_seguidas = 0usize;
+    while goal.iterations < max_iterations {
+        if inicio.elapsed() > Duration::from_secs(max_minutes * 60) {
+            goal.status = "stopped_budget_time".to_string();
+            break;
+        }
+        let lista = bd_json(
+            ws,
+            &[
+                "list".to_string(),
+                "--parent".to_string(),
+                epic.to_string(),
+                "--status".to_string(),
+                "open".to_string(),
+                "--ready".to_string(),
+                "--json".to_string(),
+            ],
+        )?;
+        let tarefas = lista.as_array().cloned().unwrap_or_default();
+        if tarefas.is_empty() {
+            let abertas = bd_json(
+                ws,
+                &[
+                    "list".to_string(),
+                    "--parent".to_string(),
+                    epic.to_string(),
+                    "--status".to_string(),
+                    "open,in_progress".to_string(),
+                    "--json".to_string(),
+                ],
+            )?;
+            let restantes = abertas.as_array().map(|a| a.len()).unwrap_or(0);
+            if restantes == 0 {
+                goal.status = if goal.tasks_done > 0 {
+                    "done".to_string()
+                } else {
+                    "blocked".to_string()
+                };
+            } else {
+                goal.status = "blocked_sem_prontas".to_string();
+            }
+            break;
+        }
+        goal.iterations += 1;
+        let tarefa = &tarefas[0];
+        let task_id = tarefa
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let titulo = tarefa
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let descricao = tarefa
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let aceite = tarefa
+            .get("acceptance_criteria")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        println!(
+            "\n[{}/{}] {} — {}",
+            goal.iterations, goal.budget.max_iterations, task_id, titulo
+        );
+        goal_evento(
+            ws,
+            &goal.id,
+            serde_json::json!({"event":"task_start","task":task_id,"title":titulo}),
+        )?;
+        if let Err(e) = bd_rodar(
+            ws,
+            &["update".to_string(), task_id.clone(), "--claim".to_string()],
+        ) {
+            goal.failures.push(format!("{task_id}: claim falhou: {e}"));
+            goal.status = "blocked_claim".to_string();
+            break;
+        }
+        let prompt = format!(
+            "Execute SOMENTE a tarefa abaixo. Nao pegue outras tarefas.\n\nTAREFA: {task_id}\nTITULO: {titulo}\nDESCRICAO:\n{descricao}\nACEITE:\n{aceite}\n\nAo terminar, responda com o que mudou e a evidencia. O harness vai verificar o aceite; nao declare concluido sem evidencia."
+        );
+        let contexto = compilar_contexto(ws, &titulo, None);
+        let system = format!("{system_base}\n\n{contexto}");
+        let mut hist = vec![serde_json::json!({"role":"user","content":prompt})];
+        let execucao = executar_agente(&system, &mut hist, ws, auto);
+        let resultado = match execucao {
+            Ok(()) => verificar_goal_task(ws, &aceite),
+            Err(e) => Err(format!("agente falhou: {e}")),
+        };
+        match resultado {
+            Ok(prova) => {
+                let _ = bd_rodar(ws, &["close".to_string(), task_id.clone()]);
+                goal.tasks_done += 1;
+                ultima_falha = None;
+                falhas_seguidas = 0;
+                println!("  verificacao: {prova}");
+                goal_evento(
+                    ws,
+                    &goal.id,
+                    serde_json::json!({"event":"task_done","task":task_id,"proof":prova}),
+                )?;
+            }
+            Err(e) => {
+                let _ = bd_rodar(
+                    ws,
+                    &[
+                        "update".to_string(),
+                        task_id.clone(),
+                        "--status".to_string(),
+                        "open".to_string(),
+                    ],
+                );
+                goal.failures.push(format!("{task_id}: {e}"));
+                println!("  falhou: {e}");
+                goal_evento(
+                    ws,
+                    &goal.id,
+                    serde_json::json!({"event":"task_failed","task":task_id,"error":e}),
+                )?;
+                if ultima_falha.as_deref() == Some(task_id.as_str()) {
+                    falhas_seguidas += 1;
+                } else {
+                    ultima_falha = Some(task_id.clone());
+                    falhas_seguidas = 1;
+                }
+                if falhas_seguidas >= 2 {
+                    goal.status = "blocked_repeated_failure".to_string();
+                    break;
+                }
+            }
+        }
+        goal.updated_at = agora_iso();
+        goal_salvar(ws, &goal)?;
+    }
+    if goal.status == "active" {
+        goal.status = if goal.iterations >= max_iterations {
+            "stopped_budget_iterations".to_string()
+        } else {
+            "stopped".to_string()
+        };
+    }
+    goal.updated_at = agora_iso();
+    goal_salvar(ws, &goal)?;
+    goal_evento(
+        ws,
+        &goal.id,
+        serde_json::json!({"event":"goal_stop","status":goal.status,"iterations":goal.iterations,"tasks_done":goal.tasks_done}),
+    )?;
+    println!("\ngoal {}: {}", goal.id, goal.status);
+    println!(
+        "iteracoes: {} | tarefas concluidas: {} | falhas: {}",
+        goal.iterations,
+        goal.tasks_done,
+        goal.failures.len()
+    );
+    Ok(())
+}
+
+fn cmd_goal_status(ws: &Workspace) {
+    match goal_mais_recente(ws) {
+        Some(g) => {
+            println!("goal: {}", g.id);
+            println!("objetivo: {}", g.objective);
+            println!("epic: {}", g.epic);
+            println!("status: {}", g.status);
+            println!("iteracoes: {}/{}", g.iterations, g.budget.max_iterations);
+            println!("tarefas concluidas: {}", g.tasks_done);
+            if !g.failures.is_empty() {
+                println!("ultima falha: {}", g.failures.last().unwrap());
+            }
+        }
+        None => println!("nenhum goal em .c2h/goals"),
+    }
+}
+
 fn cmd_chat(yolo: bool) -> Result<(), String> {
     use std::io::BufRead;
     if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
@@ -3211,6 +3576,8 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
         if entrada == "/help" || entrada == "/ajuda" {
             println!(
                 "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita
+  /goal run <epic>    executa tarefas prontas do epic via bd
+  /goal status        mostra o goal mais recente
   /shell [on|off]     liga/desliga shell livre (padrao off)\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
             );
             continue;
@@ -3258,6 +3625,21 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
                 format!("/{}", ws.cwd.to_string_lossy().replace('\\', "/"))
             };
             println!("{cwd}");
+            continue;
+        }
+        if entrada == "/goal" || entrada.starts_with("/goal ") {
+            let resto = entrada.trim_start_matches("/goal").trim();
+            if resto == "status" || resto.is_empty() {
+                cmd_goal_status(&ws);
+                continue;
+            }
+            if let Some(epic) = resto.strip_prefix("run ") {
+                if let Err(e) = cmd_goal_run(&ws, epic.trim(), auto, system_base) {
+                    println!("erro goal: {e}");
+                }
+                continue;
+            }
+            println!("uso: /goal run <epic-bd> | /goal status");
             continue;
         }
         if entrada == "/status" {

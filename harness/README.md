@@ -567,6 +567,55 @@ $env:C2H_GOAL_RUNNER="0"
 O goal runner ainda e MVP futuro; a flag ja existe para o runner nao tentar
 operar sem a infra do bd.
 
+## Goal runner (MVP)
+
+O runner usa um épico do bd como lista de tarefas:
+
+```text
+/goal run c2-622
+/goal status
+```
+
+Fluxo por tarefa:
+
+```text
+bd list --parent EPIC --status open --ready --json
+bd update TASK --claim
+executar_agente com prompt da tarefa
+verificar aceite
+bd close TASK
+```
+
+Estado:
+
+```text
+.c2h/goals/<goal>.json
+.c2h/goals/<goal>.events.jsonl
+```
+
+Verificador do MVP:
+
+```text
+test:<nome>   roda comando de .c2h/commands.toml e exige exit=0
+file:<path>   exige arquivo existente
+```
+
+Aceite do épico também é verificado no fim (`test:`/`file:`).
+
+Stop conditions:
+
+```text
+budget de iteracoes (C2H_GOAL_MAX_ITERATIONS, padrao 5)
+budget de minutos (C2H_GOAL_MAX_MINUTES, padrao 15)
+sem tarefas prontas
+2 falhas na mesma tarefa
+aceite do goal falhou
+bd ausente / C2H_GOAL_RUNNER=0
+```
+
+Sem verificador explicito, a tarefa falha e nao e fechada. O modelo nao decide
+sozinho que terminou.
+
 ## Limite de passos
 
 O agent loop tem limite configuravel:
