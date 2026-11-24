@@ -3601,9 +3601,7 @@ fn executar_goal_loop(
                     let status_depois = git_status_progresso(ws);
                     if let (Some(antes), Some(depois)) = (&status_antes, &status_depois) {
                         if antes == depois {
-                            Err(format!(
-                                "sem progresso: git status nao mudou (antes/depois iguais). Use C2H_GOAL_REQUIRE_DIFF=0 para permitir."
-                            ))
+                            Err("sem progresso: git status nao mudou (antes/depois iguais). Use C2H_GOAL_REQUIRE_DIFF=0 para permitir.".to_string())
                         } else {
                             prova
                         }
