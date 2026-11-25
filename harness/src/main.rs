@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::io::{IsTerminal, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
@@ -21,6 +21,9 @@ use sha2::{Digest, Sha256};
 
 static SHELL_ENABLED: AtomicBool = AtomicBool::new(false);
 static BD_DISPONIVEL: AtomicBool = AtomicBool::new(false);
+static STREAM_USED: AtomicBool = AtomicBool::new(false);
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+static CANCEL_LISTENER_ACTIVE: AtomicBool = AtomicBool::new(false);
 static GOAL_RUNNER_ENABLED: AtomicBool = AtomicBool::new(false);
 
 const SCHEMA_VERSION: u32 = 1;
@@ -626,10 +629,168 @@ fn chamar_provider_mensagens(
         .ok_or_else(|| "resposta sem content".to_string())
 }
 
+fn deve_streaming() -> bool {
+    match env::var("C2H_STREAM").ok().as_deref() {
+        Some("0") | Some("false") => return false,
+        Some("1") | Some("true") => return true,
+        _ => {}
+    }
+    std::io::stdout().is_terminal()
+}
+
+fn iniciar_cancel_listener() {
+    if !std::io::stdout().is_terminal() {
+        return;
+    }
+    if crossterm::terminal::enable_raw_mode().is_err() {
+        return;
+    }
+    CANCEL_REQUESTED.store(false, Ordering::Relaxed);
+    CANCEL_LISTENER_ACTIVE.store(true, Ordering::Relaxed);
+    std::thread::spawn(|| {
+        use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+        while CANCEL_LISTENER_ACTIVE.load(Ordering::Relaxed) {
+            if event::poll(Duration::from_millis(50)).unwrap_or(false) {
+                if let Ok(Event::Key(k)) = event::read() {
+                    let ctrl_c =
+                        k.code == KeyCode::Char('c') && k.modifiers.contains(KeyModifiers::CONTROL);
+                    if k.code == KeyCode::Esc || ctrl_c {
+                        CANCEL_REQUESTED.store(true, Ordering::Relaxed);
+                        break;
+                    }
+                }
+            }
+        }
+    });
+}
+
+fn parar_cancel_listener() {
+    CANCEL_LISTENER_ACTIVE.store(false, Ordering::Relaxed);
+    if std::io::stdout().is_terminal() {
+        let _ = crossterm::terminal::disable_raw_mode();
+    }
+}
+
+fn acumular_tool_call(
+    tools: &mut BTreeMap<usize, (String, String, String)>,
+    delta: &serde_json::Value,
+) {
+    let Some(lista) = delta.get("tool_calls").and_then(|v| v.as_array()) else {
+        return;
+    };
+    for tc in lista {
+        let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let entry = tools
+            .entry(idx)
+            .or_insert_with(|| (String::new(), String::new(), String::new()));
+        if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
+            entry.0.push_str(id);
+        }
+        if let Some(f) = tc.get("function") {
+            if let Some(n) = f.get("name").and_then(|v| v.as_str()) {
+                entry.1.push_str(n);
+            }
+            if let Some(a) = f.get("arguments").and_then(|v| v.as_str()) {
+                entry.2.push_str(a);
+            }
+        }
+    }
+}
+
+fn chamar_api_stream(
+    url: &str,
+    key: &str,
+    body: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let resposta = ureq::post(url)
+        .set("Authorization", &format!("Bearer {key}"))
+        .set("Content-Type", "application/json")
+        .set("Accept", "text/event-stream")
+        .set("x-opencode-session", &session_id())
+        .timeout(Duration::from_secs(180))
+        .send_json(body.clone())
+        .map_err(|e| match e {
+            ureq::Error::Status(codigo, resposta) => {
+                let corpo = resposta.into_string().unwrap_or_default();
+                format!(
+                    "provider status {codigo}: {}",
+                    corpo.chars().take(800).collect::<String>()
+                )
+            }
+            outro => format!("provider: {outro}"),
+        })?;
+    let reader = BufReader::new(resposta.into_reader());
+    let mut content = String::new();
+    let mut tools: BTreeMap<usize, (String, String, String)> = BTreeMap::new();
+    STREAM_USED.store(false, Ordering::Relaxed);
+    iniciar_cancel_listener();
+    println!("gerando... [Esc cancela]");
+    let mut cancelado = false;
+    for linha in reader.lines() {
+        if CANCEL_REQUESTED.load(Ordering::Relaxed) {
+            cancelado = true;
+            break;
+        }
+        let Ok(linha) = linha else {
+            break;
+        };
+        let linha = linha.trim();
+        if linha.is_empty() || !linha.starts_with("data:") {
+            continue;
+        }
+        let dados = linha.trim_start_matches("data:").trim();
+        if dados == "[DONE]" {
+            break;
+        }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(dados) else {
+            continue;
+        };
+        let Some(delta) = v.pointer("/choices/0/delta") else {
+            continue;
+        };
+        if let Some(txt) = delta.get("content").and_then(|v| v.as_str()) {
+            if !txt.is_empty() {
+                print!("{txt}");
+                let _ = std::io::stdout().flush();
+                STREAM_USED.store(true, Ordering::Relaxed);
+                content.push_str(txt);
+            }
+        }
+        acumular_tool_call(&mut tools, delta);
+    }
+    parar_cancel_listener();
+    if cancelado {
+        let tokens = content.chars().count() / 4;
+        println!("\n[cancelado apos ~{tokens} tokens]");
+        log_evento(
+            "provider_cancelled",
+            serde_json::json!({"chars": content.chars().count(), "tokens_aprox": tokens}),
+        );
+        return Err("__C2H_CANCELLED__".to_string());
+    }
+    if STREAM_USED.load(Ordering::Relaxed) {
+        println!();
+    }
+    let mut msg = serde_json::json!({"role":"assistant","content": if content.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(content) }});
+    if !tools.is_empty() {
+        let calls: Vec<_> = tools
+            .into_values()
+            .map(|(id, name, args)| serde_json::json!({"id": id, "type": "function", "function": {"name": name, "arguments": args}}))
+            .collect();
+        msg["tool_calls"] = serde_json::json!(calls);
+    }
+    log_evento(
+        "provider_response",
+        serde_json::json!({"stream": true, "chars": msg.get("content").and_then(|v| v.as_str()).map(|s| s.chars().count()).unwrap_or(0), "tool_calls": msg.get("tool_calls").is_some()}),
+    );
+    Ok(msg)
+}
+
 fn chamar_api(
     mensagens: &[serde_json::Value],
     tools: Option<&serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
+    STREAM_USED.store(false, Ordering::Relaxed);
     if tools.is_some() {
         if let Ok(mock) = env::var("C2H_MOCK_TOOL_CALL") {
             if !MOCK_TOOL_USED.swap(true, Ordering::Relaxed) {
@@ -669,18 +830,26 @@ fn chamar_api(
         return Ok(serde_json::json!({"role":"assistant","content": mock}));
     }
     let key = api_key().ok_or_else(|| "C2H_API_KEY/DEEPSEEK_API_KEY ausente".to_string())?;
-    let _spinner = Spinner::novo("IA pensando");
+    let streaming = deve_streaming();
+    let _spinner = if streaming {
+        None
+    } else {
+        Some(Spinner::novo("IA pensando"))
+    };
     let mut body = serde_json::json!({
         "model": model(),
         "messages": mensagens,
         "temperature": 0.2,
-        "stream": false
+        "stream": streaming
     });
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
         body["tool_choice"] = serde_json::json!("auto");
     }
     let url = format!("{}/chat/completions", base_url().trim_end_matches('/'));
+    if streaming {
+        return chamar_api_stream(&url, &key, &body);
+    }
     let resposta = ureq::post(&url)
         .set("Authorization", &format!("Bearer {key}"))
         .set("Content-Type", "application/json")
@@ -2879,14 +3048,18 @@ fn descrever_tool(nome: &str, argumentos: &str) -> String {
     }
 }
 
-fn imprimir_final(content: &str, fontes: &[String]) {
-    println!("\n{content}\n");
+fn imprimir_fontes(fontes: &[String]) {
     if !fontes.is_empty() {
         println!("FONTES DO TURNO:");
         for f in fontes {
             println!("- {f}");
         }
     }
+}
+
+fn imprimir_final(content: &str, fontes: &[String]) {
+    println!("\n{content}\n");
+    imprimir_fontes(fontes);
 }
 
 fn executar_agente(
@@ -2931,17 +3104,34 @@ fn executar_agente(
                 "content": "ORCAMENTO DE EXPLORACAO ESGOTADO. Nao chame ferramentas. Responda AGORA com o plano, as conclusoes e as lacunas usando apenas o que ja coletou."
             }));
             log_evento("agent_forced_final", serde_json::json!({"step": passo + 1}));
-            let msg = chamar_api(&mensagens, None)?;
+            let msg = match chamar_api(&mensagens, None) {
+                Ok(m) => m,
+                Err(e) if e == "__C2H_CANCELLED__" => {
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            };
             let content = msg
                 .get("content")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            imprimir_final(&content, &fontes);
+            if STREAM_USED.load(Ordering::Relaxed) {
+                println!();
+                imprimir_fontes(&fontes);
+            } else {
+                imprimir_final(&content, &fontes);
+            }
             historico.push(msg);
             return Ok(());
         }
-        let msg = chamar_api(&mensagens, Some(&tools))?;
+        let msg = match chamar_api(&mensagens, Some(&tools)) {
+            Ok(m) => m,
+            Err(e) if e == "__C2H_CANCELLED__" => {
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
         let tool_calls = msg
             .get("tool_calls")
             .and_then(|v| v.as_array())
@@ -2953,7 +3143,12 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            imprimir_final(&content, &fontes);
+            if STREAM_USED.load(Ordering::Relaxed) {
+                println!();
+                imprimir_fontes(&fontes);
+            } else {
+                imprimir_final(&content, &fontes);
+            }
             historico.push(msg);
             return Ok(());
         }
@@ -6564,9 +6759,12 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn le_commands_toml() {
-        let dir = env::temp_dir().join(format!("c2h-toml-{}", std::process::id()));
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = env::temp_dir().join(format!("c2h-toml-{}-{stamp}", std::process::id()));
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("commands.toml");
         fs::write(

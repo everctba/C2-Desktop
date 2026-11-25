@@ -635,6 +635,34 @@ composition.unit +5
 
 O contexto mostra `[layer:core domain:document]` quando disponivel.
 
+## Streaming e cancelamento
+
+Streaming e padrao em terminal (SSE `stream:true`). Em pipe/teste fica
+nao-stream. Forcar:
+
+```powershell
+$env:C2H_STREAM="1"   # forca
+$env:C2H_STREAM="0"   # desliga
+```
+
+UX:
+
+```text
+c2h> explique o projeto
+gerando... [Esc cancela]
+
+O projeto e...
+[cancelado apos ~120 tokens]
+```
+
+`Esc`/`Ctrl+C` cancelam a geracao em terminal (crossterm raw mode), fecham a
+leitura, descartam tool_calls incompletas e registram `provider_cancelled`.
+Tool que ja comecou nao e interrompida. Cancellation so funciona em terminal;
+em pipe o cancelamento e ignorado.
+
+Tool calls sao acumuladas dos deltas e executadas somente quando o stream
+termina.
+
 ## Tools de ambiente
 
 ```json
