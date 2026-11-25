@@ -2651,6 +2651,16 @@ fn descrever_tool(nome: &str, argumentos: &str) -> String {
     }
 }
 
+fn imprimir_final(content: &str, fontes: &[String]) {
+    println!("\n{content}\n");
+    if !fontes.is_empty() {
+        println!("FONTES DO TURNO:");
+        for f in fontes {
+            println!("- {f}");
+        }
+    }
+}
+
 fn executar_agente(
     system: &str,
     historico: &mut Vec<serde_json::Value>,
@@ -2668,6 +2678,7 @@ fn executar_agente(
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(2)
         .min(max_passos.saturating_sub(1));
+    let mut fontes: Vec<String> = Vec::new();
     let mut cache_leituras: BTreeMap<String, String> = BTreeMap::new();
     let mut leituras_por_arquivo: BTreeMap<String, usize> = BTreeMap::new();
     let tarefa = historico
@@ -2698,7 +2709,7 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            println!("\n{content}\n");
+            imprimir_final(&content, &fontes);
             historico.push(msg);
             return Ok(());
         }
@@ -2714,7 +2725,7 @@ fn executar_agente(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            println!("\n{content}\n");
+            imprimir_final(&content, &fontes);
             historico.push(msg);
             return Ok(());
         }
@@ -2746,7 +2757,11 @@ fn executar_agente(
                 .pointer("/function/arguments")
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
-            println!("  -> {}", descrever_tool(nome, argumentos));
+            let descricao = descrever_tool(nome, argumentos);
+            println!("  -> {descricao}");
+            if !fontes.iter().any(|f| f == &descricao) {
+                fontes.push(descricao);
+            }
             if nome == "read_file" {
                 let chave = format!("read_file|{argumentos}");
                 if cache_leituras.contains_key(&chave) {
@@ -3760,6 +3775,7 @@ fn executar_goal_loop(
                     falhas_seguidas = 1;
                 }
                 if falhas_seguidas >= 2 {
+                    let _ = gotcha_registrar(ws, &task_id, &titulo, &e);
                     goal.status = "blocked_repeated_failure".to_string();
                     break;
                 }
@@ -4049,6 +4065,211 @@ fn ferramenta_goal_events(ws: &Workspace, args: &serde_json::Value) -> Result<St
     )
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Gotcha {
+    id: String,
+    task: String,
+    file: String,
+    block: String,
+    symptom: String,
+    cause: String,
+    fix: String,
+    evidence: Vec<String>,
+    created_at: String,
+}
+
+fn gotcha_path(ws: &Workspace) -> PathBuf {
+    ws.root.join(".c2h/gotchas.jsonl")
+}
+
+fn gotcha_registrar(ws: &Workspace, task: &str, titulo: &str, erro: &str) -> Result<(), String> {
+    let g = Gotcha {
+        id: format!("gotcha-{}", agora_iso().replace([':', '-', '.'], "")),
+        task: task.to_string(),
+        file: String::new(),
+        block: String::new(),
+        symptom: format!("{titulo}: {erro}"),
+        cause: erro.to_string(),
+        fix: String::new(),
+        evidence: vec![task.to_string()],
+        created_at: agora_iso(),
+    };
+    let mut linha = serde_json::to_string(&g).map_err(|e| e.to_string())?;
+    linha.push('\n');
+    use std::io::Write as _;
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(gotcha_path(ws))
+        .map_err(|e| e.to_string())?;
+    f.write_all(linha.as_bytes()).map_err(|e| e.to_string())?;
+    log_evento("gotcha", serde_json::json!({"id": g.id, "task": task}));
+    Ok(())
+}
+
+fn gotchas_lidos(ws: &Workspace) -> Vec<Gotcha> {
+    let Ok(raw) = fs::read_to_string(gotcha_path(ws)) else {
+        return Vec::new();
+    };
+    raw.lines()
+        .filter_map(|l| serde_json::from_str::<Gotcha>(l).ok())
+        .collect()
+}
+
+fn cmd_gotchas(ws: &Workspace, termo: Option<&str>) {
+    let termo = termo.map(|t| t.to_lowercase());
+    let mut achou = 0usize;
+    for g in gotchas_lidos(ws).iter().rev() {
+        let texto = format!("{} {} {}", g.task, g.symptom, g.cause).to_lowercase();
+        if let Some(t) = &termo {
+            if !texto.contains(t) {
+                continue;
+            }
+        }
+        achou += 1;
+        println!("{} [{}] {}", g.id, g.task, g.symptom);
+        if !g.cause.is_empty() {
+            println!("  causa: {}", g.cause);
+        }
+        if !g.fix.is_empty() {
+            println!("  fix: {}", g.fix);
+        }
+        if achou >= 20 {
+            break;
+        }
+    }
+    if achou == 0 {
+        println!("nenhum gotcha");
+    }
+}
+
+fn cmd_goal_retro(ws: &Workspace) {
+    let Some(goal) = goal_ativo(ws) else {
+        println!("nenhum goal");
+        return;
+    };
+    let tarefas = goal_tarefas_bd(ws, &goal.epic).unwrap_or_default();
+    let done = tarefas
+        .iter()
+        .filter(|t| t.get("status").and_then(|v| v.as_str()) == Some("closed"))
+        .count();
+    let abertas = tarefas.len().saturating_sub(done);
+    let mut linhas = Vec::new();
+    linhas.push(format!("# Retro {}", goal.id));
+    linhas.push(format!("Objetivo: {}", goal.objective));
+    linhas.push(format!("Epic: {}", goal.epic));
+    linhas.push(format!("Status: {}", goal.status));
+    linhas.push(format!(
+        "Tasks: {} done, {} abertas, {} total",
+        done,
+        abertas,
+        tarefas.len()
+    ));
+    linhas.push(format!(
+        "Iteracoes: {}/{}",
+        goal.iterations, goal.budget.max_iterations
+    ));
+    linhas.push(format!("Falhas registradas: {}", goal.failures.len()));
+    if !goal.failures.is_empty() {
+        linhas.push("\n## Falhas".to_string());
+        for f in &goal.failures {
+            linhas.push(format!("- {f}"));
+        }
+    }
+    let mut sidecars = 0usize;
+    let mut com_why = 0usize;
+    if let Ok(dir) = fs::read_dir(ws.root.join(".c2h/blocks")) {
+        for e in dir.flatten() {
+            if let Ok(raw) = fs::read_to_string(e.path()) {
+                if let Ok(side) = serde_json::from_str::<Sidecar>(&raw) {
+                    sidecars += 1;
+                    com_why += side
+                        .blocks
+                        .iter()
+                        .filter(|b| why_tecnico(&b.w5h2.why))
+                        .count();
+                }
+            }
+        }
+    }
+    let gotchas = gotchas_lidos(ws).len();
+    linhas.push(format!("\n## Cobertura de anotacao\nsidecars: {sidecars}\nblocos com why tecnico: {com_why}\ngotchas: {gotchas}"));
+    let eventos = goal_eventos_lidos(ws, &goal.id, 20);
+    linhas.push(format!("\n## Eventos recentes ({})", eventos.len()));
+    for e in &eventos {
+        linhas.push(format!(
+            "- {}",
+            e.get("event").and_then(|v| v.as_str()).unwrap_or("?")
+        ));
+    }
+    let texto = linhas.join("\n");
+    let path = goal_dir(ws).join(format!("{}.retro.md", goal.id));
+    let _ = fs::create_dir_all(goal_dir(ws));
+    let _ = escrever_atomico(&path, &texto);
+    println!("{texto}");
+    println!("\nretro salva em {}", path.display());
+}
+
+fn cmd_handoff(ws: &Workspace, historico: &[serde_json::Value]) {
+    let goal = goal_ativo(ws);
+    let mut linhas = vec!["# Handoff".to_string(), format!("Data: {}", agora_iso())];
+    if let Some(g) = &goal {
+        linhas.push(format!("Goal: {} ({})", g.id, g.status));
+        linhas.push(format!("Objetivo: {}", g.objective));
+        linhas.push(format!("Epic: {}", g.epic));
+        linhas.push(format!(
+            "Tasks done: {} | iteracoes: {}/{}",
+            g.tasks_done, g.iterations, g.budget.max_iterations
+        ));
+        if let Some(f) = g.failures.last() {
+            linhas.push(format!("Ultima falha: {f}"));
+        }
+        if let Ok(tarefas) = goal_tarefas_bd(ws, &g.epic) {
+            linhas.push("\n## Tasks abertas".to_string());
+            for t in tarefas
+                .iter()
+                .filter(|t| t.get("status").and_then(|v| v.as_str()) != Some("closed"))
+            {
+                linhas.push(format!(
+                    "- {} [{}] {}",
+                    t.get("id").and_then(|v| v.as_str()).unwrap_or("?"),
+                    t.get("status").and_then(|v| v.as_str()).unwrap_or("?"),
+                    t.get("title").and_then(|v| v.as_str()).unwrap_or("")
+                ));
+            }
+        }
+    } else {
+        linhas.push("Nenhum goal ativo.".to_string());
+    }
+    linhas.push("\n## Ultimas mensagens".to_string());
+    for m in historico.iter().rev().take(6).rev() {
+        let role = m.get("role").and_then(|v| v.as_str()).unwrap_or("?");
+        let content = m.get("content").and_then(|v| v.as_str()).unwrap_or("");
+        linhas.push(format!(
+            "- {role}: {}",
+            content.chars().take(300).collect::<String>()
+        ));
+    }
+    if let Ok(out) = std::process::Command::new("git")
+        .args(["status", "--short"])
+        .current_dir(&ws.root)
+        .output()
+    {
+        let s = String::from_utf8_lossy(&out.stdout);
+        if !s.trim().is_empty() {
+            linhas.push("\n## Git status".to_string());
+            linhas.push(s.chars().take(2000).collect::<String>());
+        }
+    }
+    let texto = linhas.join("\n");
+    let dir = ws.root.join(".c2h/handoffs");
+    let _ = fs::create_dir_all(&dir);
+    let path = dir.join(format!("{}.md", agora_iso().replace([':', '-', '.'], "")));
+    let _ = escrever_atomico(&path, &texto);
+    println!("{texto}");
+    println!("\nhandoff salvo em {}", path.display());
+}
+
 fn cmd_chat(yolo: bool) -> Result<(), String> {
     use std::io::BufRead;
     if !std::io::stdin().is_terminal() && env::var("C2H_FORCE_CHAT").is_err() {
@@ -4080,7 +4301,7 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
     }
     println!("digite /help para comandos; /sair para encerrar.\n");
 
-    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao invente arquivos ou APIs. NUNCA use shell para ler codigo (type/cat/findstr/grep/Get-Content) nem para redirecionar (>,>>) para arquivo de codigo; use read_file/find_text/write_file/replace_file/edit_file. Shell e apenas para executar comandos.";
+    let system_base = "Voce e o c2h, um agente de codigo em terminal. Responda de forma curta, pratica e em portugues. Nao escreva preambulo. Se a tarefa for criar arquivo, chame write_file/new_component imediatamente. So responda em texto depois do resultado da ferramenta. Use as ferramentas para listar, ler, buscar e escrever arquivos. Se nao souber o caminho exato, chame list_dir antes de read_file; nunca invente nome de arquivo. Leia cada arquivo uma vez e use start/end; nao releia arquivo inalterado. Se o pedido for um plano, faca no maximo 3 leituras e responda o plano; nao explore o repo inteiro. Quando o usuario pedir para criar algo, chame write_file. Para arquivo existente, chame replace_file; nunca use remove_file para editar. O W5H2 deve ser teleologico: what e a responsabilidade, why e o proposito/causa tecnica, how e o mecanismo. Nao pergunte ao usuario sem necessidade: so pare para decisao de produto, acao destrutiva ou ambiguidade real; caso contrario continue com ferramentas. Nao invente arquivos ou APIs. NUNCA use shell para ler codigo (type/cat/findstr/grep/Get-Content) nem para redirecionar (>,>>) para arquivo de codigo; use read_file/find_text/write_file/replace_file/edit_file. Shell e apenas para executar comandos.";
     let mut historico: Vec<serde_json::Value> = Vec::new();
     let mut arquivo: Option<String> = None;
     let mut auto = yolo
@@ -4116,7 +4337,12 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
                 "\nComandos:\n  /pwd               diretorio atual\n  /ls [dir]          lista arquivos\n  /cd <dir>          muda de diretorio\n  /tree [n]          arvore do projeto\n  /read <f> [a:b]    le arquivo\n  /find <texto>      busca no projeto\n  /imports <f>       lista imports/links\n  /write <f> \"txt\"  cria arquivo com IA\n  /edit <f> \"txt\"   edita por blocos\n  /new component <n> scaffold HTML/CSS/JS\n  /rm <f>            remove com backup\n  /mv <a> <b>        move com backup\n  /preview <f>       abre HTML no navegador\n  /annotate <f>      descobre blocos com IA se vazio\n  /auto ou /yolo      ativa/desativa confirmacao de escrita
   /goal run <epic>    executa tarefas prontas do epic via bd
   /goal resume [id]   retoma goal; reabre in_progress orfas
+  /goal retro         retrospectiva do goal
   /goal status        mostra o goal mais recente
+  /premortem <f>      riscos antes de editar
+  /gotchas            lista gotchas
+  /gotcha search <t>  busca gotcha
+  /handoff            salva handoff da sessao
   /shell [on|off]     liga/desliga shell livre (padrao off)\n  /tools              lista ferramentas do agente\n  /file <f>          anexa contexto\n  /drop              remove arquivo ativo\n  /clear             limpa historico\n  /status            estado da sessao\n  /doctor            diagnostico do harness\n  /logs [n]          ultimos eventos da timeline (/log [n] idem)\n  /sair              encerra\n"
             );
             continue;
@@ -4166,10 +4392,39 @@ fn cmd_chat(yolo: bool) -> Result<(), String> {
             println!("{cwd}");
             continue;
         }
+        if entrada == "/gotchas" || entrada.starts_with("/gotcha search ") {
+            let termo = entrada.strip_prefix("/gotcha search ");
+            cmd_gotchas(&ws, termo.map(|t| t.trim()));
+            continue;
+        }
+        if entrada == "/handoff" {
+            cmd_handoff(&ws, &historico);
+            continue;
+        }
+        if entrada.starts_with("/premortem ") || entrada.starts_with("/pre-mortem ") {
+            let path = entrada.split_whitespace().nth(1).unwrap_or("").to_string();
+            if path.is_empty() {
+                println!("uso: /premortem <arquivo>");
+            } else {
+                let contexto = compilar_contexto(&ws, &path, Some(&path));
+                let system = format!("{system_base}\n\n{contexto}\n\nFaca um pre-mortem desta edicao. NAO edite. Liste: o que pode quebrar, que invariante esta em risco e que teste deveria rodar.");
+                let mut h = vec![
+                    serde_json::json!({"role":"user","content":format!("Pre-mortem antes de editar {path}.")}),
+                ];
+                if let Err(e) = executar_agente(&system, &mut h, &ws, auto) {
+                    println!("erro premortem: {e}");
+                }
+            }
+            continue;
+        }
         if entrada == "/goal" || entrada.starts_with("/goal ") {
             let resto = entrada.trim_start_matches("/goal").trim();
             if resto == "status" || resto.is_empty() {
                 cmd_goal_status(&ws);
+                continue;
+            }
+            if resto == "retro" {
+                cmd_goal_retro(&ws);
                 continue;
             }
             if let Some(id) = resto.strip_prefix("resume") {

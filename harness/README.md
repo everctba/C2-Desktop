@@ -567,6 +567,31 @@ $env:C2H_GOAL_RUNNER="0"
 O goal runner ainda e MVP futuro; a flag ja existe para o runner nao tentar
 operar sem a infra do bd.
 
+## Agent UX: retro, premortem, provenance, gotchas e handoff
+
+```text
+/goal retro        retrospectiva: tasks, falhas, cobertura, eventos
+/premortem <f>     riscos antes de editar (nao edita)
+/gotchas           lista gotchas recorrentes
+/gotcha search <t> busca gotcha
+/handoff           salva estado/decisoes/falhas/proximos passos
+```
+
+Toda resposta final com tools mostra:
+
+```text
+FONTES DO TURNO:
+- read_file: src/index.js (1-120)
+- run_test: smoke-live
+```
+
+Quando uma task falha 2x no goal, um gotcha e gravado em
+`.c2h/gotchas.jsonl`. Retro e salva em `.c2h/goals/<goal>.retro.md`; handoff em
+`.c2h/handoffs/<ts>.md`.
+
+O system prompt inclui ask-only-when-blocked: nao perguntar ao usuario sem
+decisao de produto, acao destrutiva ou ambiguidade real.
+
 ## Tools de ambiente
 
 ```json
