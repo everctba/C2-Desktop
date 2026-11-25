@@ -592,6 +592,49 @@ Quando uma task falha 2x no goal, um gotcha e gravado em
 O system prompt inclui ask-only-when-blocked: nao perguntar ao usuario sem
 decisao de produto, acao destrutiva ou ambiguidade real.
 
+## Composicao por bloco
+
+Cada bloco aceita `meta` opcional:
+
+```json
+{
+  "geometry": {"layer":"core","domain":"document","entrypoint":false},
+  "topology": {"depends_on":[],"used_by":[],"contains":[],"shared_state":[],"runtime_deps":[]},
+  "composition": {"unit":"doc","role":"public-api","boundary":"module","public":true},
+  "constraints": [{"kind":"must_not","text":"...","evidence":["doc.js:58"]}],
+  "evaluation": {"checks":["test:smoke-doc"],"weight":3,"tolerance":"byte-exact","feedback":"","metric":""}
+}
+```
+
+Geometria (layer/domain/entrypoint), `runtime_deps` e `contains` sao inferidos
+no `annotate`; o resto pode ser preenchido por `annotate_blocks.meta`.
+
+Tools read-only:
+
+```json
+{"name":"block_graph","arguments":{"path":"src/core/a.rs"}}
+{"name":"quality_report","arguments":{}}
+```
+
+`block_graph` retorna meta + quality por bloco. `quality_report` agrega score
+medio, blocos sem constraint/evaluation e os 10 piores.
+
+Quality score:
+
+```text
+why de consequencia +30
+what +10
+constraints +15
+evaluation.checks +15
+topologia +10
+geometry +5
+confidence high +5
+verified_by != none +10
+composition.unit +5
+```
+
+O contexto mostra `[layer:core domain:document]` quando disponivel.
+
 ## Tools de ambiente
 
 ```json

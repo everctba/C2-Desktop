@@ -151,6 +151,114 @@ fn verified_default() -> String {
     "none".to_string()
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockGeometry {
+    #[serde(default)]
+    layer: String,
+    #[serde(default)]
+    domain: String,
+    #[serde(default)]
+    entrypoint: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockTopology {
+    #[serde(default)]
+    depends_on: Vec<String>,
+    #[serde(default)]
+    used_by: Vec<String>,
+    #[serde(default)]
+    contains: Vec<String>,
+    #[serde(default)]
+    shared_state: Vec<String>,
+    #[serde(default)]
+    runtime_deps: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockComposition {
+    #[serde(default)]
+    unit: String,
+    #[serde(default)]
+    role: String,
+    #[serde(default)]
+    boundary: String,
+    #[serde(default)]
+    public: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockConstraint {
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    text: String,
+    #[serde(default)]
+    evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockEvaluation {
+    #[serde(default)]
+    checks: Vec<String>,
+    #[serde(default)]
+    weight: u32,
+    #[serde(default)]
+    tolerance: String,
+    #[serde(default)]
+    feedback: String,
+    #[serde(default)]
+    metric: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct BlockMeta {
+    #[serde(default)]
+    geometry: BlockGeometry,
+    #[serde(default)]
+    topology: BlockTopology,
+    #[serde(default)]
+    composition: BlockComposition,
+    #[serde(default)]
+    constraints: Vec<BlockConstraint>,
+    #[serde(default)]
+    evaluation: BlockEvaluation,
+}
+
+fn geometria_heuristica(path: &str) -> BlockGeometry {
+    let p = path.to_lowercase().replace('\\', "/");
+    let layer = if p.contains("/test") || p.contains("/tests") || p.ends_with("_test.rs") {
+        "test"
+    } else if p.contains("/tool") || p.contains("/cli") || p.contains("/bin/") {
+        "tool"
+    } else if p.contains("/core") || p.contains("/lib/") {
+        "core"
+    } else if p.contains("/ui") || p.contains("/view") || p.contains("/component") {
+        "ui"
+    } else {
+        "app"
+    };
+    let domain = Path::new(path)
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("root")
+        .to_string();
+    let nome = Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    let entrypoint = matches!(
+        nome,
+        "main.rs" | "lib.rs" | "mod.rs" | "index.js" | "index.ts" | "server.js"
+    );
+    BlockGeometry {
+        layer: layer.to_string(),
+        domain,
+        entrypoint,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SidecarBlock {
     id: String,
@@ -175,6 +283,8 @@ struct SidecarBlock {
     w5h2: W5h2,
     #[serde(default)]
     evidence: Vec<String>,
+    #[serde(default)]
+    meta: BlockMeta,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -620,14 +730,16 @@ fn ferramentas() -> serde_json::Value {
         {"type":"function","function":{"name":"bd","description":"Executa o binario bd (beads) no root do projeto, sem shell. Subcomandos de escrita pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do bd, por exemplo [\"ready\"] ou [\"create\",\"titulo\"]"}},"required":["args"]}}},
         {"type":"function","function":{"name":"shell","description":"PERIGO: executa comando de shell no root. Use apenas para testes/build/git; NAO leia codigo com type/cat/findstr/grep nem redirecione > para codigo. Pede confirmacao, exceto em YOLO.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"comando completo"},"timeout_seconds":{"type":"integer","description":"timeout em segundos; padrao 60"}},"required":["command"]}}},
         {"type":"function","function":{"name":"git","description":"Executa o binario git instalado, sem shell, no root do projeto. Leitura automatica; clone/pull/commit/etc pedem confirmacao.","parameters":{"type":"object","properties":{"args":{"type":"array","items":{"type":"string"},"description":"argumentos do git, ex: [\"status\"] ou [\"clone\",\"--depth\",\"1\",\"https://...\",\"destino\"]"}},"required":["args"]}}},
-        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"path":{"type":"string"},"start_line":{"type":"integer"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["what","why"]}}},"required":["blocks"]}}},
+        {"type":"function","function":{"name":"annotate_blocks","description":"Atualiza o W5H2 de blocos existentes SEM alterar codigo. Use why teleologico: proposito/causa/consequencia, nao mecanica.","parameters":{"type":"object","properties":{"blocks":{"type":"array","items":{"type":"object","properties":{"block_id":{"type":"string"},"path":{"type":"string"},"start_line":{"type":"integer"},"what":{"type":"string"},"why":{"type":"string"},"goal":{"type":"string"},"business_logic":{"type":"string"},"when":{"type":"string"},"where":{"type":"string"},"who":{"type":"string"},"how":{"type":"string"},"how_much":{"type":"string"},"risk":{"type":"string","enum":["high","medium","low"]},"confidence":{"type":"string","enum":["high","medium","low"]},"verified_by":{"type":"string"},"meta":{"type":"object"},"evidence":{"type":"array","items":{"type":"string"}}},"required":["what","why"]}}},"required":["blocks"]}}},
         {"type":"function","function":{"name":"goal_status","description":"Mostra o goal ativo: objetivo, epic, status, tarefa atual, iteracoes e falhas.","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"goal_tasks","description":"Lista tarefas do goal/epic com status e readiness.","parameters":{"type":"object","properties":{"status":{"type":"string","enum":["open","closed","all"],"description":"open (padrao), closed ou all"},"ready":{"type":"boolean","description":"somente prontas"}}}}},
         {"type":"function","function":{"name":"goal_next","description":"Mostra a proxima tarefa pronta do goal.","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"goal_context","description":"Contexto do goal ativo e da tarefa atual, com eventos recentes.","parameters":{"type":"object","properties":{}}}},
         {"type":"function","function":{"name":"goal_events","description":"Eventos recentes do goal ativo.","parameters":{"type":"object","properties":{"limit":{"type":"integer","description":"padrao 10, max 100"}}}}},
         {"type":"function","function":{"name":"time_info","description":"Retorna data/hora local, UTC, epoch, timezone e offset.","parameters":{"type":"object","properties":{}}}},
-        {"type":"function","function":{"name":"system_info","description":"Retorna SO/versao, CPU, memoria, discos e GPU/VRAM (read-only).","parameters":{"type":"object","properties":{"section":{"type":"string","enum":["all","os","cpu","memory","disk","gpu"],"description":"padrao all"}}}}}
+        {"type":"function","function":{"name":"system_info","description":"Retorna SO/versao, CPU, memoria, discos e GPU/VRAM (read-only).","parameters":{"type":"object","properties":{"section":{"type":"string","enum":["all","os","cpu","memory","disk","gpu"],"description":"padrao all"}}}}},
+        {"type":"function","function":{"name":"block_graph","description":"Retorna geometria/topologia/composicao/restricoes/avaliacao/quality de um bloco.","parameters":{"type":"object","properties":{"path":{"type":"string"},"block_id":{"type":"string"}},"required":["path"]}}},
+        {"type":"function","function":{"name":"quality_report","description":"Relatorio de qualidade dos blocos: score, sem constraint, sem evaluation, low.","parameters":{"type":"object","properties":{}}}}
     ]);
     if !SHELL_ENABLED.load(Ordering::Relaxed) {
         if let Some(lista) = tools.as_array_mut() {
@@ -1430,6 +1542,12 @@ fn texto_ler(ws: &Workspace, args: &serde_json::Value) -> Result<String, String>
                         bloco.w5h2.what,
                         bloco.w5h2.why
                     );
+                    if !bloco.meta.geometry.layer.is_empty() {
+                        linha.push_str(&format!(
+                            " [layer:{} domain:{}]",
+                            bloco.meta.geometry.layer, bloco.meta.geometry.domain
+                        ));
+                    }
                     if !bloco.w5h2.goal.trim().is_empty() {
                         linha.push_str(&format!(" — goal: {}", bloco.w5h2.goal));
                     }
@@ -1981,6 +2099,16 @@ fn resolver_block_id(
     ))
 }
 
+type BlockUpdate = (
+    String,
+    W5h2,
+    Vec<String>,
+    String,
+    String,
+    String,
+    Option<BlockMeta>,
+);
+
 fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> {
     let lista = args
         .get("blocks")
@@ -1990,7 +2118,7 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
         return Err("blocks vazio".to_string());
     }
     let mut sidecars = sidecars_do_projeto();
-    let mut updates: Vec<(String, W5h2, Vec<String>, String, String, String)> = Vec::new();
+    let mut updates: Vec<BlockUpdate> = Vec::new();
     let mut erros = Vec::new();
     for item in lista {
         let id_bruto = item.get("block_id").and_then(|v| v.as_str()).unwrap_or("");
@@ -2075,14 +2203,17 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
             .and_then(|v| v.as_str())
             .unwrap_or("none")
             .to_string();
-        updates.push((id.to_string(), w5h2, ev, risk, confidence, verified));
+        let meta = item
+            .get("meta")
+            .and_then(|m| serde_json::from_value::<BlockMeta>(m.clone()).ok());
+        updates.push((id.to_string(), w5h2, ev, risk, confidence, verified, meta));
     }
     if !erros.is_empty() {
         return Err(format!("annotate_blocks rejeitado:\n{}", erros.join("\n")));
     }
     let mut total = 0usize;
     for side in &mut sidecars {
-        for (id, w5h2, ev, risk, confidence, verified) in &updates {
+        for (id, w5h2, ev, risk, confidence, verified, meta) in &updates {
             if let Some(bloco) = side.blocks.iter_mut().find(|b| &b.id == id) {
                 bloco.w5h2 = w5h2.clone();
                 if !ev.is_empty() {
@@ -2092,6 +2223,9 @@ fn executar_annotate_blocks(args: &serde_json::Value) -> Result<String, String> 
                 bloco.risk = risk.clone();
                 bloco.confidence = confidence.clone();
                 bloco.verified_by = verified.clone();
+                if let Some(m) = meta {
+                    bloco.meta = m.clone();
+                }
                 total += 1;
             }
         }
@@ -2537,6 +2671,98 @@ fn ferramenta_system_info(args: &serde_json::Value) -> Result<String, String> {
     }
 }
 
+fn qualidade_bloco(b: &SidecarBlock) -> u32 {
+    let mut q = 0u32;
+    if why_tem_consequencia(&b.w5h2.why) {
+        q += 30;
+    }
+    if !b.w5h2.what.trim().is_empty() {
+        q += 10;
+    }
+    if !b.meta.constraints.is_empty() {
+        q += 15;
+    }
+    if !b.meta.evaluation.checks.is_empty() {
+        q += 15;
+    }
+    if !b.meta.topology.depends_on.is_empty()
+        || !b.meta.topology.used_by.is_empty()
+        || !b.meta.topology.contains.is_empty()
+    {
+        q += 10;
+    }
+    if !b.meta.geometry.layer.is_empty() && !b.meta.geometry.domain.is_empty() {
+        q += 5;
+    }
+    if b.confidence == "high" {
+        q += 5;
+    }
+    if b.verified_by != "none" {
+        q += 10;
+    }
+    if !b.meta.composition.unit.trim().is_empty() {
+        q += 5;
+    }
+    q.min(100)
+}
+
+fn ferramenta_block_graph(ws: &Workspace, args: &serde_json::Value) -> Result<String, String> {
+    let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+    let id = args.get("block_id").and_then(|v| v.as_str());
+    let side = ler_sidecar(Path::new(&ws.rel(&ws.resolver(path, true)?)))
+        .ok_or_else(|| format!("sem sidecar para {path}"))?;
+    let blocos: Vec<_> = side
+        .blocks
+        .iter()
+        .filter(|b| id.map(|i| b.id == i).unwrap_or(true))
+        .map(|b| {
+            serde_json::json!({
+                "id": b.id,
+                "kind": b.kind,
+                "lines": [b.start_line, b.end_line],
+                "quality": qualidade_bloco(b),
+                "meta": b.meta,
+                "confidence": b.confidence,
+                "verified_by": b.verified_by,
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({"file": side.file, "blocks": blocos}).to_string())
+}
+
+fn ferramenta_quality_report(_ws: &Workspace) -> Result<String, String> {
+    let mut total = 0usize;
+    let mut soma = 0u32;
+    let mut sem_constraint = 0usize;
+    let mut sem_evaluation = 0usize;
+    let mut baixos = Vec::new();
+    for side in sidecars_do_projeto() {
+        for b in &side.blocks {
+            let q = qualidade_bloco(b);
+            total += 1;
+            soma += q;
+            if b.meta.constraints.is_empty() {
+                sem_constraint += 1;
+            }
+            if b.meta.evaluation.checks.is_empty() {
+                sem_evaluation += 1;
+            }
+            if q < 50 {
+                baixos.push(serde_json::json!({"id": b.id, "quality": q, "why": b.w5h2.why.chars().take(120).collect::<String>()}));
+            }
+        }
+    }
+    baixos.sort_by_key(|v| v.get("quality").and_then(|q| q.as_u64()).unwrap_or(0));
+    Ok(serde_json::json!({
+        "blocks": total,
+        "avg_quality": soma.checked_div(total as u32).unwrap_or(0) as usize,
+        "missing_constraints": sem_constraint,
+        "missing_evaluation": sem_evaluation,
+        "low_quality": baixos.into_iter().take(10).collect::<Vec<_>>(),
+    })
+    .to_string())
+}
+
 fn executar_ferramenta(
     ws: &Workspace,
     auto: bool,
@@ -2583,6 +2809,8 @@ fn executar_ferramenta(
         "goal_events" => ferramenta_goal_events(ws, &args),
         "time_info" => ferramenta_time_info(),
         "system_info" => ferramenta_system_info(&args),
+        "block_graph" => ferramenta_block_graph(ws, &args),
+        "quality_report" => ferramenta_quality_report(ws),
         outro => Err(format!("ferramenta desconhecida: {outro}")),
     };
     log_evento(
@@ -5763,6 +5991,10 @@ fn anotar_blocos_ia(file: &Path) -> Result<bool, String> {
                                 .to_string(),
                         },
                         evidence: vec![format!("{}:{}", rel_file(file), start)],
+                        meta: BlockMeta {
+                            geometry: geometria_heuristica(&rel_file(file)),
+                            ..BlockMeta::default()
+                        },
                     });
                 }
                 if let Some(erro_msg) = erro {
@@ -5844,6 +6076,7 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 semantic_hash: bloco.semantic_hash.clone(),
                 w5h2: old.w5h2.clone(),
                 evidence: old.evidence.clone(),
+                meta: old.meta.clone(),
             }
         } else {
             SidecarBlock {
@@ -5861,11 +6094,31 @@ fn cmd_annotate(file: &Path, dry_run: bool) -> Result<(), String> {
                 semantic_hash: bloco.semantic_hash.clone(),
                 w5h2: W5h2::default(),
                 evidence: Vec::new(),
+                meta: BlockMeta {
+                    geometry: geometria_heuristica(&rel_file(file)),
+                    ..BlockMeta::default()
+                },
             }
         };
         novos.push(side);
     }
-    let source_hash = hash(&fs::read_to_string(file).unwrap_or_default());
+    let texto_atual = fs::read_to_string(file).unwrap_or_default();
+    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let deps = importacoes(&texto_atual, ext);
+    let ranges: Vec<(usize, usize, String)> = novos
+        .iter()
+        .map(|b| (b.start_line, b.end_line, b.id.clone()))
+        .collect();
+    for i in 0..novos.len() {
+        novos[i].meta.topology.runtime_deps = deps.clone();
+        let (s, e, id) = &ranges[i];
+        for (os, oe, oid) in &ranges {
+            if oid != id && os <= s && oe >= e && (os < s || oe > e) {
+                novos[i].meta.topology.contains.push(oid.clone());
+            }
+        }
+    }
+    let source_hash = hash(&texto_atual);
     let sidecar = Sidecar {
         schema_version: SCHEMA_VERSION,
         contract_version: CONTRACT_VERSION,
